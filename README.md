@@ -25,3 +25,14 @@ navigation; authority travels in grants, and a project that keeps spec and
 code in one repository is reviewed identically.
 
 Topic: `xf-project-openxdox`.
+
+## Posture
+
+Contributing guidelines and the code of conduct for the `openXdox` project
+live in the assembly root, not here:
+[CONTRIBUTING.md](https://github.com/opensoft/openXdox/blob/main/CONTRIBUTING.md)
+and
+[CODE_OF_CONDUCT.md](https://github.com/opensoft/openXdox/blob/main/CODE_OF_CONDUCT.md).
+
+Security reports for this repository go through [SECURITY.md](SECURITY.md).
+
