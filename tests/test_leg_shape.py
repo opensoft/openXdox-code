@@ -28,14 +28,17 @@ REQUIRED_FILES = [
 @pytest.mark.parametrize("relpath", REQUIRED_FILES)
 def test_required_file_exists(relpath: str) -> None:
     path = ROOT / relpath
-    assert path.is_file(), f"{relpath} is missing at the repository root"
+    assert path.is_file(), f"required posture file {relpath!r} is missing"
 
 
 def test_license_is_apache_2_0() -> None:
     text = (ROOT / "LICENSE").read_text(encoding="utf-8")
     assert "Apache License" in text
+    assert "Version 2.0" in text
 
 
 def test_role_directory_exists() -> None:
-    # This leg's role, per project.yaml's `legs[].role: code`, is `src/`.
+    # This leg's role, per the assembly root's project.yaml (`legs[].role:
+    # code`), is `src/`. project.yaml itself lives in the assembly root
+    # (opensoft/openXdox), not in this leg.
     assert (ROOT / "src").is_dir()
