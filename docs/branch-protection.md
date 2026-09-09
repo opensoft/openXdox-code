@@ -4,9 +4,9 @@ Closes item 1.5 of `openxFactory openspec/changes/split-opendox-two-layer-produc
 for this repository: *"Branch-protection ruleset created in EVALUATE mode in
 each, promoted to ACTIVE once its required check has reported once."*
 
-Ruleset state is a repository setting, not a tree fact — nothing this
-repository's own checks can read asserts it — so this file is the evidence
-line 1.5 asks for.
+Ruleset state is a repository setting, not a tree fact: no check this
+repository runs can read it, let alone assert it. This file is therefore the
+evidence line 1.5 asks for.
 
 It is added by the **OQ-O scaffold-levelling pass** (`opensoft/openxFactory#656`,
 RULING of 2026-09-09: *"level the six scaffolds first, one small PR per repo"*).
@@ -55,8 +55,8 @@ pass.
 
 ## One difference from the openDox family, RECORDED rather than changed
 
-`strict_required_status_checks_policy` is **`true`** on all three `openxdox`
-rulesets and **`false`** on all three `opendox` rulesets. Strict means a pull
+`strict_required_status_checks_policy` is **`true`** on all three openXdox-family
+rulesets and **`false`** on all three openDox-family rulesets. Strict means a pull
 request must be **up to date with `main`** before it can merge, so a branch
 opened here needs a merge-from-`main` if anything lands first.
 
