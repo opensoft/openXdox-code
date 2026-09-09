@@ -3,10 +3,17 @@ name: validate
 # The required check for this leg: parity with the assembly root's own
 # `validate` gate (same name, same triggers) — a pytest suite proving the leg
 # shape.
+#
+# Levelled against openDox-code by the OQ-O scaffold-levelling pass
+# (openxFactory#656): same pinned pytest major, same least-privilege
+# `permissions:` block.
 
 on:
   pull_request:
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   validate:
@@ -18,8 +25,11 @@ jobs:
         with:
           python-version: '3.12'
 
+      # PINNED to a pytest MAJOR, levelled against openDox-code (OQ-O): an
+      # unpinned major is how a suite goes red for a reason that has nothing
+      # to do with the change under test.
       - name: install pytest
-        run: python -m pip install pytest
+        run: python -m pip install "pytest>=8,<9"
 
       - name: pytest
         run: python -m pytest -q
