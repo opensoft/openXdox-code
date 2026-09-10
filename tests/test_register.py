@@ -9,7 +9,7 @@ import textwrap
 
 from conftest import BASE_REPO  # noqa: F401  (sys.path side effect)
 
-from ideation_dashboard.register import (
+from openxdox.register import (
     POSSIBLES_REGISTER_KEY, TOPIC_ENTRIES_KEY,
     CrossReferenceIndexAdapter, ProjectRegisterAdapter,
 )

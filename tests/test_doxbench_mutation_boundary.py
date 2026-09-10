@@ -60,10 +60,10 @@ STATE_JS = (
     / "doxbench-state.js"
 )
 VIEWER_JS = (
-    REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "views" / "viewer.js"
+    REPO_ROOT / "src" / "openxdox" / "web" / "views" / "viewer.js"
 )
 VENDOR_MARKDOWN_JS = (
-    REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "vendor" / "markdown-it.min.js"
+    REPO_ROOT / "src" / "openxdox" / "web" / "vendor" / "markdown-it.min.js"
 )
 NODE = shutil.which("node")
 
@@ -484,16 +484,16 @@ import yaml  # noqa: E402
 
 from session_fixtures import GATE_RECORDS_PREFIX  # noqa: E402
 
-from ideation_dashboard import branch_session as bs  # noqa: E402
-from ideation_dashboard import doxbench_hash as dh  # noqa: E402
-from ideation_dashboard import gate_console as gc  # noqa: E402
-from ideation_dashboard import session_git as sg  # noqa: E402
-from ideation_dashboard import snapshot_registry as reg  # noqa: E402
-from ideation_dashboard.boundary import HumanGate  # noqa: E402
-from ideation_dashboard.generator import generate_snapshot  # noqa: E402
+from opendox import branch_session as bs  # noqa: E402
+from opendox import doxbench_hash as dh  # noqa: E402
+from openxdox import gate_console as gc  # noqa: E402
+from opendox import session_git as sg  # noqa: E402
+from openxdox import snapshot_registry as reg  # noqa: E402
+from opendox.boundary import HumanGate  # noqa: E402
+from openxdox.generator import generate_snapshot  # noqa: E402
 
 SAVE_JS = (
-    REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "views" / "doxbench-save.js"
+    REPO_ROOT / "src" / "openxdox" / "web" / "views" / "doxbench-save.js"
 )
 
 TOPIC = "demo-topic"

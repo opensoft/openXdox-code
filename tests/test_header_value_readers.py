@@ -15,8 +15,8 @@ test that fails when IT ALONE is reverted.
 from __future__ import annotations
 
 from doc_health import corpus
-from ideation_dashboard import authoring
-from ideation_dashboard import generator
+from opendox import authoring
+from openxdox import generator
 
 
 _EXOTIC = "\x0b\x0c\x1c\x1d\x1e\x85" + chr(0x2028) + chr(0x2029)

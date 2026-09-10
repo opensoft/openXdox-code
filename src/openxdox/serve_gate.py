@@ -37,13 +37,10 @@ import sys
 import traceback
 from pathlib import Path
 
-_SCRIPTS_DIR = Path(__file__).resolve().parent.parent
-if str(_SCRIPTS_DIR) not in sys.path:  # plain-script parity with serve.py (D12)
-    sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import route_extension  # noqa: E402
 
-from ideation_dashboard.serve_wire import (  # noqa: E402
+from opendox.serve_wire import (  # noqa: E402
     AGENT_INVOCATION_REFUSAL,
     DOXBENCH_ERR_REQUEST_LIMIT_EXCEEDED,
     DOXBENCH_MAX_REQUEST_BYTES,
@@ -82,8 +79,8 @@ class GateRoutes:
                                   "message": "gate actions unavailable "
                                              "(no resolved actor/checkout)"})
             return
-        from ideation_dashboard import gate_console
-        from ideation_dashboard import gate_routes
+        from openxdox import gate_console
+        from openxdox import gate_routes
         # The console-presence test, run ONCE for every verb — a pure read of this
         # request's own headers, with no side effect. It answers two questions that
         # used to be one:

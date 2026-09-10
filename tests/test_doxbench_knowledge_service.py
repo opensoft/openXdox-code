@@ -28,11 +28,11 @@ from conftest import (  # noqa: F401  (sys.path side effect)
     BASE_REPO, REPO_ROOT, serve_surface_source,
 )
 
-from ideation_dashboard import doxbench_knowledge as kn  # noqa: E402
-from ideation_dashboard import doxbench_packet as pk  # noqa: E402
-from ideation_dashboard import doxbench_telemetry as tel  # noqa: E402
-from ideation_dashboard import serve as serve_mod  # noqa: E402
-from ideation_dashboard.doxbench_scope import ScopeKey  # noqa: E402
+from opendox import doxbench_knowledge as kn  # noqa: E402
+from opendox import doxbench_packet as pk  # noqa: E402
+from opendox import doxbench_telemetry as tel  # noqa: E402
+from opendox import serve as serve_mod  # noqa: E402
+from openxdox.doxbench_scope import ScopeKey  # noqa: E402
 
 from test_doxbench_routes import (  # noqa: E402
     CHAT_ROUTE, OUTLINE_PATH, _assert_refusal, _capabilities, _catalog,
@@ -124,8 +124,8 @@ def test_the_index_is_built_only_from_CONFINED_sources(tmp_path):
                   knowledge_declaration=kn.SELF_HOSTED_LOCAL_EMBEDDED
                   ) as (httpd, _host, _port):
         handler = _handler_class(httpd)
-        from ideation_dashboard.doxbench_scope import ScopeKey, resolve_scope
-        from ideation_dashboard.generator import generate_snapshot
+        from openxdox.doxbench_scope import ScopeKey, resolve_scope
+        from openxdox.generator import generate_snapshot
         from conftest import BASE_REPO, PINNED_REVISION, FakeGit
 
         snapshot = generate_snapshot(BASE_REPO, "fixture-repo",
@@ -925,7 +925,7 @@ def test_the_evidence_revision_is_stated_on_a_real_route(tmp_path):
 
 
 def _prompt_bytes(port) -> int:
-    from ideation_dashboard.doxbench_hash import utf8_size
+    from opendox.doxbench_hash import utf8_size
 
     return sum(utf8_size(section.text)
                for section in port.dispatched[0].sections)
@@ -1043,7 +1043,7 @@ def test_non_evidence_over_the_remaining_budget_refuses_via_the_409_arm(
         return pk.assemble_packet(**{**kwargs, "max_packet_bytes": 10,
                                      "knowledge": None})
 
-    from ideation_dashboard import doxbench_threads as dt
+    from opendox import doxbench_threads as dt
 
     def _with_a_big_thread(**kwargs):
         scope = kwargs["scope"]
@@ -1123,7 +1123,7 @@ def test_a_usage_record_cannot_be_built_with_a_placeholder_metering_field():
     """The absence is structural: `client`, `domain`, `bill_to` and the
     subject reference accept ONLY a declared absence, so a later caller
     cannot quietly fill one in."""
-    from ideation_dashboard.doxbench_scope import ScopeKey
+    from openxdox.doxbench_scope import ScopeKey
 
     scope = ScopeKey(repository="fixture-repo", ref="main", tile_kind="staged",
                      tile_id="ideation-governance")

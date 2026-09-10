@@ -37,13 +37,13 @@ import yaml
 
 from conftest import BASE_REPO
 
-from ideation_dashboard import actor_identity as actor_mod
-from ideation_dashboard import cli as cli_mod
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import kickoff as ko
-from ideation_dashboard import record_binding as rb
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard.boundary import DOCUMENT_ESCAPE, BoundaryViolation, HumanGate
+from opendox import actor_identity as actor_mod
+from opendox import cli as cli_mod
+from openxdox import gate_console as gc
+from openxdox import kickoff as ko
+from openxdox import record_binding as rb
+from opendox import serve as serve_mod
+from opendox.boundary import DOCUMENT_ESCAPE, BoundaryViolation, HumanGate
 
 CHANGE = "add-ideation-governance"
 DOC = f"openspec/changes/{CHANGE}/proposal.md"

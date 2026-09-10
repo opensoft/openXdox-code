@@ -45,17 +45,17 @@ import yaml
 from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit, find_openxfactory_validator
 
 from doc_health import families
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import record_binding as rb
-from ideation_dashboard import round_trip
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard.boundary import (
+from openxdox import gate_console as gc
+from openxdox import record_binding as rb
+from openxdox import round_trip
+from opendox import serve as serve_mod
+from opendox.boundary import (
     AGENT, GATE_SIDE_EFFECT, BoundaryViolation, HumanGate, OutputBoundary,
 )
-from ideation_dashboard.generator import generate_snapshot
+from openxdox.generator import generate_snapshot
 
 VALIDATOR = find_openxfactory_validator()
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 GATE_JS = WEB / "views" / "gate.js"
 NODE = shutil.which("node")
 CHANGE = "add-ideation-governance"

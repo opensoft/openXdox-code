@@ -46,11 +46,11 @@ import pytest
 from conftest import BASE_REPO, PINNED_REVISION
 
 from doc_health import corpus
-from ideation_dashboard import cli as cli_mod
-from ideation_dashboard import corpus_root as corpus_root_mod
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard import snapshot as snapshot_mod
-from ideation_dashboard.corpus_root import (
+from opendox import cli as cli_mod
+from openxdox import corpus_root as corpus_root_mod
+from opendox import serve as serve_mod
+from openxdox import snapshot as snapshot_mod
+from openxdox.corpus_root import (
     SCANNED_ROOTS, corpus_root_refusal, corpus_scan_defect,
 )
 
@@ -170,7 +170,7 @@ def test_the_refusal_names_the_resolved_path_what_it_wanted_and_a_correct_shape(
         assert f"{root}/" in err
     assert "SERVED CHECKOUT" in err
     assert "namespace" in err          # the T092 cause, named
-    assert "python3 scripts/ideation_dashboard/cli.py generate-and-open" in err
+    assert "python3 src/opendox/cli.py generate-and-open" in err
     assert "--repo-root <path to the corpus checkout>" in err
     # and it hardcodes nobody's filesystem: no home directory, no container path
     for leak in ("/home/", "/root/", "/srv/", "/workspace/", "/Users/"):
@@ -312,7 +312,7 @@ def test_serve_refuses_a_checkout_root_that_cannot_be_a_checkout(
     assert served == [], "a refused --checkout-root must start no server"
     assert "--checkout-root is not a corpus checkout" in err
     assert "/nonexistent/openxFactory" in err
-    assert "python3 scripts/ideation_dashboard/serve.py" in err
+    assert "python3 src/opendox/serve.py" in err
 
 
 def test_serve_still_serves_the_hosted_empty_sentinel_but_says_what_is_off(

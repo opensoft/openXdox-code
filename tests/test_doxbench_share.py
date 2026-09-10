@@ -33,15 +33,15 @@ from conftest import (FORBIDDEN_PUSH_TOKENS,
                       find_openxfactory_validator)
 from session_fixtures import FakePullRequests, build_scratch_repo
 
-from ideation_dashboard import branch_session as bs
-from ideation_dashboard import doxbench_hash as dh
-from ideation_dashboard import doxbench_threads as dt
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import gate_routes as gr
-from ideation_dashboard import session_git as sg
-from ideation_dashboard import session_pr
-from ideation_dashboard import snapshot_registry as reg
-from ideation_dashboard.generator import generate_snapshot
+from opendox import branch_session as bs
+from opendox import doxbench_hash as dh
+from opendox import doxbench_threads as dt
+from openxdox import gate_console as gc
+from openxdox import gate_routes as gr
+from opendox import session_git as sg
+from opendox import session_pr
+from openxdox import snapshot_registry as reg
+from openxdox.generator import generate_snapshot
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TOPIC = "demo-topic"

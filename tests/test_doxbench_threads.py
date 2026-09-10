@@ -21,10 +21,10 @@ import pytest
 from conftest import REPO_ROOT  # noqa: F401  (sys.path side effect)
 from session_fixtures import GATE_RECORDS_PREFIX  # noqa: E402
 
-from ideation_dashboard import doxbench_threads as dt  # noqa: E402
-from ideation_dashboard import doxbench_turns as dtu  # noqa: E402
-from ideation_dashboard import gate_routes as gr  # noqa: E402
-from ideation_dashboard.boundary import (  # noqa: E402
+from opendox import doxbench_threads as dt  # noqa: E402
+from opendox import doxbench_turns as dtu  # noqa: E402
+from openxdox import gate_routes as gr  # noqa: E402
+from opendox.boundary import (  # noqa: E402
     OUTSIDE_ALLOWLIST, BoundaryViolation, HumanGate,
 )
 

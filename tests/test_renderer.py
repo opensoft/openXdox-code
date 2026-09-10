@@ -32,11 +32,11 @@ import pytest
 
 from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit  # noqa: F401
 
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard.cli import build_parser, cmd_generate_and_open
-from ideation_dashboard.generator import generate_snapshot
+from opendox import serve as serve_mod
+from opendox.cli import build_parser, cmd_generate_and_open
+from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 MODEL_JS = WEB / "views" / "model.js"
 VIEWER_JS = WEB / "views" / "viewer.js"
 VENDOR_MARKDOWN_JS = WEB / "vendor" / "markdown-it.min.js"
@@ -1073,8 +1073,8 @@ def test_doxbench_markdown_flows_only_through_the_sanitized_viewer_seam():
 # ---------------------------------------------------------------------------
 
 def test_every_constructed_doxbench_class_has_a_styles_rule():
-    views = REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "views"
-    styles = (REPO_ROOT / "scripts" / "ideation_dashboard" / "web" /
+    views = REPO_ROOT / "src" / "openxdox" / "web" / "views"
+    styles = (REPO_ROOT / "src" / "openxdox" / "web" /
               "styles.css").read_text(encoding="utf-8")
     import re
     constructed = set()

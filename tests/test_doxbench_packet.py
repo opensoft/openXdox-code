@@ -33,10 +33,10 @@ import pytest
 
 from conftest import REPO_ROOT  # noqa: F401  (sys.path side effect)
 
-from ideation_dashboard import doxbench_knowledge as kn  # noqa: E402
-from ideation_dashboard import doxbench_packet as pk  # noqa: E402
-from ideation_dashboard import doxbench_threads as dt  # noqa: E402
-from ideation_dashboard.doxbench_scope import (  # noqa: E402
+from opendox import doxbench_knowledge as kn  # noqa: E402
+from opendox import doxbench_packet as pk  # noqa: E402
+from opendox import doxbench_threads as dt  # noqa: E402
+from openxdox.doxbench_scope import (  # noqa: E402
     ScopeKey, ScopeProjection,
 )
 
@@ -289,7 +289,7 @@ def test_a_retrieved_document_never_becomes_a_loaded_buffer():
     assembler neither receives as mutable state nor returns: evidence lands in
     evidence sections and nowhere else, and the buffer sections of the assembled
     prompt still enumerate exactly the buffers the request supplied."""
-    from ideation_dashboard import doxbench_turns as dtu
+    from opendox import doxbench_turns as dtu
 
     loaded = (DOC_A,)
     packet = pk.assemble_packet(

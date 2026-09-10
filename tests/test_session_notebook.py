@@ -41,14 +41,14 @@ import pytest
 
 from session_fixtures import FakeNotebookAdapter, build_scratch_repo
 
-from ideation_dashboard import branch_session as bs
-from ideation_dashboard import cli as cli_mod
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard import session_git as sg
-from ideation_dashboard import snapshot_registry as reg
-from ideation_dashboard import workbench as wb
-from ideation_dashboard.generator import generate_snapshot
+from opendox import branch_session as bs
+from opendox import cli as cli_mod
+from openxdox import gate_console as gc
+from opendox import serve as serve_mod
+from opendox import session_git as sg
+from openxdox import snapshot_registry as reg
+from opendox import workbench as wb
+from openxdox.generator import generate_snapshot
 
 REPO = "openxFactory"
 RECORDS = gc.DEFAULT_RECORDS_DIR

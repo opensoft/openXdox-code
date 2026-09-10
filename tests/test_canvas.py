@@ -38,11 +38,11 @@ import pytest
 
 from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit, find_openxfactory_validator
 
-from ideation_dashboard import canvas_drafts as cd
-from ideation_dashboard.boundary import BoundaryViolation, OutputBoundary
-from ideation_dashboard.generator import generate_snapshot
+from opendox import canvas_drafts as cd
+from opendox.boundary import BoundaryViolation, OutputBoundary
+from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 CANVAS_MODEL_JS = WEB / "views" / "canvas-model.js"
 CANVAS_JS = WEB / "views" / "canvas.js"
 NODE = shutil.which("node")

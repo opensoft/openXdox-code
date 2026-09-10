@@ -37,11 +37,11 @@ import pytest
 from conftest import (BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit,
                       serve_surface_paths, serve_surface_source)
 
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard import snapshot_registry as reg
-from ideation_dashboard.generator import generate_snapshot
+from opendox import serve as serve_mod
+from openxdox import snapshot_registry as reg
+from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 MODEL_JS = WEB / "views" / "repo-selector-model.js"
 SERVE_PY = REPO_ROOT / "scripts" / "ideation_dashboard" / "serve.py"
 NODE = shutil.which("node")

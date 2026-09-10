@@ -39,6 +39,6 @@ from __future__ import annotations
 # live sessions from the worktrees and branches beside the checkout, exactly as
 # the CLI does, through the one bootstrap every session-bearing verb goes
 # through; openXdox owns the gate and commission loop that already depends on it.
-from .branch_session import bootstrap_sessions  # noqa: F401  (re-export)
+from opendox.branch_session import bootstrap_sessions  # noqa: F401  (re-export)
 
 __all__ = ["bootstrap_sessions"]

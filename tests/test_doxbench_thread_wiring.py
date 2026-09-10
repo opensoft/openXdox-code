@@ -36,11 +36,11 @@ from conftest import (  # noqa: F401  (sys.path side effect)
     BASE_REPO, REPO_ROOT, serve_surface_source,
 )
 
-from ideation_dashboard import doxbench_knowledge as kn  # noqa: E402
-from ideation_dashboard import doxbench_packet as pk  # noqa: E402
-from ideation_dashboard import doxbench_threads as dt  # noqa: E402
-from ideation_dashboard import serve as serve_mod  # noqa: E402
-from ideation_dashboard.doxbench_model import (  # noqa: E402
+from opendox import doxbench_knowledge as kn  # noqa: E402
+from opendox import doxbench_packet as pk  # noqa: E402
+from opendox import doxbench_threads as dt  # noqa: E402
+from opendox import serve as serve_mod  # noqa: E402
+from opendox.doxbench_model import (  # noqa: E402
     ModelCatalog, ModelCatalogEntry,
 )
 
@@ -538,12 +538,12 @@ def test_the_conversation_key_the_route_sends_carries_the_whole_scope(tmp_path):
 
         @staticmethod
         def conversation_key(scope, buffer_key):
-            from ideation_dashboard import doxbench_bridge as brg
+            from opendox import doxbench_bridge as brg
             return brg.OmpHarnessBridge.conversation_key(scope, buffer_key)
 
         @staticmethod
         def outline_conversation_key(scope):
-            from ideation_dashboard import doxbench_bridge as brg
+            from opendox import doxbench_bridge as brg
             return brg.OmpHarnessBridge.outline_conversation_key(scope)
 
         def for_conversation(self, conversation):
@@ -643,12 +643,12 @@ class _BindingPort:
 
     @staticmethod
     def conversation_key(scope, buffer_key):
-        from ideation_dashboard import doxbench_bridge as brg
+        from opendox import doxbench_bridge as brg
         return brg.OmpHarnessBridge.conversation_key(scope, buffer_key)
 
     @staticmethod
     def outline_conversation_key(scope):
-        from ideation_dashboard import doxbench_bridge as brg
+        from opendox import doxbench_bridge as brg
         return brg.OmpHarnessBridge.outline_conversation_key(scope)
 
     def for_conversation(self, conversation):
@@ -695,7 +695,7 @@ def test_an_OUTLINE_turn_binds_its_tiles_own_conversation_not_a_document(
                                      client_turn_id="turn-outline"))[0] == 200
     assert DOC_ALPHA in port.bound[0]
     assert port.bound[1] != port.bound[0]
-    from ideation_dashboard import doxbench_bridge as _brg
+    from opendox import doxbench_bridge as _brg
     assert _brg.OUTLINE_CONVERSATION_BUFFER in port.bound[1]
     assert DOC_ALPHA not in port.bound[1]
     # …and the OUTLINE turn wrote no sidecar of its own: a thread belongs to a
@@ -995,7 +995,7 @@ def test_every_section_KEY_a_source_can_carry_is_counted():
     and left out the SELECTED thread's fixed `selected_thread` — which is
     longer than `thread_state:`, so a selected-thread source undercounted its
     key bytes."""
-    from ideation_dashboard.doxbench_hash import utf8_size
+    from opendox.doxbench_hash import utf8_size
 
     # The three keys a packet source can contribute, and the widest of them.
     keys = (pk.PACKET_SECTION_SELECTED_THREAD, pk.THREAD_STATE_SECTION_PREFIX,
@@ -1043,7 +1043,7 @@ def test_the_rendered_prompt_stays_inside_the_ceiling_WITH_threads(tmp_path):
     The pre-slice flat reserve is what this would have caught: it charged
     nothing for the thread sections, so a turn near its ceiling was accepted and
     then dispatched a prompt over it."""
-    from ideation_dashboard.doxbench_hash import utf8_size
+    from opendox.doxbench_hash import utf8_size
 
     worktree = tmp_path / "worktree"
     worktree.mkdir()
@@ -1090,7 +1090,7 @@ def test_the_FLAT_reserve_really_was_too_small_for_the_shape_this_slice_makes(
         a turn at its ceiling and then dispatched a prompt past it;
       * it fits inside the reserve the route now computes from the turn's own
         refs, so the new arithmetic covers what it charges for."""
-    from ideation_dashboard.doxbench_hash import utf8_size
+    from opendox.doxbench_hash import utf8_size
 
     worktree = tmp_path / "worktree"
     worktree.mkdir()
@@ -1146,11 +1146,11 @@ def test_a_dirty_sidecar_rides_its_document_s_Save_as_ONE_commit(scratch_repo):
     and the thread joins the DECLARED path set the Save already commits — so a
     thread and the document text it discusses cannot land in separate commits.
     """
-    from ideation_dashboard import branch_session as bs
-    from ideation_dashboard import gate_routes as gr
-    from ideation_dashboard import session_git as sg
-    from ideation_dashboard import snapshot_registry as reg
-    from ideation_dashboard.generator import generate_snapshot
+    from opendox import branch_session as bs
+    from openxdox import gate_routes as gr
+    from opendox import session_git as sg
+    from openxdox import snapshot_registry as reg
+    from openxdox.generator import generate_snapshot
     from session_fixtures import GATE_RECORDS_PREFIX
 
     repo = scratch_repo
@@ -1188,7 +1188,7 @@ def test_a_dirty_sidecar_rides_its_document_s_Save_as_ONE_commit(scratch_repo):
     sidecar = dt.thread_path_for(document)
     assert sidecar in set(git.dirty_paths(worktree))
 
-    from ideation_dashboard import doxbench_hash as dh
+    from opendox import doxbench_hash as dh
     second = gr.execute_first_edit(
         git=git, session_registry=registry, repository=repo.repository,
         tile=tile, document=document, content="# Detail\n\nsecond\n",
@@ -1209,11 +1209,11 @@ def test_a_Save_with_no_thread_written_commits_exactly_what_it_always_did(
     """The seam is inert where no turn has written a sidecar: declaring a path
     that is not dirty would refuse every Save on a tile whose thread had not
     moved, so the filter is load-bearing rather than an optimisation."""
-    from ideation_dashboard import branch_session as bs
-    from ideation_dashboard import gate_routes as gr
-    from ideation_dashboard import session_git as sg
-    from ideation_dashboard import snapshot_registry as reg
-    from ideation_dashboard.generator import generate_snapshot
+    from opendox import branch_session as bs
+    from openxdox import gate_routes as gr
+    from opendox import session_git as sg
+    from openxdox import snapshot_registry as reg
+    from openxdox.generator import generate_snapshot
     from session_fixtures import GATE_RECORDS_PREFIX
 
     repo = scratch_repo
@@ -1262,11 +1262,11 @@ def _real_worktree_for(registry, key):
 
 
 def _open_a_real_session(repo):
-    from ideation_dashboard import branch_session as bs
-    from ideation_dashboard import gate_routes as gr
-    from ideation_dashboard import session_git as sg
-    from ideation_dashboard import snapshot_registry as reg
-    from ideation_dashboard.generator import generate_snapshot
+    from opendox import branch_session as bs
+    from openxdox import gate_routes as gr
+    from opendox import session_git as sg
+    from openxdox import snapshot_registry as reg
+    from openxdox.generator import generate_snapshot
     from session_fixtures import GATE_RECORDS_PREFIX
 
     snapshot_path = repo.root.parent / "main-snapshot.json"
@@ -1293,7 +1293,7 @@ def test_the_REAL_session_worktree_method_finds_a_live_session(scratch_repo):
     ADVISORY and "never the reason a session fails". It now asks the liveness
     authority the Save path itself trusts, and this drives the real thing
     against a real git session."""
-    from ideation_dashboard.doxbench_scope import ScopeKey
+    from openxdox.doxbench_scope import ScopeKey
 
     registry, ref = _open_a_real_session(scratch_repo)
     key = ScopeKey(repository=scratch_repo.repository, ref=ref,
@@ -1309,7 +1309,7 @@ def test_the_ADVISORY_markers_are_no_longer_the_predicate(scratch_repo):
     """The regression this fix exists for: a bootstrap-reconstructed entry
     carries neither `session_tile` nor `session_base`, and the old predicate
     silently lost every record on it. Liveness is unchanged by clearing them."""
-    from ideation_dashboard.doxbench_scope import ScopeKey
+    from openxdox.doxbench_scope import ScopeKey
 
     registry, ref = _open_a_real_session(scratch_repo)
     entry = registry.resolve(scratch_repo.repository, ref)
@@ -1331,8 +1331,8 @@ def test_the_liveness_question_has_ONE_spelling_and_it_normalises_refs(
     does, so a ref carrying stray whitespace resolves rather than silently
     failing to match. (It does NOT strip `refs/heads/` — an earlier draft of
     this note claimed it did, and that was wrong.)"""
-    from ideation_dashboard import doxbench_scope
-    from ideation_dashboard.doxbench_scope import ScopeKey
+    from openxdox import doxbench_scope
+    from openxdox.doxbench_scope import ScopeKey
 
     registry, ref = _open_a_real_session(scratch_repo)
     key = ScopeKey(repository=scratch_repo.repository, ref=ref,
@@ -1359,8 +1359,8 @@ def test_the_liveness_question_has_ONE_spelling_and_it_normalises_refs(
 
 def test_a_ref_that_is_not_a_live_session_branch_has_no_worktree(scratch_repo):
     """The fail-closed half still holds: `main` is not a session."""
-    from ideation_dashboard.doxbench_scope import ScopeKey
-    from ideation_dashboard import snapshot_registry as reg
+    from openxdox.doxbench_scope import ScopeKey
+    from openxdox import snapshot_registry as reg
 
     registry, _ref = _open_a_real_session(scratch_repo)
     key = ScopeKey(repository=scratch_repo.repository, ref=reg.DEFAULT_REF,
@@ -1371,7 +1371,7 @@ def test_a_ref_that_is_not_a_live_session_branch_has_no_worktree(scratch_repo):
 def test_another_tiles_session_is_not_this_tiles_worktree(scratch_repo):
     """Liveness is asked over THIS tile's branch family, so one tile's session
     never answers another tile's thread question."""
-    from ideation_dashboard.doxbench_scope import ScopeKey
+    from openxdox.doxbench_scope import ScopeKey
 
     registry, ref = _open_a_real_session(scratch_repo)
     key = ScopeKey(repository=scratch_repo.repository, ref=ref,

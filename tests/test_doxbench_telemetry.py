@@ -16,8 +16,8 @@ import pytest
 
 from conftest import REPO_ROOT  # noqa: F401  (sys.path side effect)
 
-from ideation_dashboard import doxbench_telemetry as tel  # noqa: E402
-from ideation_dashboard.doxbench_scope import ScopeKey  # noqa: E402
+from opendox import doxbench_telemetry as tel  # noqa: E402
+from openxdox.doxbench_scope import ScopeKey  # noqa: E402
 
 MODULE_PATH = (REPO_ROOT / "scripts" / "ideation_dashboard"
                / "doxbench_telemetry.py")

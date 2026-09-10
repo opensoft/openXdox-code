@@ -39,9 +39,9 @@ import pytest
 
 from conftest import REPO_ROOT  # noqa: F401  (sys.path side effect)
 
-from ideation_dashboard import doxbench_abstract_store as store_mod
-from ideation_dashboard import doxbench_scope
-from ideation_dashboard import doxbench_turns
+from opendox import doxbench_abstract_store as store_mod
+from openxdox import doxbench_scope
+from opendox import doxbench_turns
 
 MODULE_PATH = (REPO_ROOT / "scripts" / "ideation_dashboard"
                / "doxbench_abstract_store.py")

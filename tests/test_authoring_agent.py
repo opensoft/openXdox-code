@@ -44,12 +44,12 @@ import pytest
 
 from conftest import REPO_ROOT  # noqa: F401  (sys.path side effect)
 
-from ideation_dashboard import authoring, workbench as wb
-from ideation_dashboard.boundary import (
+from opendox import authoring, workbench as wb
+from opendox.boundary import (
     AGENT, HEADER_INCOMPLETE, HUMAN, SOURCE_DELETE, SOURCE_EDIT,
     BoundaryViolation, OutputBoundary,
 )
-from ideation_dashboard.generator import generate_snapshot
+from openxdox.generator import generate_snapshot
 
 REQUIRED_HEADERS = ("Status:", "Kind:", "Summary:", "Topics:",
                     "Repository context:", "Captured:")

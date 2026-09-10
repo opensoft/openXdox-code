@@ -38,23 +38,23 @@ import pytest
 
 from conftest import FIXTURES, REPO_ROOT
 
-from ideation_dashboard.doxbench_hash import (
+from opendox.doxbench_hash import (
     ContentEncodingError,
     ContentIdentity,
     content_identity,
     sha256_hex,
     utf8_size,
 )
-from ideation_dashboard.doxbench_hash import MAX_BUFFER_BYTES as HASH_MAX_BUFFER_BYTES
-from ideation_dashboard.doxbench_scope import ScopeKey, ScopeProjection, resolve_scope
-from ideation_dashboard.doxbench_model import (
+from opendox.doxbench_hash import MAX_BUFFER_BYTES as HASH_MAX_BUFFER_BYTES
+from openxdox.doxbench_scope import ScopeKey, ScopeProjection, resolve_scope
+from opendox.doxbench_model import (
     SERVER_MAX_INPUT_LIMIT_BYTES,
     SERVER_MAX_OUTPUT_LIMIT_BYTES,
     ModelCatalogEntry,
     effective_limit_bytes,
 )
 
-from ideation_dashboard.doxbench_turns import (
+from opendox.doxbench_turns import (
     MAX_ASSISTANT_PROSE_BYTES,
     MAX_IDEMPOTENCY_BYTES,
     MAX_IDEMPOTENCY_ENTRIES,
@@ -98,7 +98,7 @@ from ideation_dashboard.doxbench_turns import (
     validate_working_subject,
     verify_buffer_identity,
 )
-from ideation_dashboard import doxbench_packet, doxbench_turns
+from opendox import doxbench_packet, doxbench_turns
 
 MODULE_PATH = REPO_ROOT / "scripts" / "ideation_dashboard" / "doxbench_turns.py"
 
@@ -629,7 +629,7 @@ def test_the_reserved_keys_are_the_same_two_the_browser_refuses():
         doxbench_turns.OUTLINE_BUFFER_KEY,
         doxbench_turns.UNBACKED_DOCUMENT_BUFFER_KEY,
     }
-    state_js = (REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "views"
+    state_js = (REPO_ROOT / "src" / "openxdox" / "web" / "views"
                 / "doxbench-state.js").read_text(encoding="utf-8")
     assert 'LOAD_REFUSED_RESERVED_KEY = "path_is_a_reserved_key"' in state_js
     for key in doxbench_turns.RESERVED_BUFFER_KEYS:
@@ -3134,9 +3134,9 @@ def test_the_declared_document_order_is_deterministic_and_matches_the_browser():
         "ideation/staging/demo-topic/zulu.md",
     )
     assert doxbench_turns.ordered_buffer_keys(_THREE)[0] == "outline"
-    state_js = (REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "views"
+    state_js = (REPO_ROOT / "src" / "openxdox" / "web" / "views"
                 / "doxbench-state.js").read_text(encoding="utf-8")
-    save_js = (REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "views"
+    save_js = (REPO_ROOT / "src" / "openxdox" / "web" / "views"
                / "doxbench-save.js").read_text(encoding="utf-8")
     assert doxbench_turns.DOCUMENT_KEY_ORDER_RULE in state_js
     assert doxbench_turns.DOCUMENT_KEY_ORDER_RULE in save_js
@@ -3144,7 +3144,7 @@ def test_the_declared_document_order_is_deterministic_and_matches_the_browser():
     # order buffer keys -- the request builder, the selector listing, and the
     # proposal card order -- and a rule re-spelled in prose is a rule that drifts.
     # Every home carries the SAME string, and this is where that is enforced.
-    views = REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "views"
+    views = REPO_ROOT / "src" / "openxdox" / "web" / "views"
     for home in ("doxbench-chat.js", "doxbench-chat-model.js"):
         text = (views / home).read_text(encoding="utf-8")
         assert doxbench_turns.DOCUMENT_KEY_ORDER_RULE in text, home

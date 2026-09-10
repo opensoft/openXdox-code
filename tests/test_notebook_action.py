@@ -35,12 +35,12 @@ from conftest import (  # noqa: F401
     BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit, find_openxfactory_validator,
 )
 
-from ideation_dashboard import notebook_action as na
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard import workbench as wb
-from ideation_dashboard.generator import generate_snapshot
+from opendox import notebook_action as na
+from opendox import serve as serve_mod
+from opendox import workbench as wb
+from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 NOTEBOOK_JS = WEB / "views" / "notebook.js"
 NODE = shutil.which("node")
 

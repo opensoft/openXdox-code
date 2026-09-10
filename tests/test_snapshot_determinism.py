@@ -13,9 +13,9 @@ from conftest import (  # noqa: F401  (sys.path side effect)
     BASE_REPO, PINNED_REVISION, FakeGit, find_openxfactory_validator,
 )
 
-from ideation_dashboard import snapshot
-from ideation_dashboard.boundary import OutputBoundary
-from ideation_dashboard.generator import generate_snapshot
+from openxdox import snapshot
+from opendox.boundary import OutputBoundary
+from openxdox.generator import generate_snapshot
 
 
 def _gen(**over):

@@ -23,9 +23,9 @@ import pytest
 from conftest import REPO_ROOT  # noqa: F401 (sys.path side effect)
 from test_snapshot_registry import _published_tree, _write_snapshot
 
-from ideation_dashboard import snapshot_registry as reg
+from openxdox import snapshot_registry as reg
 
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 NODE = shutil.which("node")
 
 REGISTER = """\
@@ -373,7 +373,7 @@ def test_wire_the_snapshot_route_serves_a_project_aggregate(tmp_path):
     import http.client
     import threading
 
-    from ideation_dashboard import serve as serve_mod
+    from opendox import serve as serve_mod
 
     source = _source(tmp_path)
     httpd = serve_mod.build_server(

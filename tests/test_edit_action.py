@@ -23,10 +23,10 @@ import pytest
 
 from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit
 
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard.generator import generate_snapshot
+from opendox import serve as serve_mod
+from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 EDIT_JS = WEB / "views" / "edit.js"
 NODE = shutil.which("node")
 

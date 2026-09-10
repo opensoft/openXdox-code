@@ -44,14 +44,11 @@ import sys
 import urllib.parse
 from pathlib import Path
 
-_SCRIPTS_DIR = Path(__file__).resolve().parent.parent
-if str(_SCRIPTS_DIR) not in sys.path:  # plain-script parity with serve.py (D12)
-    sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import route_extension  # noqa: E402
 
-from ideation_dashboard import snapshot_registry as registry_mod  # noqa: E402
-from ideation_dashboard.serve_wire import (  # noqa: E402
+from openxdox import snapshot_registry as registry_mod  # noqa: E402
+from opendox.serve_wire import (  # noqa: E402
     HOSTED_SESSION_REFUSAL,
     JSON_CTYPE,
 )

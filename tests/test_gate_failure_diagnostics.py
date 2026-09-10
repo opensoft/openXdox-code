@@ -45,13 +45,13 @@ import pytest
 from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit
 from session_fixtures import build_scratch_repo
 
-from ideation_dashboard import gate_routes as gr
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard import workbench as wb
-from ideation_dashboard.boundary import HumanGate
-from ideation_dashboard.generator import generate_snapshot
+from openxdox import gate_routes as gr
+from opendox import serve as serve_mod
+from opendox import workbench as wb
+from opendox.boundary import HumanGate
+from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 REPO = "openxFactory"
 RECORDS = "ideation/dashboard/gate-records/"
 

@@ -37,13 +37,13 @@ from pathlib import Path
 import pytest
 
 from session_fixtures import GATE_RECORDS_PREFIX
-from ideation_dashboard import branch_session as bs
-from ideation_dashboard import doxbench_hash as dh
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import session_git as sg
-from ideation_dashboard import snapshot_registry as reg
-from ideation_dashboard.boundary import HumanGate
-from ideation_dashboard.generator import generate_snapshot
+from opendox import branch_session as bs
+from opendox import doxbench_hash as dh
+from openxdox import gate_console as gc
+from opendox import session_git as sg
+from openxdox import snapshot_registry as reg
+from opendox.boundary import HumanGate
+from openxdox.generator import generate_snapshot
 
 TOPIC = "demo-topic"
 DRAFT = "draft/demo-topic"
@@ -1107,7 +1107,7 @@ def emitted_scope_kinds(tmp_path_factory):
 
 
 def test_every_emitted_first_edit_scope_kind_is_a_server_scope_kind(emitted_scope_kinds):
-    from ideation_dashboard import branch_session
+    from opendox import branch_session
     server_kinds = set(branch_session.SCOPE_KINDS)
     for tile_kind, emitted in emitted_scope_kinds.items():
         assert emitted in server_kinds, (

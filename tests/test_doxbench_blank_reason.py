@@ -52,12 +52,12 @@ from conftest import (  # noqa: F401  (sys.path side effect)
     REPO_ROOT, serve_surface_paths, serve_surface_source,
 )
 
-from ideation_dashboard import doxbench_packet as pk  # noqa: E402
-from ideation_dashboard import serve as serve_mod  # noqa: E402
-from ideation_dashboard.doxbench_scope import ScopeKey  # noqa: E402
+from opendox import doxbench_packet as pk  # noqa: E402
+from opendox import serve as serve_mod  # noqa: E402
+from openxdox.doxbench_scope import ScopeKey  # noqa: E402
 
 NODE = shutil.which("node")
-CHAT_MODEL_JS = (REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "views"
+CHAT_MODEL_JS = (REPO_ROOT / "src" / "openxdox" / "web" / "views"
                  / "doxbench-chat-model.js")
 
 # ---------------------------------------------------------------------------
@@ -696,7 +696,7 @@ def test_a_builder_refusal_answers_on_the_routes_fixed_400_shape(
     # on `serve_mod` would no longer reach it and this test would drive the real
     # builder and prove nothing. The assertion below is unchanged: the wire
     # answer to a builder refusal is still the route's fixed 400.
-    from ideation_dashboard import serve_workbench
+    from opendox import serve_workbench
     monkeypatch.setattr(serve_workbench, "doxbench_turn_v2_success_body",
                         _raising)
     status, payload, _port = _post_turn(tmp_path, _turn_v2())

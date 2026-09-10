@@ -67,10 +67,11 @@ import yaml
 
 from pathlib import Path
 
-from . import branch_session, doxbench_threads, gate_console, generator
-from . import session_git as session_git_mod
-from . import session_pr
-from .boundary import (
+from opendox import branch_session, doxbench_threads
+from . import gate_console, generator
+from opendox import session_git as session_git_mod
+from opendox import session_pr
+from opendox.boundary import (
     GATE_SIDE_EFFECT, SOURCE_EDIT, BoundaryViolation, HumanGate,
 )
 
@@ -884,7 +885,7 @@ def _refuse_duplicate_set(root: Path, name: str) -> None:
     the operating system and the answer can always be an error (an unreadable
     parent, a name the filesystem rejects for its own reasons) — and a gate verb
     answers with a refusal, never with a traceback."""
-    from . import workbench as wb
+    from opendox import workbench as wb
     rel = wb.manifest_relpath(name)
     try:
         exists = (root / rel).exists()
@@ -908,7 +909,7 @@ def execute_lens_save_recipe(gate, *, repository: str, name: str,
     Human-only: an OutputBoundary / agent path is rejected (BoundaryViolation)
     before anything is built or written — the same structural guard every gate
     action uses."""
-    from . import lens, workbench as wb
+    from opendox import lens, workbench as wb
 
     human = gate_console.require_human_gate(gate)   # agent path -> BoundaryViolation
     root = human.output.root
@@ -1015,8 +1016,8 @@ def _lens_common(body: dict, snapshot):
 def _lens_save_recipe(body: dict, root: Path, actor: str, records_dir: str,
                       snapshot_path, manifest_validator, *,
                       provenance=None) -> tuple[int, dict]:
-    from . import workbench as wb
-    from .workbench import WorkbenchError, ManifestInvalid
+    from opendox import workbench as wb
+    from opendox.workbench import WorkbenchError, ManifestInvalid
 
     snapshot = _load_snapshot(snapshot_path)
     if not isinstance(snapshot, dict):
@@ -1044,7 +1045,7 @@ def _lens_add_as_cluster(body: dict, root: Path, actor: str, records_dir: str,
                          snapshot_path, manifest_validator,
                          xref_validator, *, provenance=None) -> tuple[int, dict]:
     from . import workbench as wb, human_seen as hs
-    from .workbench import WorkbenchError, ManifestInvalid
+    from opendox.workbench import WorkbenchError, ManifestInvalid
 
     snapshot = _load_snapshot(snapshot_path)
     if not isinstance(snapshot, dict):
@@ -1129,7 +1130,7 @@ def execute_create_document(gate, *, area: str, title: str, summary: str,
 
     Outside a session (`session is None`) the path is byte-identical to the
     pre-session one: one record written through the gate, no git write at all."""
-    from . import authoring
+    from opendox import authoring
 
     human = gate_console.require_human_gate(gate)   # agent path -> BoundaryViolation
     root = human.output.root
@@ -1224,7 +1225,7 @@ def _create_body(body: dict, snapshot):
     snapshot's repository (the same defaulting the lens verbs use), and the
     `Status:` default is `brainstorm` in EVERY area (open question 1's
     ruling — NOT area-derived; placement carries the packet tie)."""
-    from . import authoring
+    from opendox import authoring
 
     title = _str_or_none(body.get("title"))
     if not title:
@@ -1407,7 +1408,7 @@ def resolve_session(body_scope, *, checkout_root: Path, registry,
     scope_kind, scope_id = body_scope or (None, None)
     if not scope_kind or not scope_id or registry is None:
         return None, None
-    from .session_git import SessionGit
+    from opendox.session_git import SessionGit
 
     root = Path(checkout_root)
     git = git or SessionGit(root)

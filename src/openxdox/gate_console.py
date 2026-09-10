@@ -64,7 +64,7 @@ from doc_health import corpus
 
 from . import record_binding
 from . import round_trip
-from .boundary import (
+from opendox.boundary import (
     DOCUMENT_ESCAPE,
     GATE_SIDE_EFFECT,
     BoundaryViolation,
@@ -686,7 +686,7 @@ def document_target_id(document: str) -> str:
     `ideation/brainstorm/lens-launch.md` files its records under
     `ideation-brainstorm-lens-launch/`. Slugged for the same reason every other
     path segment here is — a hostile value can never traverse the records tree."""
-    from .workbench import slug
+    from opendox.workbench import slug
     stem = str(document or "").rsplit(".", 1)[0]
     return slug(stem.replace("/", "-"))
 
@@ -697,7 +697,7 @@ def ref_target_id(ref: str) -> str:
     slugged, so `cluster/cl-a` files its records under `cluster-cl-a/`. Slugged
     for the same reason every other path segment here is — a hostile value can
     never traverse the records tree."""
-    from .workbench import slug
+    from opendox.workbench import slug
     return slug(str(ref or "").replace("/", "-"))
 
 

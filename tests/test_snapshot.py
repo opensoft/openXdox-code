@@ -10,8 +10,8 @@ import pytest
 
 from conftest import find_openxfactory_validator  # noqa: F401
 
-from ideation_dashboard import snapshot
-from ideation_dashboard.boundary import BoundaryViolation, OutputBoundary
+from openxdox import snapshot
+from opendox.boundary import BoundaryViolation, OutputBoundary
 
 
 def _minimal_snapshot(**over) -> dict:

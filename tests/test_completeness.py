@@ -31,9 +31,10 @@ from conftest import (  # noqa: F401  (sys.path side effect)
 )
 
 from doc_health import corpus
-from ideation_dashboard import authoring, snapshot
-from ideation_dashboard import completeness as C
-from ideation_dashboard.generator import generate_snapshot, live_topic_health
+from opendox import authoring
+from openxdox import snapshot
+from openxdox import completeness as C
+from openxdox.generator import generate_snapshot, live_topic_health
 
 SCRIPTS = REPO_ROOT / "scripts"
 

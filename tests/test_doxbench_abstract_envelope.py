@@ -33,20 +33,20 @@ import re
 
 import pytest
 
-from ideation_dashboard import doxbench_packet, doxbench_turns
-from ideation_dashboard.doxbench_hash import (
+from opendox import doxbench_packet, doxbench_turns
+from opendox.doxbench_hash import (
     MAX_BUFFER_BYTES,
     content_identity,
     utf8_size,
 )
-from ideation_dashboard.doxbench_model import (
+from opendox.doxbench_model import (
     FakeWorkbenchModelPort,
     ModelCatalogEntry,
     TurnDispatchSuccess,
     dispatch_turn,
 )
-from ideation_dashboard.doxbench_scope import ScopeKey, ScopeProjection
-from ideation_dashboard.doxbench_turns import (
+from openxdox.doxbench_scope import ScopeKey, ScopeProjection
+from opendox.doxbench_turns import (
     ABSTRACT_PROSE_WORDS_APPROX_BYTES,
     ABSTRACT_SECTION_ORDER,
     ABSTRACT_SUBJECT_FENCE_CLOSE_PREFIX,

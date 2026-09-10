@@ -1281,11 +1281,11 @@ class SnapshotSource:
         root = entry.source_root or self.checkout_root
         if root is None or not Path(root).is_dir():
             raise ValueError(f"{entry.key_id}: no served checkout to regenerate from")
-        from ideation_dashboard import snapshot as snapshot_mod
-        from ideation_dashboard.boundary import OutputBoundary
+        from openxdox import snapshot as snapshot_mod
+        from opendox.boundary import OutputBoundary
         generate = self._generator
         if generate is None:
-            from ideation_dashboard.generator import generate_snapshot
+            from openxdox.generator import generate_snapshot
             generate = generate_snapshot
         snapshot = generate(
             Path(root), entry.repository,

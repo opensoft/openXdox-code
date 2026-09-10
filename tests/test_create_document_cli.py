@@ -22,9 +22,9 @@ import yaml as yaml_mod
 
 from conftest import REPO_ROOT  # noqa: F401 (sys.path side effect)
 
-from ideation_dashboard import authoring as authoring_mod
-from ideation_dashboard import cli
-from ideation_dashboard import gate_console as gate_mod
+from opendox import authoring as authoring_mod
+from opendox import cli
+from openxdox import gate_console as gate_mod
 
 
 def _args(root: Path, **over):

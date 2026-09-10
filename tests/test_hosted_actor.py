@@ -37,10 +37,10 @@ from session_fixtures import (
     FakePullRequests,
 )
 
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard.generator import generate_snapshot
+from opendox import serve as serve_mod
+from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 AUTH_HEADER = "X-Auth-Request-User"
 
 

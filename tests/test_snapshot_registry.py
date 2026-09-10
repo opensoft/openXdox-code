@@ -35,8 +35,8 @@ import pytest
 
 from conftest import BASE_REPO, PINNED_REVISION, FakeGit, find_openxfactory_validator
 
-from ideation_dashboard import snapshot_registry as reg
-from ideation_dashboard.generator import generate_snapshot
+from openxdox import snapshot_registry as reg
+from openxdox.generator import generate_snapshot
 
 VALIDATOR = find_openxfactory_validator()
 needs_validator = pytest.mark.skipif(

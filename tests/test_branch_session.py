@@ -24,9 +24,9 @@ from __future__ import annotations
 
 import pytest
 
-from ideation_dashboard import branch_session as bs
-from ideation_dashboard import session_git as sg
-from ideation_dashboard.snapshot_registry import SnapshotEntry, SnapshotRegistry
+from opendox import branch_session as bs
+from opendox import session_git as sg
+from openxdox.snapshot_registry import SnapshotEntry, SnapshotRegistry
 
 REPO = "openxFactory"
 
@@ -492,8 +492,8 @@ def test_is_live_documents_the_single_bootstrap_exception():
 
 from pathlib import Path                                 # noqa: E402
 
-from ideation_dashboard import gate_console as gc        # noqa: E402
-from ideation_dashboard.boundary import HumanGate        # noqa: E402
+from openxdox import gate_console as gc        # noqa: E402
+from opendox.boundary import HumanGate        # noqa: E402
 from session_fixtures import GATE_RECORDS_PREFIX         # noqa: E402
 
 TOPIC = "demo-topic"
@@ -871,7 +871,7 @@ def test_the_in_flight_dispatch_is_read_from_the_records_tree(scratch_repo):
     """The trivially-checkable half of FR-024 is wired in Phase 3: a dispatched,
     undelivered `propose` job in the served checkout's records tree IS the
     in-flight signal (the same source `propose`'s own duplicate guard reads)."""
-    from ideation_dashboard import kickoff as ko
+    from openxdox import kickoff as ko
 
     records_root = scratch_repo.root / gc.DEFAULT_RECORDS_DIR
     assert bs.proposal_state_for(bs.Tile(bs.STAGED_TOPIC, TOPIC),
@@ -903,9 +903,9 @@ def test_the_in_flight_dispatch_is_read_from_the_records_tree(scratch_repo):
 # pre-existing verb with pre-existing callers (FR-018).
 # ==========================================================================
 
-from ideation_dashboard import cli as cli_mod                     # noqa: E402
-from ideation_dashboard import gate_routes as gr                  # noqa: E402
-from ideation_dashboard import serve as serve_mod                 # noqa: E402
+from opendox import cli as cli_mod                     # noqa: E402
+from openxdox import gate_routes as gr                  # noqa: E402
+from opendox import serve as serve_mod                 # noqa: E402
 
 CREATE_BODY = {
     "title": "First Draft",
@@ -1082,7 +1082,7 @@ def test_a_cross_tile_collision_refuses_the_create_and_persists_nothing(scratch_
 
 def test_a_scoped_create_refuses_while_a_propose_dispatch_is_in_flight(scratch_repo):
     """FR-024 at the route, the half that is trivially checkable in Phase 3."""
-    from ideation_dashboard import kickoff as ko
+    from openxdox import kickoff as ko
 
     job_dir = scratch_repo.root / gc.DEFAULT_RECORDS_DIR / TOPIC
     job_dir.mkdir(parents=True, exist_ok=True)
@@ -1272,7 +1272,7 @@ def test_the_cli_rejects_an_unknown_scope_kind_at_parse_time(scratch_repo):
 
 def test_the_cli_reports_a_session_refusal_verbatim_and_exits_non_zero(scratch_repo,
                                                                       capsys):
-    from ideation_dashboard import kickoff as ko
+    from openxdox import kickoff as ko
 
     job_dir = scratch_repo.root / gc.DEFAULT_RECORDS_DIR / TOPIC
     job_dir.mkdir(parents=True, exist_ok=True)

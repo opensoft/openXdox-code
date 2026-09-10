@@ -224,9 +224,9 @@ class _Recorder:
 
 def main() -> int:
     sync_playwright = _preflight_playwright()
-    from ideation_dashboard import serve as serve_mod  # noqa: E402
-    from ideation_dashboard import doxbench_model  # noqa: E402
-    from ideation_dashboard.generator import generate_snapshot  # noqa: E402
+    from opendox import serve as serve_mod  # noqa: E402
+    from opendox import doxbench_model  # noqa: E402
+    from openxdox.generator import generate_snapshot  # noqa: E402
 
     base = Path(tempfile.mkdtemp(prefix="t098-doxbench-"))
     try:
@@ -279,7 +279,7 @@ def main() -> int:
 
         from session_fixtures import FakePullRequests  # noqa: E402
 
-        web_dir = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+        web_dir = REPO_ROOT / "src" / "openxdox" / "web"
         httpd = serve_mod.build_server(
             web_dir,
             snapshot_path,

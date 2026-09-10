@@ -23,9 +23,9 @@ import yaml
 from conftest import REPO_ROOT  # noqa: F401 (sys.path side effect)
 from test_gate_routes import _post, _serving
 
-from ideation_dashboard.boundary import HumanGate
-from ideation_dashboard.gate_console import GateConsole
-from ideation_dashboard import register_edit_lane as lane
+from opendox.boundary import HumanGate
+from openxdox.gate_console import GateConsole
+from openxdox import register_edit_lane as lane
 
 REGISTER = """\
 # Curated header comment — MUST survive every lane edit.

@@ -27,10 +27,10 @@ from conftest import (  # noqa: F401  (sys.path side effect)
     REPO_ROOT, serve_surface_source,
 )
 
-from ideation_dashboard import doxbench_bridge as br  # noqa: E402
-from ideation_dashboard import doxbench_mcp as mcp  # noqa: E402
-from ideation_dashboard import doxbench_threads as dt  # noqa: E402
-from ideation_dashboard.doxbench_model import (  # noqa: E402
+from opendox import doxbench_bridge as br  # noqa: E402
+from opendox import doxbench_mcp as mcp  # noqa: E402
+from opendox import doxbench_threads as dt  # noqa: E402
+from opendox.doxbench_model import (  # noqa: E402
     ModelCatalog, ModelCatalogEntry, WorkbenchModelPort,
 )
 
@@ -290,7 +290,7 @@ def test_TWO_SCOPES_sharing_a_document_path_get_TWO_sessions(tmp_path):
     that load the same path — one repository at two refs, or two repositories on
     a multi-repository plane — collided, and the second silently inherited the
     first's harness session and its conversation context."""
-    from ideation_dashboard.doxbench_scope import ScopeKey
+    from openxdox.doxbench_scope import ScopeKey
 
     document = "ideation/staging/shared/README.md"
     scopes = (
@@ -434,7 +434,7 @@ def test_an_outline_turn_binds_its_TILES_own_conversation(tmp_path):
     """An outline conversation is a real conversation; it just is not a
     document's. Keyed by the tile, because two tiles' outlines are two
     conversations and a bare `outline` would merge them."""
-    from ideation_dashboard.doxbench_scope import ScopeKey
+    from openxdox.doxbench_scope import ScopeKey
     scope_a = ScopeKey(repository="r", ref="main", tile_kind="staged",
                        tile_id="topic-a")
     scope_b = ScopeKey(repository="r", ref="main", tile_kind="staged",
@@ -1204,8 +1204,8 @@ def test_a_streamed_answer_is_not_doubled_by_its_own_text_end(tmp_path):
 def test_the_rendered_prompt_is_the_envelopes_own_rendering():
     """P3-20: one spelling. `PromptEnvelope.rendered()` is the authority, and
     the bridge's fallback join must agree with it byte for byte."""
-    from ideation_dashboard.doxbench_turns import PromptEnvelope, PromptSection
-    from ideation_dashboard.doxbench_scope import ScopeKey
+    from opendox.doxbench_turns import PromptEnvelope, PromptSection
+    from openxdox.doxbench_scope import ScopeKey
 
     envelope = PromptEnvelope(
         sections=(PromptSection(key="a", text="ALPHA"),

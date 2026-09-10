@@ -21,7 +21,7 @@ from typing import Any, Iterable, Mapping, Sequence
 # `except ScopeConfinementError` handlers and `ScopeKey` equality behave
 # identically whichever path a caller imports by, and every landed
 # `from ideation_dashboard.doxbench_scope import ScopeKey` still resolves.
-from ideation_dashboard.doxbench_scope_types import (  # noqa: F401  (re-export)
+from opendox.doxbench_scope_types import (  # noqa: F401  (re-export)
     SCOPE_KINDS,
     ScopeConfinementError,
     ScopeDocument,
@@ -726,7 +726,7 @@ def is_live_session_ref(registry: Any, key: ScopeKey, *, repository: str,
       stops being indistinguishable from an honest absence.
     """
 
-    from . import branch_session  # lazy: keeps this module's import graph flat
+    from opendox import branch_session  # lazy: keeps this module's import graph flat
 
     kinds = {
         "cluster": branch_session.CLUSTER,

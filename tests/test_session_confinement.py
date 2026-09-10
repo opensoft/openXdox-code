@@ -55,21 +55,21 @@ from conftest import REPO_ROOT
 
 from session_fixtures import FakeNotebookAdapter, build_scratch_repo
 
-from ideation_dashboard import branch_session as bs
-from ideation_dashboard import cli as cli_mod
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import gate_routes as gr
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard import session_git as sg
-from ideation_dashboard import session_pr as spr
-from ideation_dashboard import snapshot_registry as reg
-from ideation_dashboard.generator import generate_snapshot
+from opendox import branch_session as bs
+from opendox import cli as cli_mod
+from openxdox import gate_console as gc
+from openxdox import gate_routes as gr
+from opendox import serve as serve_mod
+from opendox import session_git as sg
+from opendox import session_pr as spr
+from openxdox import snapshot_registry as reg
+from openxdox.generator import generate_snapshot
 
 REPO = "openxFactory"
 TOPIC = "demo-topic"
 DRAFT = "draft/demo-topic"
 RECORDS = gc.DEFAULT_RECORDS_DIR
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 
 CREATE_BODY = {
     "title": "First Draft",
@@ -279,7 +279,7 @@ def test_the_renderer_presents_the_console_token_from_the_capability_probe():
     """The page's side of the same contract: ONE header-name definition in the
     pure model, consulted by both write transports, sourced from the capability
     probe app.js already performs. No new fetch, no second definition."""
-    views = REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "views"
+    views = REPO_ROOT / "src" / "openxdox" / "web" / "views"
     model = (views / "staging-workbench-model.js").read_text(encoding="utf-8")
     assert f'export const CONSOLE_TOKEN_HEADER = "{serve_mod.CONSOLE_TOKEN_HEADER}"' in model
     assert f'export const CONSOLE_TOKEN_FIELD = "{serve_mod.CONSOLE_TOKEN_FIELD}"' in model
@@ -360,7 +360,7 @@ def test_the_renderer_repairs_a_stale_token_by_re_reading_it_never_by_reloading(
     reach for `location.reload()`. A reload would fix the header by throwing
     away the textarea, the selection and the drafted seed — the work the
     refusal interrupted."""
-    views = REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "views"
+    views = REPO_ROOT / "src" / "openxdox" / "web" / "views"
     model = (views / "staging-workbench-model.js").read_text(encoding="utf-8")
 
     # the retriable set is exactly the codes serve.py emits from its
@@ -619,7 +619,7 @@ def test_the_session_rekey_asks_the_serve_which_repository_a_session_lives_in(
         "a name that is not the owning repository must not resolve a session "
         "snapshot — which is why the browser may not infer one")
 
-    app = (REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "app.js"
+    app = (REPO_ROOT / "src" / "openxdox" / "web" / "app.js"
            ).read_text(encoding="utf-8")
     rekey = app.split("const rekeyToSession = async (ref) => {", 1)[1].split(
         "\n    };", 1)[0]
@@ -1702,7 +1702,7 @@ def test_the_hosted_plane_renders_no_session_surface_at_all():
     The discriminator is the capability's own statement. `sessionSurfaceHidden`
     is asked FIRST in both the mount and the view's `drawSession`, and the whole
     bar goes with it — posture chip included."""
-    views = REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "views"
+    views = REPO_ROOT / "src" / "openxdox" / "web" / "views"
     model = (views / "staging-workbench-model.js").read_text(encoding="utf-8")
     session = (views / "swb-session.js").read_text(encoding="utf-8")
     view = (views / "staging-workbench.js").read_text(encoding="utf-8")
@@ -1792,7 +1792,7 @@ def test_the_outline_pane_reads_through_the_active_keys_source_base():
     and the whole suite stayed green — exactly the finding-16 regression this test
     exists to catch. The pattern below must therefore run through the call's own
     closing arguments, which the declaration cannot supply."""
-    web = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+    web = REPO_ROOT / "src" / "openxdox" / "web"
     view = (web / "views" / "staging-workbench.js").read_text(encoding="utf-8")
     app = (web / "app.js").read_text(encoding="utf-8")
 

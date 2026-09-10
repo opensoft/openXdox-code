@@ -67,7 +67,8 @@ from doc_health import TAXONOMY, corpus
 from doc_health.corpus import RealGit
 from doc_health.lines import split_keepends
 
-from . import GENERATOR_VERSION, completeness, fixtures
+from opendox import GENERATOR_VERSION, fixtures
+from . import completeness
 from .register import CrossReferenceIndexAdapter, ProjectRegisterAdapter
 
 # Header window matches doc_health.corpus.STATUS_SCAN_LINES: governance headers

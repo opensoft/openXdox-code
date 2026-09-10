@@ -47,16 +47,16 @@ from conftest import (  # noqa: F401
 )
 from session_fixtures import scratch_repo  # noqa: F401
 
-from ideation_dashboard import doxbench_binding
-from ideation_dashboard import doxbench_install
-from ideation_dashboard import doxbench_intake
-from ideation_dashboard import doxbench_provider
-from ideation_dashboard import gate_console
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard.generator import generate_snapshot
+from opendox import doxbench_binding
+from opendox import doxbench_install
+from opendox import doxbench_intake
+from opendox import doxbench_provider
+from openxdox import gate_console
+from opendox import serve as serve_mod
+from openxdox.generator import generate_snapshot
 
 NODE = shutil.which("node")
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 VIEWS = WEB / "views"
 CHAT_MODEL_JS = VIEWS / "doxbench-chat-model.js"
 CHAT_VIEW_JS = VIEWS / "doxbench-chat.js"
@@ -1122,7 +1122,7 @@ def test_the_closed_catalog_entry_does_not_widen(scratch_repo, tmp_path):
     and still passes byte-for-byte: an APPROVED plain entry projects exactly
     `PUBLIC_ENTRY_FIELDS`, because each optional group is emitted only by an
     entry that declares it."""
-    from ideation_dashboard.doxbench_model import (
+    from opendox.doxbench_model import (
         PUBLIC_ENTRY_FIELDS, catalog_wire_envelope)
     program, _record = _write_broker(tmp_path)
     _declare_broker(scratch_repo.root, program)

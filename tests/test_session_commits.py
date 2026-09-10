@@ -29,11 +29,11 @@ import yaml
 
 from session_fixtures import GATE_RECORDS_PREFIX
 
-from ideation_dashboard import branch_session as bs
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import session_git as sg
-from ideation_dashboard.boundary import BoundaryViolation, HumanGate, OutputBoundary
-from ideation_dashboard.snapshot_registry import SnapshotRegistry
+from opendox import branch_session as bs
+from openxdox import gate_console as gc
+from opendox import session_git as sg
+from opendox.boundary import BoundaryViolation, HumanGate, OutputBoundary
+from openxdox.snapshot_registry import SnapshotRegistry
 
 AT = "2026-07-26T12:00:00Z"
 BRANCH = "draft/demo-topic"

@@ -17,10 +17,10 @@ import yaml as yaml_mod
 
 import pytest
 
-from ideation_dashboard import cli
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import kickoff as ko
-from ideation_dashboard.boundary import HumanGate
+from opendox import cli
+from openxdox import gate_console as gc
+from openxdox import kickoff as ko
+from opendox.boundary import HumanGate
 
 AT = "2026-08-02T09:00:00Z"
 CLUSTERS = {"clusters": [{"id": "cl-a", "name": "A"}]}

@@ -43,8 +43,8 @@ import pytest
 
 from conftest import BASE_REPO, PINNED_REVISION
 
-from ideation_dashboard import snapshot as snapshot_mod
-from ideation_dashboard.cli import build_parser, cmd_generate_and_open
+from openxdox import snapshot as snapshot_mod
+from opendox.cli import build_parser, cmd_generate_and_open
 
 STUB_VALIDATOR = """import sys
 print("stub-validator: 0 error(s), 0 warning(s)")

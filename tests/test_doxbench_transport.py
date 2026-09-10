@@ -68,10 +68,10 @@ import pytest
 
 from conftest import BASE_REPO, PINNED_REVISION, FakeGit
 
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard.generator import generate_snapshot
+from opendox import serve as serve_mod
+from openxdox.generator import generate_snapshot
 
-WEB = Path(__file__).resolve().parent.parent.parent / "scripts" / "ideation_dashboard" / "web"
+WEB = Path(__file__).resolve().parent.parent / "src" / "openxdox" / "web"
 APP_JS = WEB / "app.js"
 STAGING_WORKBENCH_JS = WEB / "views" / "staging-workbench.js"
 NODE = shutil.which("node")

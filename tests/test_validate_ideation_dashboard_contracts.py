@@ -364,6 +364,6 @@ def test_the_validators_reserved_sets_agree_with_the_runtimes(vidc):
     scripts = str(ROOT / "scripts")
     if scripts not in sys.path:
         sys.path.insert(0, scripts)
-    from ideation_dashboard import doxbench_turns as turns
+    from opendox import doxbench_turns as turns
     assert set(vidc.V2_RESERVED_DOCUMENT_PATHS) == set(turns.RESERVED_BUFFER_KEYS)
     assert set(vidc.V1_RESERVED_DOCUMENT_PATHS) == set(turns.V1_RESERVED_BUFFER_KEYS)

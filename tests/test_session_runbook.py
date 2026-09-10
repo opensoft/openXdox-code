@@ -38,16 +38,16 @@ import pytest
 from conftest import REPO_ROOT
 from session_fixtures import build_scratch_repo  # noqa: F401 - fixture module
 
-from ideation_dashboard import branch_session as bs
-from ideation_dashboard import cli as cli_mod
-from ideation_dashboard import corpus_root as corpus_root_mod
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import gate_routes as gr
-from ideation_dashboard import session_git as sg
-from ideation_dashboard import session_pr as spr
-from ideation_dashboard import snapshot_registry as reg
-from ideation_dashboard.boundary import HumanGate
-from ideation_dashboard.generator import generate_snapshot
+from opendox import branch_session as bs
+from opendox import cli as cli_mod
+from openxdox import corpus_root as corpus_root_mod
+from openxdox import gate_console as gc
+from openxdox import gate_routes as gr
+from opendox import session_git as sg
+from opendox import session_pr as spr
+from openxdox import snapshot_registry as reg
+from opendox.boundary import HumanGate
+from openxdox.generator import generate_snapshot
 
 RUNBOOK = REPO_ROOT / "docs" / "ideation-dashboard-session-runbook.md"
 
@@ -118,7 +118,7 @@ def test_the_runbook_start_command_parses_with_the_real_cli_parser():
     blocks = _bash_blocks(start)
     assert blocks, "§2 offers no command at all"
     command = blocks[0]
-    assert command.startswith("python3 scripts/ideation_dashboard/cli.py "
+    assert command.startswith("python3 src/opendox/cli.py "
                               "generate-and-open"), command
 
     parser = cli_mod.build_parser()
@@ -226,7 +226,7 @@ def test_the_runbook_does_not_call_the_unvalidated_snapshot_routine():
 # finding 18 — §4's posture readings are the ones the page can actually render
 # --------------------------------------------------------------------------
 
-MODEL_JS = (REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "views"
+MODEL_JS = (REPO_ROOT / "src" / "openxdox" / "web" / "views"
             / "staging-workbench-model.js")
 
 

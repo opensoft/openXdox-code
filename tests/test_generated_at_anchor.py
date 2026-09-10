@@ -40,8 +40,8 @@ import pytest
 
 from conftest import BASE_REPO, PINNED_REVISION, FakeGit, find_openxfactory_validator
 
-from ideation_dashboard import cli as cli_mod
-from ideation_dashboard.generator import generate_snapshot, is_rfc3339_datetime
+from opendox import cli as cli_mod
+from openxdox.generator import generate_snapshot, is_rfc3339_datetime
 
 VALIDATOR = find_openxfactory_validator()
 

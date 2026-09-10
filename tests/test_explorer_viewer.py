@@ -40,10 +40,10 @@ import pytest
 
 from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit  # noqa: F401
 
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard.generator import generate_snapshot
+from opendox import serve as serve_mod
+from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 EXPLORER_JS = WEB / "views" / "explorer.js"
 VIEWER_JS = WEB / "views" / "viewer.js"
 VENDOR_JS = WEB / "vendor" / "markdown-it.min.js"

@@ -43,10 +43,10 @@ import pytest
 
 from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit
 
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard.generator import generate_snapshot
+from opendox import serve as serve_mod
+from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 
 
 def _snapshot():
@@ -642,7 +642,7 @@ _ALL_DOXBENCH_CODES = (
 
 
 def test_the_dispatch_outcome_codes_are_spelled_by_doxbench_models_closed_set():
-    from ideation_dashboard import doxbench_model as model_mod
+    from opendox import doxbench_model as model_mod
     assert (_DISPATCH_OUTCOME_CODES | {"model_unavailable"}
             == set(model_mod.DISPATCH_FAILURE_CODES))
 
@@ -916,7 +916,7 @@ def test_a_70kb_first_edit_save_passes_the_transport_and_reaches_the_verb(tmp_pa
     happen is the old failure: the bare transport `invalid_body` with the
     fixed `JSON_OBJECT_BODY_REQUIRED` message, or any oversize refusal."""
     assert 70_000 > serve_mod._MAX_BODY_BYTES  # the old cap refused this Save
-    from ideation_dashboard import doxbench_hash
+    from opendox import doxbench_hash
     assert 70_000 < doxbench_hash.MAX_BUFFER_BYTES  # both sides declare it legal
     with _serving(tmp_path) as (httpd, host, port):
         caps = _capabilities(host, port)
@@ -966,7 +966,7 @@ def test_a_lone_surrogate_in_first_edit_content_refuses_400_not_500(tmp_path):
     vocabulary: 400 `invalid_body` with a FIXED sentence naming the
     unpaired-surrogate condition — never the text itself, and never a
     session opened for a Save that cannot be written."""
-    from ideation_dashboard import gate_routes
+    from openxdox import gate_routes
     sentinel = "FIRST-EDIT-SURROGATE-SENTINEL-7e2a"
     body = {"scope_kind": "staged-topic", "scope_id": "ideation-governance",
             "document": "ideation/staging/ideation-governance/README.md",
@@ -989,7 +989,7 @@ def test_the_first_edit_cap_accommodates_the_declared_buffer_bound():
     JSON-escaping inflation and envelope overhead. If either constant moves so
     that a maximal legal Save no longer fits, this pin makes the collision a
     test failure instead of a rediscovered F5-6."""
-    from ideation_dashboard import doxbench_hash
+    from opendox import doxbench_hash
     assert serve_mod.DOXBENCH_MAX_REQUEST_BYTES > doxbench_hash.MAX_BUFFER_BYTES
 
 

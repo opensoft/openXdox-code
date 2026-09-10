@@ -41,17 +41,17 @@ import argparse
 import sys
 from pathlib import Path
 
-from ideation_dashboard import actor_identity as actor_mod
-from ideation_dashboard import authoring as authoring_mod
-from ideation_dashboard import branch_session as branch_session_mod
-from ideation_dashboard import gate_console as gate_mod
-from ideation_dashboard import gate_routes as gate_routes_mod
+from opendox import actor_identity as actor_mod
+from opendox import authoring as authoring_mod
+from opendox import branch_session as branch_session_mod
+from openxdox import gate_console as gate_mod
+from openxdox import gate_routes as gate_routes_mod
 from ideation_dashboard import human_seen as human_seen_mod
-from ideation_dashboard import kickoff as kickoff_mod
-from ideation_dashboard import session_git as session_git_mod
-from ideation_dashboard import session_pr as session_pr_mod
-from ideation_dashboard import workbench as workbench_mod
-from ideation_dashboard.boundary import BoundaryViolation, HumanGate
+from openxdox import kickoff as kickoff_mod
+from opendox import session_git as session_git_mod
+from opendox import session_pr as session_pr_mod
+from opendox import workbench as workbench_mod
+from opendox.boundary import BoundaryViolation, HumanGate
 
 
 def _core():
@@ -71,7 +71,7 @@ def _core():
     `main`'s `except` clauses do not name, and it would escape as a traceback.
     `from . import cli` resolves against the package this module was imported
     under, so the column always reaches the very core that is running it."""
-    from . import cli
+    from opendox import cli
 
     return cli
 

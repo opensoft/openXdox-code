@@ -25,9 +25,9 @@ import pytest
 from conftest import REPO_ROOT  # noqa: F401 (sys.path side effect)
 from test_gate_routes import _post, _serving
 
-from ideation_dashboard.boundary import BoundaryViolation, HumanGate, OutputBoundary
-from ideation_dashboard.gate_console import GateConsole, GateRefused
-from ideation_dashboard import kickoff as kickoff_mod
+from opendox.boundary import BoundaryViolation, HumanGate, OutputBoundary
+from openxdox.gate_console import GateConsole, GateRefused
+from openxdox import kickoff as kickoff_mod
 
 REGISTER = """\
 schema_version: 1

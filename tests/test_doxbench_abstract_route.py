@@ -55,22 +55,22 @@ import pytest
 
 from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit
 
-from ideation_dashboard import doxbench_abstract_store as store_mod
-from ideation_dashboard import doxbench_bridge as brg
-from ideation_dashboard import doxbench_hash
-from ideation_dashboard import doxbench_knowledge
-from ideation_dashboard import doxbench_model
-from ideation_dashboard import doxbench_turns
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard.doxbench_model import (
+from opendox import doxbench_abstract_store as store_mod
+from opendox import doxbench_bridge as brg
+from opendox import doxbench_hash
+from opendox import doxbench_knowledge
+from opendox import doxbench_model
+from opendox import doxbench_turns
+from opendox import serve as serve_mod
+from opendox.doxbench_model import (
     FakeWorkbenchModelPort,
     ModelCatalog,
     ModelCatalogEntry,
 )
-from ideation_dashboard.doxbench_scope import ScopeKey
-from ideation_dashboard.generator import generate_snapshot
+from openxdox.doxbench_scope import ScopeKey
+from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 FAKE_CHILD = Path(__file__).resolve().parent / "fixtures" / "fake_omp_child.py"
 
 # The route under test. Referenced at module scope deliberately: it does not
@@ -115,7 +115,7 @@ def _projection():
     """The scope projection the ROUTE resolves for this fixture scope, built
     from server truth exactly as `_handle_workbench_document_abstract` builds
     it — the two path sets ruling 7(a) and the S2 disclosure rule are about."""
-    from ideation_dashboard import doxbench_scope
+    from openxdox import doxbench_scope
 
     return doxbench_scope.resolve_scope(
         _snapshot(), ScopeKey(**SCOPE), source_root=BASE_REPO,

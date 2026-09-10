@@ -86,24 +86,24 @@ import yaml
 
 from conftest import REPO_ROOT
 
-from ideation_dashboard import branch_session as bs
-from ideation_dashboard import cli as cli_mod
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import gate_routes as gr
-from ideation_dashboard import kickoff as kickoff_mod
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard import session_git as sg
-from ideation_dashboard import session_pr as spr
-from ideation_dashboard import snapshot_registry as reg
-from ideation_dashboard.boundary import (
+from opendox import branch_session as bs
+from opendox import cli as cli_mod
+from openxdox import gate_console as gc
+from openxdox import gate_routes as gr
+from openxdox import kickoff as kickoff_mod
+from opendox import serve as serve_mod
+from opendox import session_git as sg
+from opendox import session_pr as spr
+from openxdox import snapshot_registry as reg
+from opendox.boundary import (
     BoundaryViolation, HumanGate, OutputBoundary,
 )
-from ideation_dashboard.generator import generate_snapshot, live_topic_health
+from openxdox.generator import generate_snapshot, live_topic_health
 
 REPO = "openxFactory"
 TOPIC = "demo-topic"
 DRAFT = "draft/demo-topic"
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 EDIT_ROUTE = "/actions/gate/edit-document"
 OPEN_PR_ROUTE = "/actions/gate/open-pr"
 RECORDS = gc.DEFAULT_RECORDS_DIR

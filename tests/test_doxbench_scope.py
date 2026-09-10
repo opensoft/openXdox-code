@@ -14,8 +14,9 @@ import yaml
 
 from conftest import FIXTURES, REPO_ROOT
 
-from ideation_dashboard import branch_session, gate_console
-from ideation_dashboard.doxbench_scope import (
+from opendox import branch_session
+from openxdox import gate_console
+from openxdox.doxbench_scope import (
     ScopeConfinementError,
     ScopeKey,
     created_paths_from_records,
@@ -26,7 +27,7 @@ from ideation_dashboard.doxbench_scope import (
 )
 
 CASES_PATH = FIXTURES / "doxbench_scope_cases.json"
-WEB_VIEWS = REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "views"
+WEB_VIEWS = REPO_ROOT / "src" / "openxdox" / "web" / "views"
 MODEL_JS = WEB_VIEWS / "staging-workbench-model.js"
 WHEEL_MODEL_JS = WEB_VIEWS / "wheel-model.js"
 NODE = shutil.which("node")

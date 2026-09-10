@@ -29,11 +29,11 @@ import pytest
 from conftest import REPO_ROOT
 
 from doc_health import families
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import round_trip as rt
+from openxdox import gate_console as gc
+from openxdox import round_trip as rt
 
 OUTLINE_MODEL_JS = (
-    REPO_ROOT / "scripts/ideation_dashboard/web/views/outline-model.js")
+    REPO_ROOT / "src/openxdox/web/views/outline-model.js")
 NODE = shutil.which("node")
 
 

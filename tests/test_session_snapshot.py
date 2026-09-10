@@ -56,18 +56,18 @@ import pytest
 
 from conftest import REPO_ROOT, serve_surface_source
 
-from ideation_dashboard import branch_session as bs
-from ideation_dashboard import cli as cli_mod
-from ideation_dashboard import gate_routes as gr
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard import session_git as sg
-from ideation_dashboard import snapshot_registry as reg
-from ideation_dashboard.generator import generate_snapshot
+from opendox import branch_session as bs
+from opendox import cli as cli_mod
+from openxdox import gate_routes as gr
+from opendox import serve as serve_mod
+from opendox import session_git as sg
+from openxdox import snapshot_registry as reg
+from openxdox.generator import generate_snapshot
 
 REPO = "openxFactory"
 TOPIC = "demo-topic"
 DRAFT = "draft/demo-topic"
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 MODEL_JS = WEB / "views" / "repo-selector-model.js"
 NODE = shutil.which("node")
 
@@ -874,7 +874,7 @@ def test_the_loopback_serve_declares_the_pull_request_port(scratch_repo, tmp_pat
         port = handler._session_pull_requests(handler)
     finally:
         httpd.server_close()
-    from ideation_dashboard import session_pr
+    from opendox import session_pr
     assert isinstance(port, session_pr.GhPullRequests)
     # the port declares exactly the three operations FR-030 permits
     for name in session_pr.PORT_OPERATIONS:
@@ -893,7 +893,7 @@ def test_the_loopback_serve_declares_the_pull_request_port(scratch_repo, tmp_pat
     # it stated the opposite of the build, on exactly the question a reader comes
     # to it with. Pinned here rather than in a prose-only test, because the
     # sentence and the behaviour are one claim.
-    from ideation_dashboard import gate_routes as gr
+    from openxdox import gate_routes as gr
     doc = gr.run_gate_action.__doc__
     assert "declares none yet" not in doc
     assert "_session_pull_requests" in doc

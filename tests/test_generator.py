@@ -11,10 +11,11 @@ from conftest import (  # noqa: F401  (sys.path side effect)
     BASE_REPO, NEGATIVES, PINNED_REVISION, FakeGit, find_openxfactory_validator,
 )
 
-from ideation_dashboard import fixtures, generator, snapshot
-from ideation_dashboard.boundary import OutputBoundary
-from ideation_dashboard.generator import generate_snapshot
-from ideation_dashboard.register import CrossReferenceIndexAdapter
+from opendox import fixtures
+from openxdox import generator, snapshot
+from opendox.boundary import OutputBoundary
+from openxdox.generator import generate_snapshot
+from openxdox.register import CrossReferenceIndexAdapter
 
 WORKED_EXAMPLE_POSSIBLES = {
     "pos-avatar-inline", "pos-avatar-lab", "pos-dtn-autopromote",

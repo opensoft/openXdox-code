@@ -56,13 +56,13 @@ from session_fixtures import (
     FakeNotebookAdapter, build_scratch_repo,
 )
 
-from ideation_dashboard import branch_session as bs
-from ideation_dashboard import cli as cli_mod
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import gate_routes as gr
-from ideation_dashboard import session_git as sg
-from ideation_dashboard import snapshot_registry as reg
-from ideation_dashboard.generator import generate_snapshot
+from opendox import branch_session as bs
+from opendox import cli as cli_mod
+from openxdox import gate_console as gc
+from openxdox import gate_routes as gr
+from opendox import session_git as sg
+from openxdox import snapshot_registry as reg
+from openxdox.generator import generate_snapshot
 
 REPO = "openxFactory"
 TOPIC = "demo-topic"
@@ -627,7 +627,7 @@ def test_a_save_whose_record_fails_reports_the_pull_request_as_OPEN(
     """FR-029 mandates push -> open-or-update -> record, so a record-write
     failure leaves the REMOTE write done. Reporting it as a bare "refused" read
     as "nothing happened", which is the opposite of the truth."""
-    from ideation_dashboard import session_pr as spr
+    from opendox import session_pr as spr
 
     registry = _registry(scratch_repo, tmp_path)
     _create(scratch_repo, registry)
@@ -667,7 +667,7 @@ def test_a_save_that_can_write_neither_the_record_nor_the_marker_says_so(
     both writes failing, that sentence was false, the FR-029 record was permanently
     lost, and the human was told it was recoverable — a reader who trusts it stops
     looking for the record. The attestation is the defect as much as the loss."""
-    from ideation_dashboard import session_pr as spr
+    from opendox import session_pr as spr
 
     registry = _registry(scratch_repo, tmp_path)
     _create(scratch_repo, registry)
@@ -702,7 +702,7 @@ def test_a_save_that_can_write_the_marker_still_promises_it(scratch_repo,
     promise is true, and it must still be made — the recovery path is real and the
     human needs to know it exists. This is what keeps the fix from being a blanket
     downgrade of the message."""
-    from ideation_dashboard import session_pr as spr
+    from opendox import session_pr as spr
 
     registry = _registry(scratch_repo, tmp_path)
     _create(scratch_repo, registry)
@@ -725,7 +725,7 @@ def test_an_unwritable_marker_never_blocks_a_record_that_can_be_written(
     failure must never be the reason a pull request the human already has cannot be
     recorded. With the marker directory unwritable but the records tree fine, the
     save SUCCEEDS and the FR-029 record lands."""
-    from ideation_dashboard import session_pr as spr
+    from opendox import session_pr as spr
 
     registry = _registry(scratch_repo, tmp_path)
     _create(scratch_repo, registry)
@@ -762,7 +762,7 @@ def test_the_merge_ending_finalizes_a_dispatch_whose_record_was_never_written(
     request MERGED before the human retried, and the merge ending then deleted
     the branch while ASSERTING a main-resident record that never existed. The
     dispatch is now finalized from the marker before anything is destroyed."""
-    from ideation_dashboard import session_pr as spr
+    from opendox import session_pr as spr
 
     registry = _registry(scratch_repo, tmp_path)
     _create(scratch_repo, registry)
@@ -793,7 +793,7 @@ def test_the_merged_hint_does_not_claim_a_record_that_does_not_exist(
     """A session merged without ever being saved through `open-pr` has NO
     main-resident record, and the response used to assert one 'stays on `main`
     and outlives the branch' while the same call deleted the branch."""
-    from ideation_dashboard import session_pr as spr
+    from opendox import session_pr as spr
 
     registry = _registry(scratch_repo, tmp_path)
     _create(scratch_repo, registry)
@@ -826,7 +826,7 @@ def test_the_abandon_ending_finalizes_the_same_interrupted_dispatch(
     """The reproduction, inverted. The dispatch is finalized from the marker at
     THIS ending too, the open pull request is NAMED, and the verb still closes
     nothing (FR-022, G9)."""
-    from ideation_dashboard import session_pr as spr
+    from opendox import session_pr as spr
 
     registry = _registry(scratch_repo, tmp_path)
     _create(scratch_repo, registry)
@@ -868,7 +868,7 @@ def test_a_port_that_returns_no_url_records_nothing_and_says_so(scratch_repo,
     `pull-request` reference — which the pinned schema requires NON-EMPTY. The save
     returned 200, told the human it had opened a pull request, and left an FR-029
     audit record naming NOTHING in the served corpus."""
-    from ideation_dashboard import session_pr as spr
+    from opendox import session_pr as spr
 
     class UrllessPullRequests(spr.FakePullRequests):
         def open_or_update(self, branch, **kw):
@@ -896,7 +896,7 @@ def test_an_abandon_over_a_recorded_dispatch_still_names_the_open_pull_request(
     finalizes nothing — there is nothing missing — but the abandon must still tell
     the human a pull request is open, because this ending cannot close it and the
     branch it lives on is retained."""
-    from ideation_dashboard import session_pr as spr
+    from opendox import session_pr as spr
 
     registry = _registry(scratch_repo, tmp_path)
     _create(scratch_repo, registry)
@@ -1239,7 +1239,7 @@ def test_a_merge_ending_whose_teardown_fails_stays_ended(scratch_repo, tmp_path)
     with the worktree still attached `git branch -D` refuses too, so FR-033's
     mandatory deletion silently does not happen and a MERGED session comes back
     live — re-enabling gate writes onto a branch whose pull request has merged."""
-    from ideation_dashboard import session_pr as spr
+    from opendox import session_pr as spr
 
     registry = _registry(scratch_repo, tmp_path)
     _create(scratch_repo, registry)

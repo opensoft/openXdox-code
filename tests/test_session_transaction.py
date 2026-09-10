@@ -57,15 +57,15 @@ from session_fixtures import (
     FakeNotebookAdapter, GATE_RECORDS_PREFIX, build_scratch_repo,
 )
 
-from ideation_dashboard import branch_session as bs
-from ideation_dashboard import doxbench_hash as dh
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import gate_routes as gr
-from ideation_dashboard import session_git as sg
-from ideation_dashboard import session_pr as spr
-from ideation_dashboard import snapshot_registry as reg
-from ideation_dashboard.boundary import HumanGate
-from ideation_dashboard.generator import generate_snapshot
+from opendox import branch_session as bs
+from opendox import doxbench_hash as dh
+from openxdox import gate_console as gc
+from openxdox import gate_routes as gr
+from opendox import session_git as sg
+from opendox import session_pr as spr
+from openxdox import snapshot_registry as reg
+from opendox.boundary import HumanGate
+from openxdox.generator import generate_snapshot
 
 REPO = "openxFactory"
 TOPIC = "demo-topic"
@@ -1134,7 +1134,7 @@ def test_a_lock_contention_through_the_CLI_is_the_same_refusal(
     `cli.py gate edit-document` in its own process beside a serve request, so the
     CLI must exit 1 with the engine's reason and the same on-disk truth — not a
     traceback and not a different sentence."""
-    from ideation_dashboard import cli as cli_mod
+    from opendox import cli as cli_mod
 
     registry, created, worktree = _open_through_the_route(scratch_repo, tmp_path)
     relpath = created["path"]

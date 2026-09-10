@@ -27,10 +27,10 @@ import pytest
 
 from conftest import BASE_REPO, PINNED_REVISION, FakeGit, find_openxfactory_validator
 
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import kickoff as ko
-from ideation_dashboard.boundary import AGENT, GATE_SIDE_EFFECT, BoundaryViolation, HumanGate, OutputBoundary
-from ideation_dashboard.generator import generate_snapshot
+from openxdox import gate_console as gc
+from openxdox import kickoff as ko
+from opendox.boundary import AGENT, GATE_SIDE_EFFECT, BoundaryViolation, HumanGate, OutputBoundary
+from openxdox.generator import generate_snapshot
 
 VALIDATOR = find_openxfactory_validator()
 CHANGE = "add-ideation-governance"

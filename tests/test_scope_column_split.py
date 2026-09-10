@@ -54,7 +54,8 @@ import pytest
 
 from conftest import REPO_ROOT
 
-from ideation_dashboard import doxbench_scope, doxbench_scope_types
+from openxdox import doxbench_scope
+from opendox import doxbench_scope_types
 
 PACKAGE = REPO_ROOT / "scripts" / "ideation_dashboard"
 

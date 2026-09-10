@@ -40,12 +40,12 @@ import yaml
 from conftest import find_openxfactory_validator
 from session_fixtures import FakePullRequests, build_scratch_repo
 
-from ideation_dashboard import branch_session as bs
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import gate_routes as gr
-from ideation_dashboard import snapshot_registry as reg
-from ideation_dashboard.boundary import HumanGate, OutputBoundary
-from ideation_dashboard.generator import generate_snapshot
+from opendox import branch_session as bs
+from openxdox import gate_console as gc
+from openxdox import gate_routes as gr
+from openxdox import snapshot_registry as reg
+from opendox.boundary import HumanGate, OutputBoundary
+from openxdox.generator import generate_snapshot
 
 AT = "2026-07-26T12:00:00Z"
 STAMP = "20260726T120000Z"
@@ -374,7 +374,7 @@ def test_the_written_record_is_readable_yaml_carrying_the_ref(tmp_path):
 
 def test_an_agent_boundary_still_cannot_author_a_session_record(tmp_path):
     """The structural human-only guard is unchanged by the growth (D16)."""
-    from ideation_dashboard.boundary import BoundaryViolation
+    from opendox.boundary import BoundaryViolation
     agent = OutputBoundary(tmp_path, [RECORDS], actor="agent")
     with pytest.raises(BoundaryViolation):
         gc.require_human_gate(agent)

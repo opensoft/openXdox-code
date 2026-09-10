@@ -38,8 +38,8 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(_SCRIPTS_DIR) not in sys.path:  # plain-script parity with serve.py (D12)
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from ideation_dashboard.gate_console import DEFAULT_RECORDS_DIR  # noqa: E402
-from ideation_dashboard.kickoff import (  # noqa: E402
+from openxdox.gate_console import DEFAULT_RECORDS_DIR  # noqa: E402
+from openxdox.kickoff import (  # noqa: E402
     dispatched_commission_rows,
     discover_project_register,
 )

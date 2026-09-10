@@ -38,14 +38,14 @@ from conftest import (  # noqa: F401  (sys.path side effect)
     BASE_REPO, PINNED_REVISION, FakeGit, staging_fragment, thin_fragment,
 )
 
-from ideation_dashboard import cli
-from ideation_dashboard import completeness as C
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import kickoff as ko
-from ideation_dashboard.boundary import (
+from opendox import cli
+from openxdox import completeness as C
+from openxdox import gate_console as gc
+from openxdox import kickoff as ko
+from opendox.boundary import (
     AGENT, GATE_SIDE_EFFECT, BoundaryViolation, HumanGate, OutputBoundary,
 )
-from ideation_dashboard.generator import generate_snapshot
+from openxdox.generator import generate_snapshot
 
 AT = "2026-07-25T12:00:00Z"
 
@@ -233,7 +233,7 @@ def test_no_parameter_or_keyword_can_bypass_the_gate(tmp_path):
 def test_the_guard_sits_at_the_one_choke_point_every_surface_passes_through():
     # the loopback route and the CLI both execute propose through the console,
     # which is `kickoff.propose` — so all three surfaces are gated identically.
-    from ideation_dashboard import gate_routes
+    from openxdox import gate_routes
     assert "propose" in gate_routes.EXECUTING_VERBS
     assert "kickoff_mod.propose" in inspect.getsource(gc.GateConsole.propose)
     assert "console.propose" in inspect.getsource(cli.cmd_gate_propose)

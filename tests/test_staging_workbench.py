@@ -43,10 +43,10 @@ import pytest
 
 from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit  # noqa: F401
 
-from ideation_dashboard import gate_routes as gate_routes_mod
-from ideation_dashboard.generator import generate_snapshot
+from openxdox import gate_routes as gate_routes_mod
+from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 MODEL_JS = WEB / "views" / "staging-workbench-model.js"
 NODE = shutil.which("node")
 
@@ -628,7 +628,7 @@ def test_create_seed_status_is_always_brainstorm(tmp_path):
     never consulted (an earlier pass derived `staged` and the ruling REVERSED
     it), and the JS agrees with the Python default, so the browser affordance and
     a hand-rolled request land the same header."""
-    from ideation_dashboard import authoring
+    from opendox import authoring
 
     out = _run_create(CREATE_CASES, tmp_path)
     assert dict(out["statuses"]) == {area: "brainstorm" for area in _STATUS_AREAS}
@@ -763,10 +763,10 @@ def test_gate_off_descriptor_is_the_real_cli_invocation(tmp_path):
     the real CLI parser — a descriptor the CLI would reject is a broken promise."""
     import shlex
 
-    from ideation_dashboard import cli
+    from opendox import cli
 
     command = _run_create(CREATE_CASES, tmp_path)["scopes"]["staged"]["command"]
-    assert command.startswith("python3 scripts/ideation_dashboard/cli.py "
+    assert command.startswith("python3 src/opendox/cli.py "
                               "gate create-document ")
     argv = shlex.split(command)[2:]          # drop `python3 <script>`
     args = cli.build_parser().parse_args(argv)
@@ -878,7 +878,7 @@ def test_workbench_posture_and_affordances_are_capability_derived():
     transport — the viewer owns the fetch, exactly as it did before."""
     view = (WEB / "views" / "staging-workbench.js").read_text(encoding="utf-8")
     create = CREATE_JS.read_text(encoding="utf-8")
-    app = (REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "app.js").read_text(
+    app = (REPO_ROOT / "src" / "openxdox" / "web" / "app.js").read_text(
         encoding="utf-8")
     # the mount takes caps + fetcher, and app.js hands the probe's verdict over
     assert "{ onOpenDoc, caps, fetcher, active, index," in view
@@ -1001,7 +1001,7 @@ def test_scopes_derive_from_the_real_fixture_snapshot(tmp_path):
 # ==========================================================================
 
 SESSION_JS = WEB / "views" / "swb-session.js"
-APP_JS = REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "app.js"
+APP_JS = REPO_ROOT / "src" / "openxdox" / "web" / "app.js"
 
 _SESSION_HARNESS = """
 import {
@@ -1507,7 +1507,7 @@ def test_the_pages_tile_inventory_is_the_engines_tile_inventory(tmp_path):
     """Finding 18's mechanism, pinned against the Python it mirrors:
     `advertisedTiles` reads the same three registers `discover_tile_inventory`
     unions, and `otherTileBranches` is `TileInventory.other_branches`."""
-    from ideation_dashboard import branch_session as bs
+    from opendox import branch_session as bs
 
     out = _run_session(tmp_path)
     inventories = {"main": SNAP, "sibling": SIBLING_SNAP}
@@ -1543,8 +1543,8 @@ def test_the_posture_agrees_with_live_session_branches_on_ownership(tmp_path):
     registry can be in — the owner recorded as the sibling, the owner recorded as
     this tile, and no owner at all. In NO shape is `draft/topic-x-2` tile
     `topic-x`'s live session, which is exactly what the page must not claim."""
-    from ideation_dashboard import branch_session as bs
-    from ideation_dashboard import snapshot_registry as reg
+    from opendox import branch_session as bs
+    from openxdox import snapshot_registry as reg
 
     inventory = bs.TileInventory.from_scopes(
         staged_topics=["topic-x", "topic-x-2"])
@@ -1582,7 +1582,7 @@ def test_the_session_branch_derivation_agrees_with_the_python_side(tmp_path):
     """T078: the browser derives a session branch name for the posture and for
     every descriptor, so a DRIFT from `branch_session.session_branch` would name
     a branch nobody is on. Pinned against the real Python derivation."""
-    from ideation_dashboard import branch_session as bs
+    from opendox import branch_session as bs
 
     out = _run_session(tmp_path)
     js = out["branches"]
@@ -1651,7 +1651,7 @@ def test_gate_off_session_affordances_are_the_real_cli_invocations(tmp_path):
     REAL CLI parser, so a descriptor the terminal would reject is caught here."""
     import shlex
 
-    from ideation_dashboard import cli
+    from opendox import cli
 
     out = _run_session(tmp_path)
     parser = cli.build_parser()
@@ -1660,7 +1660,7 @@ def test_gate_off_session_affordances_are_the_real_cli_invocations(tmp_path):
                 "abandon": cli.cmd_gate_abandon_session}
     for affordance, func in expected.items():
         command = out["commands"][affordance]
-        assert command.startswith("python3 scripts/ideation_dashboard/cli.py gate "
+        assert command.startswith("python3 src/opendox/cli.py gate "
                                   + out["verbs"][affordance] + " "), command
         args = parser.parse_args(shlex.split(command)[2:])
         assert args.func is func
@@ -1812,7 +1812,7 @@ def test_the_create_body_carries_the_continuation_answer(tmp_path):
     assert out["continuations"] == ["resume", "new"]
     assert out["normalizedContinuations"] == [None, None, "resume", "new", "new",
                                               None]
-    from ideation_dashboard import branch_session as bs
+    from opendox import branch_session as bs
     assert list(bs.CONTINUATIONS) == out["continuations"]
     body = out["createBody"]
     assert body["continuation"] is None
@@ -2224,7 +2224,7 @@ def test_a_hostile_descriptor_stays_one_command(tmp_path, name):
     argv, _output = _paste_into_a_shell(tmp_path, command)
 
     tool = ("scripts/sync-notebooklm-books.py" if name == "notebook"
-            else "scripts/ideation_dashboard/cli.py")
+            else "src/opendox/cli.py")
     assert argv[:1] == [tool], argv
 
 
@@ -2246,7 +2246,7 @@ def test_the_hostile_descriptors_still_parse_into_the_real_cli(tmp_path):
     inside the process, which is the layer that can refuse."""
     import shlex
 
-    from ideation_dashboard import cli
+    from opendox import cli
 
     out = _hostile_descriptors(tmp_path)
     parser = cli.build_parser()
@@ -2257,7 +2257,7 @@ def test_the_hostile_descriptors_still_parse_into_the_real_cli(tmp_path):
     assert abandon.scope_id == _HOSTILE_VALUES["scopeId"]
     assert abandon.reason == _HOSTILE_VALUES["reason"]
     # and the id the shell handed over intact is refused by the derivation
-    from ideation_dashboard import branch_session as bs
+    from opendox import branch_session as bs
     with pytest.raises(bs.SessionRefused):
         bs.session_branch(bs.STAGED_TOPIC, abandon.scope_id)
 
@@ -2556,7 +2556,7 @@ def test_a_selection_that_does_not_land_reconciles_the_docs_wheel():
     different documents — and `doc-wheel.js`'s `selectPath`, written for exactly
     this, had zero callers."""
     source = SWB_JS.read_text(encoding="utf-8")
-    wheel = (REPO_ROOT / "scripts" / "ideation_dashboard" / "web" / "views"
+    wheel = (REPO_ROOT / "src" / "openxdox" / "web" / "views"
              / "doc-wheel.js").read_text(encoding="utf-8")
     assert "selectPath(path)" in wheel
     assert "wheel.selectPath(path)" in source          # the caller it lacked

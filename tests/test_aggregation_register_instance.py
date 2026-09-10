@@ -15,7 +15,7 @@ import yaml
 
 from conftest import REPO_ROOT, find_openxfactory_validator
 
-from ideation_dashboard.register import ProjectRegisterAdapter
+from openxdox.register import ProjectRegisterAdapter
 
 VALIDATOR = find_openxfactory_validator()
 AGG_ROOT = REPO_ROOT.parent  # openxFactory -> aggregation root

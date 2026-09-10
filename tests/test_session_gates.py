@@ -63,23 +63,23 @@ from conftest import REPO_ROOT
 from session_fixtures import FakeNotebookAdapter, FakePullRequests, build_scratch_repo
 from staging_shapes import staging_fragment
 
-from ideation_dashboard import branch_session as bs
-from ideation_dashboard import doxbench_hash
-from ideation_dashboard import cli as cli_mod
-from ideation_dashboard import gate_console as gc
-from ideation_dashboard import gate_routes as gr
-from ideation_dashboard import kickoff as kickoff_mod
-from ideation_dashboard import serve as serve_mod
-from ideation_dashboard import session_git as sg
-from ideation_dashboard import snapshot_registry as reg
-from ideation_dashboard.boundary import BoundaryViolation, OutputBoundary
-from ideation_dashboard.generator import generate_snapshot
+from opendox import branch_session as bs
+from opendox import doxbench_hash
+from opendox import cli as cli_mod
+from openxdox import gate_console as gc
+from openxdox import gate_routes as gr
+from openxdox import kickoff as kickoff_mod
+from opendox import serve as serve_mod
+from opendox import session_git as sg
+from openxdox import snapshot_registry as reg
+from opendox.boundary import BoundaryViolation, OutputBoundary
+from openxdox.generator import generate_snapshot
 
 REPO = "openxFactory"
 TOPIC = "demo-topic"
 DRAFT = "draft/demo-topic"
 CHANGE = "add-demo-topic"
-WEB = REPO_ROOT / "scripts" / "ideation_dashboard" / "web"
+WEB = REPO_ROOT / "src" / "openxdox" / "web"
 RECORDS = gc.DEFAULT_RECORDS_DIR
 ABANDON_ROUTE = "/actions/gate/abandon-session"
 CLEANUP_ROUTE = "/actions/gate/cleanup-abandoned-branch"
