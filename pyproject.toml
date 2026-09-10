@@ -19,6 +19,81 @@ version = "0.0.0"
 description = "The openXdox code leg — the `openxdox` package, carved from openxFactory."
 requires-python = ">=3.12"
 
+# THE RUNTIME DEPENDENCY SET, levelling round 2 — authored per
+# opensoft/openxFactory#656 ("HEADS-UP for LEG 3", item 1; Brett Heap,
+# 2026-09-10: "merge openXdox-code levelling round 2 when green"), after leg 1
+# (opensoft/openDox-code) landed at merge commit
+# `ce53b489f8007c37f70da19c90c95ba89156feed`. Scaffold files only — same shape
+# as openDox-code's own round 2 (#5). Leg 3 (this repository's carved content)
+# has not landed; this change only makes sure `validate` does not go red the
+# moment it does.
+#
+# openXdox imports openDox BY DESIGN (runbook § 5.1, "two pin moves per hop"):
+# leg 3's carved tests import the `opendox` package, which this leg does not
+# otherwise supply. Round 1 created the import root and stopped there, so this
+# file declared no dependencies and `validate.yml` installed the test runner
+# alone — sufficient for a scaffold whose only suite reads its own tree, but
+# exactly the gap that made openDox-code's own first carved commit fail its
+# required check with `No module named 'yaml'` before ITS round 2 landed.
+# Levelling this leg the same way BEFORE leg 3 lands, instead of after, is the
+# point of this change.
+#
+# `opendox` IS PIP-INSTALLABLE FROM GIT: leg 1's landed `pyproject.toml`
+# declares `[project] name = "opendox"` with a `src/` layout
+# (`[tool.setuptools] package-dir = {"" = "src"}`,
+# `[tool.setuptools.packages.find] where = ["src"]`) and a real
+# `[build-system]` (`setuptools>=68` / `setuptools.build_meta`), so a PEP 508
+# direct reference resolves and builds. Pinned to the merge commit, never a
+# range or branch, per the estate's pin convention.
+#
+# PyYAML, DERIVED THE SAME WAY openDox-code's floor was: an `ast` walk over
+# every row in `docs/opendox-carve-manifest.yaml` destined `openxdox_code`
+# whose destination lands under this leg's `src/openxdox/` or `tests/` — 89 of
+# this leg's 92 rows are in that scope (90 rows are `.py`; the 90th,
+# `scripts/validate-ideation-dashboard-contracts.py`, lands at the repository
+# root, outside both, and is excluded the same way the precedent scoped its
+# own walk to `src/opendox/` and `tests/` only; the other 2 of the 92 rows are
+# non-`.py` fixtures) — collecting every `Import`/`ImportFrom` in the module
+# body and in module-level `if`/`try`/`with` blocks at the carve commit
+# `b075fd91dc8fced8e1373825ba80220c33536bae`, then partitioning against
+# `sys.stdlib_module_names`. Exactly one third-party name turns up: `yaml` ->
+# PyYAML, module-level in six `src/openxdox/` modules (`gate_console.py`,
+# `gate_routes.py`, `generator.py`, `kickoff.py`, `register.py`,
+# `register_edit_lane.py`) and in twenty-three test modules — so it is a
+# RUNTIME dependency, not a test-only one, matching openDox-code's own shape.
+#
+# Every other non-stdlib name the walk turns up is a file this leg already
+# supplies or will supply, none of them a dependency: `conftest`,
+# `session_fixtures` and `staging_shapes` (test-tree helpers that arrive as
+# rows or declared replicas — Q-L7 covers `session_fixtures`'s own replica
+# gap), `route_extension` (the neutral extension-point module of RULED Q-L1),
+# and `test_doxbench_routes` / `test_gate_routes` / `test_snapshot_registry`
+# (sibling test modules imported by name, same class). Two names are
+# deliberately NOT dependencies, on openDox-code's own precedent:
+# `ideation_dashboard` is the pre-carve package name the carve's "import
+# rewrites" edit class retires on arrival, and `doc_health` is openxFactory's
+# own corpus machinery (the CLI's one `doc_health` reach, carried item (g)) —
+# a BUILD-arc cross-column reach, not a package on PyPI, and not this PR's to
+# resolve.
+#
+# LOWER BOUND: `>=6.0`, the same floor openDox-code's round 2 stated rather
+# than guessed, for the same reason — it is what this source tree
+# (openxFactory) itself runs (`requirements/hermes-runtime-contracts.lock`
+# pins `pyyaml==6.0.3`), not the oldest release that might parse.
+dependencies = [
+    "opendox @ git+https://github.com/opensoft/openDox-code@ce53b489f8007c37f70da19c90c95ba89156feed",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+# The pytest range from round 1, unchanged — `pytest>=8,<9`. What moves is its
+# home: `validate.yml` used to carry it as a literal in the install step and
+# now installs `.[test]`, so the range is declared once and the workflow reads
+# it, instead of two copies that can drift apart while both keep passing.
+test = [
+    "pytest>=8,<9",
+]
+
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
