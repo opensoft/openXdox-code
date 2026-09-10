@@ -46,7 +46,7 @@ from opendox import authoring as authoring_mod
 from opendox import branch_session as branch_session_mod
 from openxdox import gate_console as gate_mod
 from openxdox import gate_routes as gate_routes_mod
-from ideation_dashboard import human_seen as human_seen_mod
+from openxdox.consumer_reach import human_seen as human_seen_mod
 from openxdox import kickoff as kickoff_mod
 from opendox import session_git as session_git_mod
 from opendox import session_pr as session_pr_mod

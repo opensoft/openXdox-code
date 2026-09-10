@@ -46,5 +46,16 @@ jobs:
       # byte-identical and return to this workflow when the BUILD arc lands.
       # The same disclosed narrowing openDox-code carries under RULED Q-L5
       # (b′).
+      #
+      # `tests/test_dependency_direction.py` joins it under
+      # `split-opendox-two-layer-product` § 4.1 (RULED 5626260214,
+      # opensoft/openxFactory#656). It is a SHAPE assertion authored HERE, of
+      # the same class as `test_leg_shape.py` — it parses trees, it does not
+      # import the carved modules — so it does NOT un-narrow Q-L8 (b′): the
+      # carved suites stay out until the BUILD arc makes them runnable.
       - name: pytest
-        run: python -m pytest -q tests/test_leg_shape.py --noconftest
+        run: >-
+          python -m pytest -q
+          tests/test_leg_shape.py
+          tests/test_dependency_direction.py
+          --noconftest
