@@ -55,6 +55,18 @@ from typing import Any
 _CANDIDATE_PREFIXES = ("ideation_dashboard.", "")
 
 
+def _names_the_candidate(missing: str, dotted: str) -> bool:
+    """Is `missing` the candidate itself, or a package on its dotted path?
+
+    `import_module("ideation_dashboard.human_seen")` raises
+    `ModuleNotFoundError(name="ideation_dashboard")` when the PACKAGE is absent
+    and `name="ideation_dashboard.human_seen"` when only the submodule is — both
+    mean "the consumer is not here". `name="yaml"`, raised from inside a
+    consumer module that DID load, does not, and must not be swallowed.
+    """
+    return dotted == missing or dotted.startswith(f"{missing}.")
+
+
 class ConsumerReachUnavailable(RuntimeError):
     """A verb of this column reached its consumer's column and it is absent.
 
@@ -87,7 +99,17 @@ class _LateConsumerModule:
         return self._name
 
     def resolve(self) -> ModuleType:
-        """Import the consumer-column module, or refuse naming the layering."""
+        """Import the consumer-column module, or refuse naming the layering.
+
+        A candidate that is ABSENT is skipped; a candidate that is PRESENT and
+        raises while executing is re-raised untouched. Catching `ImportError`
+        wholesale would turn a broken consumer module into a silent fall-through
+        to the next candidate — which could be an unrelated top-level module of
+        the same name — or into a `ConsumerReachUnavailable` blaming the
+        layering for a bug inside openxFactory. Only `ModuleNotFoundError`
+        naming the candidate itself, or a package on its own dotted path, means
+        "not here".
+        """
         if self._module is not None:
             return self._module
         tried: list[str] = []
@@ -96,8 +118,10 @@ class _LateConsumerModule:
             tried.append(dotted)
             try:
                 self._module = importlib.import_module(dotted)
-            except ImportError:
-                continue
+            except ModuleNotFoundError as exc:
+                if exc.name is not None and _names_the_candidate(exc.name, dotted):
+                    continue
+                raise
             return self._module
         raise ConsumerReachUnavailable(
             f"{self._name!r} is openxFactory's own adapter column and this "
