@@ -37,6 +37,27 @@ def profile() -> dp.DomainProfile:
     return dp.load(FIXTURE)
 
 
+@pytest.fixture()
+def unregistered_profile():
+    """Run one test with NO domain profile registered, then restore it.
+
+    Declared HERE and not in `tests/conftest.py` deliberately: this module runs
+    under `validate`'s `--noconftest` invocation, beside the other shape
+    assertions, so it may not depend on a conftest being collected. Restoring
+    whatever was registered means a run that DID come through the root
+    `conftest.py` — the host's process-start registration — is left exactly as
+    it was found.
+    """
+    previous = dp.current() if dp.is_registered() else None
+    dp.unregister()
+    try:
+        yield
+    finally:
+        dp.unregister()
+        if previous is not None:
+            dp.register(previous)
+
+
 # --------------------------------------------------------------- the loader
 
 
