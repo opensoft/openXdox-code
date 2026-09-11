@@ -69,6 +69,7 @@ from doc_health.lines import split_keepends
 
 from opendox import GENERATOR_VERSION, fixtures
 from . import completeness
+from . import domain_profile
 from .register import CrossReferenceIndexAdapter, ProjectRegisterAdapter
 
 # Header window matches doc_health.corpus.STATUS_SCAN_LINES: governance headers
@@ -325,6 +326,24 @@ def declared_origin_staging(folder: Path) -> str | None:
     return staging_id
 
 
+
+def _declared_origin_kind() -> str:
+    """The `kind:` token a change's declared `origin:` block carries.
+
+    RULING C2 / § 4.4: this was the literal `"staged"`, which is openxFactory's
+    OWN word living in the domain-neutral package. It is the status the
+    `demote` transition lands on — declared by the profile, which is why one
+    accessor serves both the reader below and the manifest `gate_console.py`
+    writes: the record the forward gate writes and the record the reverse gate
+    reads must agree, and now they agree BY CONSTRUCTION rather than by two
+    literals that happened to match.
+
+    Resolved LATE, per call, never at import time (`domain_profile.current()`);
+    a process that has registered no profile is refused, not defaulted.
+    """
+    return domain_profile.current().destination_status("demote")
+
+
 def declared_origin_state(folder: Path) -> tuple[str, str | None]:
     """Classify a change origin without collapsing invalid data into absence.
 
@@ -346,7 +365,7 @@ def declared_origin_state(folder: Path) -> tuple[str, str | None]:
     origin = loaded.get("origin")
     if not isinstance(origin, dict):
         return "invalid", None
-    if origin.get("kind") != "staged":
+    if origin.get("kind") != _declared_origin_kind():
         return "non-staged", None
     path = origin.get("path")
     if not isinstance(path, str):
@@ -364,7 +383,7 @@ def declared_origin_state(folder: Path) -> tuple[str, str | None]:
     parts = [part for part in normalized.split("/") if part not in ("", ".")]
     if parts[:2] != ["ideation", "staging"] or len(parts) < 3:
         return "invalid", None
-    return "staged", parts[2]
+    return _declared_origin_kind(), parts[2]
 
 
 # Compatibility aliases. Cleanup now consumes the same declared origin reader
