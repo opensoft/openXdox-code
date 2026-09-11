@@ -46,6 +46,8 @@ def _existing_gate_and_projection_extensions():
         from openxdox.serve_gate import GateRoutesExtension
         from openxdox.serve_projection import ProjectionRoutesExtension
     except ModuleNotFoundError as exc:
+        if exc.name != "doc_health" and not (exc.name or "").startswith("doc_health"):
+            raise
         pytest.skip(
             f"existing § 2.4 contribution column not importable in this "
             f"environment ({exc!r}) — doc_health reachability is BUILD-arc "
