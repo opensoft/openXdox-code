@@ -424,6 +424,21 @@ def _back_import_census() -> dict[str, list[int]]:
 #: and the rest of this leg's runtime, and a literal comparison should not need
 #: any of it — nor should a drift in a CONSTANT be reportable only when every
 #: unrelated dependency of its module happens to be installed.
+#:
+#: THE PAIRING IS NOT AUTHORED HERE. `opendox/defaults.py` publishes
+#: `MIRRORED_AT_CONSUMER` — `(consumer module, attribute) -> the name THERE` —
+#: for exactly this guard, in its own words: *"so the guard reads the pairing
+#: from the side that owns the values rather than restating it a third time."*
+#: The tests below read that mapping and compare THIS table against it first.
+#: Restating the pairing without checking it is how the guard would end up
+#: comparing the wrong pair and staying green: rename or re-home a value
+#: upstream and a hand-kept inverse would go on pointing at the old module,
+#: which is the failure mode the guard exists to prevent, one level up.
+#:
+#: It stays a RECORDED expectation rather than being derived silently, for the
+#: reason the census above is recorded: a change in what openDox owns should
+#: come to a reader of this file as a failure that names the change, not as a
+#: table that quietly follows whatever the pin happens to publish.
 OPENDOX_OWNED_DEFAULTS = {
     # opendox/defaults.py name       this leg's module,   this leg's name
     "DEFAULT_RECORDS_DIR":          ("gate_console",      "DEFAULT_RECORDS_DIR"),
@@ -449,9 +464,39 @@ def _module_level_literals(path: Path) -> dict[str, object]:
         for target in targets:
             try:
                 found[target.id] = ast.literal_eval(value)
-            except ValueError:
+            except (ValueError, TypeError, SyntaxError):
                 continue  # a derived value, not a literal — not this guard's business
     return found
+
+
+def _opendox_owned() -> dict[str, object]:
+    """`opendox/defaults.py`'s module-level literals, read out of the PINNED tree."""
+    return _module_level_literals(_pinned_opendox_root() / "defaults.py")
+
+
+def test_the_owned_defaults_table_matches_the_mapping_opendox_publishes() -> None:
+    """The pairing is openDox's to publish; this file's copy must agree with it.
+
+    `MIRRORED_AT_CONSUMER` exists at openDox-code for this guard and no other
+    reader. Comparing against it is what stops the guard from holding the WRONG
+    pair: a value re-homed from `gate_console` to some other module of this leg,
+    or renamed, would leave a hand-kept inverse pointing at the old one and
+    every literal comparison below still green.
+    """
+    published = _opendox_owned().get("MIRRORED_AT_CONSUMER")
+    assert isinstance(published, dict) and published, (
+        "`opendox/defaults.py` no longer publishes MIRRORED_AT_CONSUMER as a "
+        "module-level literal. It is the pairing this guard reads; if it moved "
+        "or became derived, this guard has to follow it in the same act")
+
+    inverted = {owned: pair for pair, owned in published.items()}
+    assert inverted == OPENDOX_OWNED_DEFAULTS, (
+        f"the pinned openDox publishes a different pairing than this file "
+        f"records: {inverted} vs {OPENDOX_OWNED_DEFAULTS}. openDox owns these "
+        "values and names where each mirrors at THIS leg, so the mapping there "
+        "is the authority — update this table in the same act, and check that "
+        "the module it now names is the one this leg actually publishes the "
+        "value from")
 
 
 @pytest.mark.parametrize("owned_name", sorted(OPENDOX_OWNED_DEFAULTS))
@@ -466,8 +511,15 @@ def test_the_opendox_owned_defaults_match_this_leg(owned_name: str) -> None:
     peeked with one TTL and served with another, and every suite on both sides
     would stay green while it happened.
     """
-    module_name, leg_name = OPENDOX_OWNED_DEFAULTS[owned_name]
-    owned = _module_level_literals(_pinned_opendox_root() / "defaults.py")
+    owned = _opendox_owned()
+    published = owned.get("MIRRORED_AT_CONSUMER") or {}
+    # The OPERATIVE pairing is the one openDox publishes, not this file's copy;
+    # the copy is checked against it by the test above, which fails first and
+    # says so. Falling back to the recorded table keeps THIS test's failure
+    # about the literals when the mapping is what has gone missing.
+    pairs = {owned_at: pair for pair, owned_at in published.items()}
+    module_name, leg_name = pairs.get(owned_name,
+                                      OPENDOX_OWNED_DEFAULTS[owned_name])
     assert owned_name in owned, (
         f"`opendox/defaults.py` no longer defines {owned_name!r} as a "
         f"module-level literal. It holds the value for openDox's default "
