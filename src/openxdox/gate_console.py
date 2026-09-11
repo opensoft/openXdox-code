@@ -62,6 +62,7 @@ import yaml
 
 from doc_health import corpus
 
+from . import domain_profile
 from . import record_binding
 from . import round_trip
 from opendox.boundary import (
@@ -164,11 +165,72 @@ DEMOTION_EXECUTION_KIND = "demotion-execution-receipt"
 # any write here — only a default the CLI/tests may override.
 DEFAULT_RECORDS_DIR = "ideation/dashboard/gate-records/"
 
-DRAFT_STATUS = "draft"
-# The status a returning PRIMARY FRAGMENT carries. Set positively rather than by
-# omitting the flip, so a snapshot whose own header had drifted is normalized
-# instead of returned as-is (align-demote-to-round-trip-rule).
-STAGED_STATUS = "staged"
+# THE DOMAIN'S WORDS, RESOLVED LATE — NEVER HARDCODED (RULING C2, § 4.4).
+#
+# `DRAFT_STATUS` and `STAGED_STATUS` were `"draft"` and `"staged"`: openxFactory's
+# OWN `Status:` taxonomy living inside the domain-neutral `openxdox` package,
+# which is verbatim the failure `domain-mapping-declaration` names. They are now
+# looked up from the registered domain profile, by neutral ROLE, at the moment
+# they are needed.
+#
+# BY ROLE, AND BY ACT — never by word, and never by a kind's name either.
+# `STAGED_STATUS` was never "the string `staged`"; it is "the status a returning
+# primary fragment carries", which is precisely the status the profile declares
+# the `demote` transition lands ON. `DRAFT_STATUS` is "the PROPOSED status of the
+# kind this domain demotes", and that kind is found through the same transition
+# rather than by writing `governance-document` — a descendant calls its governed
+# prose something else. What the engine does keep is its OWN verb list: `demote`
+# is the gate console's API surface, not a status word, and looking the domain's
+# words up BY the act is what makes `MedxDox` need no engine change.
+#
+# NOTHING RESOLVES AT IMPORT TIME. These are functions, and the module-level
+# `__getattr__` at the foot of this file keeps `gate_console.STAGED_STATUS` and
+# `gate_console.DRAFT_STATUS` working for any importer, resolved on first ACCESS.
+# Importing this module still registers nothing and requires nothing.
+
+#: The gate console's own reverse-transition verb. The engine's vocabulary, not
+#: the domain's — the profile's words are reached THROUGH it.
+DEMOTE_ACT = "demote"
+
+#: The gate console's promote verb. Used to NAME the kind whose entries it
+#: promotes without writing that kind's domain name into this package: the
+#: profile says which of its kinds declares this act, and that kind's declared
+#: `terminal_statuses` are the ones `promotability_refusal` refuses on.
+PROMOTE_TO_STAGING_ACT = "promote-to-staging"
+
+
+def _demote_destination() -> str:
+    """The status — and the record `kind:` token — the `demote` act lands on."""
+    return domain_profile.current().destination_status(DEMOTE_ACT)
+
+
+def _staged_status() -> str:
+    """The status a returning PRIMARY FRAGMENT carries.
+
+    Set positively rather than by omitting the flip, so a snapshot whose own
+    header had drifted is normalized instead of returned as-is
+    (align-demote-to-round-trip-rule).
+    """
+    return _demote_destination()
+
+
+def _draft_status() -> str:
+    """The PROPOSED status of the kind this domain demotes."""
+    profile = domain_profile.current()
+    return profile.status("proposed", kind=profile.kind_declaring(DEMOTE_ACT))
+
+
+def _terminal_register_states() -> tuple[str, ...]:
+    """The register vocabulary's terminal states, per kind (RULED ASK-4 Q4).
+
+    These two words are the POSSIBLES REGISTER's states, not the document
+    spine's — which is exactly why `terminal_statuses` is declared per KIND: one
+    flat list would have mixed two vocabularies and handed the next descendant
+    the confusion.
+    """
+    profile = domain_profile.current()
+    return profile.terminal_statuses(
+        profile.kind_declaring(PROMOTE_TO_STAGING_ACT))
 
 
 class GateRefused(Exception):
@@ -823,7 +885,7 @@ def classify_change_file(rel_within_change: str) -> tuple[str, str, str | None]:
     supporting-docs return to the topic root. Markdown drafts flip to
     `Status: draft`; non-markdown carry no Status header (flip is a no-op)."""
     base = rel_within_change.split("/")[-1]
-    flip = DRAFT_STATUS if base.endswith(".md") else None
+    flip = _draft_status() if base.endswith(".md") else None
     if base == "proposal.md":
         return "proposal-draft", f"openspec/{rel_within_change}", flip
     if base == "design.md":
@@ -900,7 +962,7 @@ def plan_demotion(
             from_path=path, to_path=to_path, role=role,
             # A staged topic's outline is STAGED. The `draft` flip stays exactly
             # as it was for the proposal documents bound for `openspec/`.
-            status_flip=STAGED_STATUS if is_outline else flip,
+            status_flip=_staged_status() if is_outline else flip,
             outline=is_outline))
 
     withdrawn = tuple(sorted(
@@ -965,7 +1027,7 @@ def transition_manifest(plan: DemotionPlan, *, actor: str, at: str,
         "transition": "demote",
         "change_id": plan.change_id,
         "destination": {
-            "kind": "staged",
+            "kind": _demote_destination(),
             "id": plan.staging_topic,
             "path": plan.topic_path,
             "openspec_workspace": plan.openspec_workspace,
@@ -1009,7 +1071,7 @@ def executable_plan(plan: DemotionPlan, *, actor: str, at: str) -> dict:
             # one. Whether any given file needs it is a fact about the tree, not
             # the path — so the plan states the RULE and the execution record
             # names the files it actually applied to.
-            step["ensure_status"] = DRAFT_STATUS
+            step["ensure_status"] = _draft_status()
         if m.outline:
             # DECLARED before execution: this destination is the topic's outline,
             # so it is refreshed rather than overwritten, and a pre-existing
@@ -1148,7 +1210,7 @@ def promotability_refusal(entry: Any) -> str | None:
         return "no such possible in the pinned checkout's register"
     state = entry.get("state")
     if state != _PROMOTABLE_STATE:
-        if state in ("rejected", "superseded"):
+        if state in _terminal_register_states():
             return (f"possible is {state!r} — a terminal state; a revived "
                     "candidate is a NEW register entry with a new id")
         if state == "picked":
@@ -1336,7 +1398,8 @@ def _restore_outline(
         # the corpus readers (doc-health, the wheel) should see it.
         kept = dst.parent / f"{plan.staging_topic}.snapshot-{plan.change_id}.md"
         kept_text, kept_added = _add_status_header(
-            _flip_status(snapshot_bytes.decode("utf-8"), DRAFT_STATUS), DRAFT_STATUS)
+            _flip_status(snapshot_bytes.decode("utf-8"), _draft_status()),
+            _draft_status())
         kept.write_bytes(kept_text.encode("utf-8"))
         if kept_added:
             result.status_headers_added.append(
@@ -1348,7 +1411,7 @@ def _restore_outline(
         # CASES 1 and 2. The snapshot becomes the fragment, with its Status set
         # positively to `staged` by the plan's own flip.
         base = _flip_status(snapshot_bytes.decode("utf-8"), outline.status_flip
-                            or STAGED_STATUS)
+                            or _staged_status())
         result.snapshot_disposition = "applied"
 
     # THE HEADER OBLIGATION REACHES THE OUTLINE TOO, and specifically the
@@ -1371,7 +1434,7 @@ def _restore_outline(
     # own status — whatever the human set it to — is still never rewritten here.
     # Only its absence is filled.
     base, outline_added = _add_status_header(
-        base, outline.status_flip or STAGED_STATUS)
+        base, outline.status_flip or _staged_status())
     if outline_added:
         result.status_headers_added.append(outline.to_path)
 
@@ -1484,7 +1547,8 @@ def execute_demotion_plan(plan: DemotionPlan, tree_root: Path | str, *, at: str 
             # unheadered returned artifact makes the cycle one-way for that
             # topic. `_flip_status` cannot do this — it is a no-op on a document
             # with no header, which is 93 of 94 `tasks.md` in this corpus.
-            updated, added = _add_status_header(updated, m.status_flip or DRAFT_STATUS)
+            updated, added = _add_status_header(
+                updated, m.status_flip or _draft_status())
             if added:
                 result.status_headers_added.append(m.to_path)
             if updated != decoded:
@@ -1566,7 +1630,7 @@ def execute_demotion_plan(plan: DemotionPlan, tree_root: Path | str, *, at: str 
     # immutable evidence `record` would claim (design Decision 2).
     index.write_text(
         f"# openspec/ draft workspace — {plan.staging_topic}\n\n"
-        f"Status: {DRAFT_STATUS}\n\n"
+        f"Status: {_draft_status()}\n\n"
         f"Draft proposals returned from demoted change {plan.change_id} "
         f"({at[:10]}). These continue as draft ideas per the draft-proposal "
         f"convention:\n\n" + ("\n".join(f"- {p}" for p in ws_files) or "- (none)") + "\n",
@@ -1648,7 +1712,7 @@ def demotion_execution_receipt(
         "change_id": result.plan.change_id,
         "status": "executed",
         "destination": {
-            "kind": "staged",
+            "kind": _demote_destination(),
             "id": result.plan.staging_topic,
             "path": result.plan.topic_path,
         },
@@ -2239,3 +2303,35 @@ class GateConsole:
             self.gate, project_id, add=add, remove=remove, roster=roster,
             register_source=register_source, outline=outline, note=note,
             at=at, records_dir=self.records_dir, provenance=provenance, **extra)
+
+
+# ---------------------------------------------------------------------------
+# BACKWARD-COMPATIBLE MODULE ATTRIBUTES, RESOLVED ON FIRST ACCESS (PEP 562).
+#
+# `STAGED_STATUS` and `DRAFT_STATUS` were module constants of this file for the
+# whole of its life, and an importer is entitled to keep reading them. They are
+# no longer constants — they are one domain's words, and this package no longer
+# owns any — so they resolve through the registered profile at the moment they
+# are ASKED FOR. A module-level `__getattr__` is the one mechanism that does
+# that without resolving anything at import time: `import openxdox.gate_console`
+# still registers nothing, requires nothing and refuses nothing.
+#
+# Accessing either with no profile registered raises
+# `domain_profile.DomainProfileNotRegistered`, naming the registration call —
+# the same refusal every other site in this module gets, rather than a
+# `NameError` or, worse, a stale word.
+_LATE_ATTRIBUTES = {
+    "STAGED_STATUS": _staged_status,
+    "DRAFT_STATUS": _draft_status,
+}
+
+
+def __getattr__(name: str):
+    resolver = _LATE_ATTRIBUTES.get(name)
+    if resolver is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    return resolver()
+
+
+def __dir__() -> list[str]:
+    return sorted(list(globals()) + list(_LATE_ATTRIBUTES))

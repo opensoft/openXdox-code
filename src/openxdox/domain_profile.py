@@ -440,6 +440,28 @@ class DomainProfile:
         """Every declared transition carrying `act`, across every kind."""
         return tuple(t for lc in self.lifecycle for t in lc.transitions if t.act == act)
 
+    def kind_declaring(self, act: str) -> str:
+        """The artifact kind whose lifecycle declares transitions for `act`.
+
+        How the engine names a KIND without hardcoding one. `governance-document`
+        is openxFactory's word for its governed prose; `MedxDox` will call the
+        same thing something else, so an engine site that needs "the kind this
+        domain demotes" asks for it by the ACT rather than by the kind's name.
+        The engine keeps its own verb list — `demote` is the gate console's own
+        API surface, not a status word — and looks the DOMAIN's words up by it.
+        """
+        kinds = tuple(sorted({lc.artifact_kind for lc in self.lifecycle
+                              for t in lc.transitions if t.act == act}))
+        if not kinds:
+            raise ProfileLookupError(
+                f"no lifecycle in domain profile {self.mapping_id!r} declares a "
+                f"transition for act {act!r}")
+        if len(kinds) > 1:
+            raise ProfileLookupError(
+                f"act {act!r} is declared by more than one kind in domain profile "
+                f"{self.mapping_id!r}: {list(kinds)}; the engine cannot pick one")
+        return kinds[0]
+
     def destination_status(self, act: str) -> str:
         """The status an act's declared transitions land ON.
 

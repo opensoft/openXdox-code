@@ -61,6 +61,14 @@ artifact_kinds:
     label: "OpenSpec change"
     description: "An active proposal: proposal.md, tasks.md, design.md and spec deltas."
     locations: ["openspec/changes/<change-id>/"]
+  - id: register-possible
+    label: "Register possible"
+    description: >-
+      An entry in the possibles register — a candidate a lens derived or a
+      human authored, which may be picked into a change or disposed of. Its
+      states are the REGISTER's vocabulary, not the document spine's, which is
+      exactly why ASK-4 Q4 ruled `terminal_statuses` per KIND.
+    locations: ["ideation/dashboard/registers/"]
   - id: projection
     label: "Projection"
     description: >-
@@ -198,6 +206,29 @@ lifecycle:
     transitions:
       - {from: staged, to: draft, authority: change-author, act: propose, basis: "organized -> proposed"}
 
+  - artifact_kind: register-possible
+    vocabulary:
+      - {id: latent,     role: captured,   label: "Latent",     meaning: "Derived or authored and not yet acted on; the only promotable state"}
+      - {id: picked,     role: proposed,   label: "Picked",     meaning: "Already carries its own pick edge into a change"}
+      - {id: promoted,   role: promoted,   label: "Promoted",   meaning: "Carried into ideation/staging/ as a topic"}
+      - {id: rejected,   role: retired,    label: "Rejected",   meaning: "Disposed of; a revived candidate is a NEW entry with a new id"}
+      - {id: superseded, role: superseded, label: "Superseded", meaning: "Replaced by another entry; kept for provenance"}
+    terminal_statuses: [rejected, superseded]
+    immutability_point:
+      status: rejected
+      addenda: separate-document
+      note: >-
+        Past a terminal state a register entry is never edited back to life:
+        "a revived candidate is a NEW register entry with a new id"
+        (gate_console.promotability_refusal). The correction is a separate
+        entry, never a mutation of this one.
+    transitions:
+      - {from: null,   to: latent,     authority: evidence-producer,   act: derive-possibles, basis: "a lens derives a candidate, or a human authors one"}
+      - {from: latent, to: picked,     authority: change-author,       basis: "the candidate acquires a pick edge into a change"}
+      - {from: latent, to: promoted,   authority: gate-actor,          act: promote-to-staging, destination_kind: staging-topic, basis: "only a `latent` possible is promotable"}
+      - {from: latent, to: rejected,   authority: gate-actor,          act: dispose-possible, basis: "disposed of at the gate console, with a recorded reason"}
+      - {from: latent, to: superseded, authority: gate-actor,          act: dispose-possible, basis: "replaced by another entry"}
+
   - artifact_kind: projection
     vocabulary:
       - {id: projection, role: out-of-band, label: "Projection", excluded_from_conversion: true}
@@ -304,6 +335,19 @@ notes:
     read off a stale checkout and omitted `projection`, which is retracted in
     openxFactory#656 comment 5633989351 and corrected by openXdox-spec #11.
     See this file's own header.
+  - >-
+    TWO DELIBERATE ADDITIONS to the source example, both of which the source
+    itself asks for. (1) `projection` — see this file's header. (2) the
+    `register-possible` kind: the source example's own closing note says it
+    "would gain a fifth artifact kind (`register-possible`) when the register's
+    own vocabulary is declared", and the engine now ASKS for that vocabulary —
+    `gate_console.promotability_refusal` reads
+    `terminal_statuses("register-possible")` where it used to carry the literal
+    pair `("rejected", "superseded")`. A fixture that omitted the kind would
+    prove the accessor against a profile no real host could supply. THE
+    openxFactory HALF MUST DECLARE THIS KIND: a real profile without it makes
+    `promotability_refusal` raise `ProfileLookupError` instead of refusing a
+    terminal candidate.
   - >-
     `terminal_statuses` on `governance-document` is `[superseded, retired]`.
     The `("rejected", "superseded")` pair hardcoded at
