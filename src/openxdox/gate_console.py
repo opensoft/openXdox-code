@@ -1611,8 +1611,17 @@ def execute_demotion_plan(plan: DemotionPlan, tree_root: Path | str, *, at: str 
         readme.write_text(readme.read_bytes().decode("utf-8") + note,
                           encoding="utf-8", newline="")
     else:
-        readme.write_text(f"# {plan.staging_topic}\n\nStatus: staged\n" + note,
-                          encoding="utf-8", newline="")
+        # SITE EIGHTEEN. The design note's sweep counted seventeen occurrences
+        # over fifteen lines and missed this one, because it looked for the bare
+        # token `"staged"` and the constant `STAGED_STATUS` and this word is
+        # EMBEDDED in a longer f-string. `tests/test_no_hardcoded_status_words.py`
+        # found it, which is the argument for a guard over a careful reading.
+        # A new staging topic's README is a governed markdown document written
+        # by the reverse transition, and it carries the same status the returning
+        # primary fragment does — so it reads the same accessor.
+        readme.write_text(
+            f"# {plan.staging_topic}\n\nStatus: {_staged_status()}\n" + note,
+            encoding="utf-8", newline="")
     result.readme_path = readme
 
     # openspec/ workspace INDEX of the returned draft proposals.
