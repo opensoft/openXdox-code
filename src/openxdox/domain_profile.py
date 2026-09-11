@@ -12,11 +12,11 @@ consequence in one box:
     defect under `domain-mapping-declaration`.
 
 It did not do this. `gate_console.py` and `generator.py` carried openxFactory's
-OWN `Status:` taxonomy as literals — seventeen occurrences over fifteen lines,
+OWN `Status:` taxonomy as literals — eighteen occurrences over sixteen lines,
 re-swept live for this slice — inside the domain-neutral `openxdox` package,
 which is verbatim the failure `domain-mapping-declaration` names ("openxFactory's
 own vocabulary is treated as neutral ... the placement is refused under RULING
-C2"). This module is what those seventeen sites now read instead.
+C2"). This module is what those eighteen sites now read instead.
 
 THE SHAPE IS RULED, NOT INVENTED. `openXdox-spec`
 `docs/domain-profile-design-note.md` designs it and
@@ -1109,7 +1109,7 @@ def current() -> DomainProfile:
     before the host's process-start call has run.
 
     There is no fallback to the words this package used to hardcode. That
-    fallback is precisely how the seventeen literals would have survived § 4.4
+    fallback is precisely how the eighteen literals would have survived § 4.4
     invisibly, and it is the permissive default `domain-mapping-declaration`
     refuses.
     """
