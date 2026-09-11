@@ -61,11 +61,44 @@ OWN = frozenset({"openxdox", "route_extension", "subcommand_extension"})
 #:                this suite's job.
 IMPORT_TIME_ALLOWED = frozenset({"opendox", "yaml", "doc_health"})
 
-#: Additionally reachable inside a function body. `jsonschema` is reached once
-#: (`gate_console.py:563`) and is NOT in `pyproject.toml`'s dependency set —
-#: recorded here as a finding rather than silently declared, because adding a
-#: dependency is not a direction fix.
-DEFERRED_ALSO_ALLOWED = frozenset({"jsonschema"})
+
+def _declared_runtime_dependency_import_names() -> frozenset[str]:
+    """Top-level import name of every `[project] dependencies` entry.
+
+    Read back with `tomllib` (stdlib at the interpreter this leg pins,
+    `>=3.12`) rather than re-deriving the `ast`-walk this file's
+    `pyproject.toml` documents for HOW the list was built — that walk is how
+    the names get INTO the list; this only reads them back out, so the two
+    cannot drift apart with one hand-maintained twice. A PEP 508 requirement's
+    distinguishing name is everything before its first version/marker/URL
+    separator; the PyPI distribution name and the import name differ for
+    exactly one entry here, `PyYAML` -> `yaml`, mapped by hand because no
+    general rule covers it.
+    """
+    import re
+    import tomllib
+
+    data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    names = {
+        re.split(r"[ @\[<>=!~;]", requirement, maxsplit=1)[0].strip().lower()
+        for requirement in data["project"]["dependencies"]
+    }
+    return frozenset("yaml" if name == "pyyaml" else name for name in names)
+
+
+#: Cross-package roots reachable ONLY inside a function body, where the name
+#: IS a declared runtime dependency — DERIVED from `pyproject.toml` rather
+#: than hand-listed, so this set can only ever say "declared", never merely
+#: "allowlisted". `jsonschema` is the one example today: reached once,
+#: `gate_console.py:563`'s `_validate_contract_document`, exercised only when
+#: a caller asks to validate a contract document. It was the BUILD-arc slice 3
+#: finding recorded on opensoft/openxFactory#656 comment 5627156620,
+#: correction (c) — undeclared because the derivation walk `pyproject.toml`
+#: documents covers module bodies and module-level `if`/`try`/`with` only,
+#: never a function body, the same gap `DEFERRED_ALLOWED` closes for the
+#: CHECK: declaring the name (this same PR) is what makes it appear here, not
+#: a second hand-typed copy of it.
+DEFERRED_ALLOWED = _declared_runtime_dependency_import_names()
 
 #: The pre-carve package name. Every arrived module's `import rewrites` edit
 #: class exists to retire it; a survivor under `src/` is an UNAPPLIED rewrite,
@@ -164,16 +197,21 @@ def test_no_module_under_src_reaches_its_consumer_at_import_time() -> None:
 
 
 def test_every_deferred_cross_package_reach_out_of_src_is_known() -> None:
-    """The same list, one name wider, for reaches inside a function body."""
-    allowed = IMPORT_TIME_ALLOWED | DEFERRED_ALSO_ALLOWED
+    """The same list, one name wider: reaches from inside a function body,
+    where the name need only be a DECLARED dependency — never hand-listed a
+    second time — to count as known."""
+    allowed = IMPORT_TIME_ALLOWED | DEFERRED_ALLOWED
     offenders = sorted({
         f"{rel}:{line} -> {root}" for rel, line, root, at_import in _src_census()
         if not at_import and root not in OWN and root not in allowed
         and root not in _STDLIB
     })
     assert offenders == [], (
-        f"deferred cross-package reach(es) out of src/ nothing declares: "
-        f"{offenders}")
+        "deferred cross-package reach(es) out of src/ that this leg does not "
+        f"declare: {offenders}. A name reached only from inside a function "
+        "body still needs a declared runtime dependency (pyproject.toml) or "
+        "a place on IMPORT_TIME_ALLOWED above — add it there, it is not "
+        "enough for the reach to merely defer")
 
 
 #: Modules of this leg whose whole purpose is to CONSUME openDox — the § 2.4
