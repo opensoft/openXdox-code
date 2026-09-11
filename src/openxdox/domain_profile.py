@@ -598,6 +598,26 @@ def _as_sequence(value: Any, where: str) -> list[Any]:
     return items
 
 
+def _opt_sequence(mapping: Mapping[str, Any], key: str, where: str) -> list[Any]:
+    """A declared list for the one axis (`gates`) that is genuinely optional.
+
+    `mapping.get(key) or []` treats a missing key, an explicit `null`, AND any
+    other falsey present value — `false`, `0`, `""` — identically, silently
+    loading a malformed declaration as "not declared" and letting whatever it
+    contained (or didn't) skip every check downstream. Missing/`null` is the
+    only case that legitimately means "no gates"; anything else present must
+    actually be a list. Unlike `_as_sequence`, an explicitly empty list is NOT
+    refused here — "no entries" and "key absent" mean the same thing for an
+    optional axis, unlike a required one.
+    """
+    value = mapping.get(key)
+    if value is None:
+        return []
+    if isinstance(value, (str, bytes)) or not isinstance(value, Iterable):
+        raise DomainProfileInvalid(f"{where}: expected a list, got {type(value).__name__}")
+    return list(value)
+
+
 def _text(value: Any, where: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise DomainProfileInvalid(f"{where}: expected a non-empty string")
@@ -951,7 +971,7 @@ def load(source: str | Path | Mapping[str, Any]) -> DomainProfile:
             for i, v in enumerate(_as_sequence(data["lifecycle"], "lifecycle"))),
         acts=tuple(_act(v, i) for i, v in enumerate(_as_sequence(data["acts"], "acts"))),
         gates=tuple(
-            _gate(v, i) for i, v in enumerate(data.get("gates") or [])),
+            _gate(v, i) for i, v in enumerate(_opt_sequence(data, "gates", "gates"))),
         evidence_classes=tuple(
             _evidence_class(v, i)
             for i, v in enumerate(_as_sequence(data["evidence_classes"], "evidence_classes"))),
