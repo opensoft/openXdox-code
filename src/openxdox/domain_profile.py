@@ -904,10 +904,16 @@ def load(source: str | Path | Mapping[str, Any]) -> DomainProfile:
             "kinds, lifecycle, acts and gates, evidence classes, promoting "
             "authorities — plus its truth store; none of them is optional.")
 
-    if data["schema_version"] != SCHEMA_VERSION:
+    # `isinstance(..., bool)` checked FIRST and separately from `!= SCHEMA_VERSION`:
+    # `bool` is a subclass of `int` in Python and `True == 1`, so
+    # `schema_version: true` would otherwise pass this check as schema version
+    # 1 — a malformed profile with the wrong type let through by an equality
+    # comparison that does not care about type.
+    version = data["schema_version"]
+    if isinstance(version, bool) or not isinstance(version, int) or version != SCHEMA_VERSION:
         raise DomainProfileInvalid(
-            f"{where}: schema_version is {data['schema_version']!r}; this engine "
-            f"reads {SCHEMA_VERSION}")
+            f"{where}: schema_version is {version!r}; this engine reads "
+            f"{SCHEMA_VERSION}")
     if data["kind"] != PROFILE_KIND:
         raise DomainProfileInvalid(
             f"{where}: kind is {data['kind']!r}, not {PROFILE_KIND!r}")

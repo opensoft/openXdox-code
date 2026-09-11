@@ -96,6 +96,16 @@ def test_a_later_schema_version_is_refused_rather_than_guessed(raw):
         dp.load(raw)
 
 
+@pytest.mark.parametrize("bad", [True, False, "1", 1.0])
+def test_a_non_int_schema_version_is_refused_even_when_equal_by_coincidence(raw, bad):
+    """`bool` is an `int` subclass and `True == 1` in Python, so
+    `schema_version: true` must be explicitly rejected rather than accepted as
+    version 1 by a bare `!=` comparison that does not check the type."""
+    raw["schema_version"] = bad
+    with pytest.raises(dp.DomainProfileInvalid, match="schema_version"):
+        dp.load(raw)
+
+
 def test_unrecognized_fields_are_tolerated(raw):
     """Forward tolerance: a later revision of the openXdox-spec schema loads.
 
