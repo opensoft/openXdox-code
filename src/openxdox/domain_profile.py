@@ -748,7 +748,16 @@ def _lifecycle(raw: Any, index: int) -> Lifecycle:
             raise DomainProfileInvalid(
                 f"{where}.transitions[{i}].from: {t.from_status!r} is not in this "
                 f"kind's declared vocabulary {ids}")
-    terminal = _tuple_of_text(data.get("terminal_statuses"), f"{where}.terminal_statuses")
+    # `_require`, not `.get()`: `terminal_statuses` is required by the profile
+    # contract EVEN WHEN THE LIST IS EMPTY (openxFactory's own `projection`
+    # kind declares `terminal_statuses: []` rather than omitting the key).
+    # `.get()` cannot tell "declared empty" apart from "not declared at all" —
+    # both reach `_tuple_of_text` as `None` and both become `()` — so a
+    # profile that omits the field entirely loaded exactly as if it had
+    # explicitly said "no terminal states", instead of being refused for
+    # skipping a required declaration.
+    terminal = _tuple_of_text(
+        _require(data, "terminal_statuses", where), f"{where}.terminal_statuses")
     for word in terminal:
         if word not in ids:
             raise DomainProfileInvalid(

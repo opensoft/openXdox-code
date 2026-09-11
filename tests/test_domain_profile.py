@@ -145,6 +145,17 @@ def test_a_terminal_status_outside_the_vocabulary_is_refused(raw):
         dp.load(raw)
 
 
+def test_an_omitted_terminal_statuses_is_refused_not_defaulted_to_empty(raw):
+    """`terminal_statuses` is required EVEN WHEN THE LIST IS EMPTY — openxFactory's
+    own `projection` kind declares `terminal_statuses: []` rather than omitting
+    the key. `.get()` cannot tell "declared empty" apart from "not declared at
+    all"; omitting the key entirely must be refused, not silently treated as
+    the former."""
+    del raw["lifecycle"][0]["terminal_statuses"]
+    with pytest.raises(dp.DomainProfileInvalid, match="terminal_statuses"):
+        dp.load(raw)
+
+
 def test_a_status_without_a_neutral_role_is_refused(raw):
     del raw["lifecycle"][0]["vocabulary"][0]["role"]
     with pytest.raises(dp.DomainProfileInvalid, match="role"):
