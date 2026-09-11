@@ -604,9 +604,23 @@ def _text(value: Any, where: str) -> str:
     return value
 
 
-def _opt_text(mapping: Mapping[str, Any], key: str) -> str | None:
-    value = mapping.get(key)
-    return value if isinstance(value, str) and value.strip() else None
+def _opt_text(mapping: Mapping[str, Any], key: str, where: str) -> str | None:
+    """An optional declared string: absent or null is `None`, anything else must
+    actually be one.
+
+    `value if isinstance(value, str) ... else None` would silently turn a
+    malformed present value — `transition.act: 123`, `destination_kind: 42` —
+    into the SAME `None` a genuinely omitted field produces, which is
+    indistinguishable from "this transition does not declare one" to every
+    cross-axis check below (`kind_declaring()`, `destination_role_status()`)
+    and to `load()`'s own referential-integrity checks, letting a malformed
+    profile load as if it had declared less than it did. A present value is
+    therefore refused here, by name, unless it actually is a non-empty string —
+    the same promise `_text` makes for required fields.
+    """
+    if key not in mapping or mapping[key] is None:
+        return None
+    return _text(mapping[key], f"{where}.{key}")
 
 
 def _flag(mapping: Mapping[str, Any], key: str, where: str) -> bool:
@@ -653,8 +667,8 @@ def _status(raw: Any, where: str) -> Status:
     return Status(
         id=_text(_require(data, "id", where), f"{where}.id"),
         role=role,
-        label=_opt_text(data, "label"),
-        meaning=_opt_text(data, "meaning"),
+        label=_opt_text(data, "label", where),
+        meaning=_opt_text(data, "meaning", where),
         contradiction_legal=_flag(data, "contradiction_legal", where),
         excluded_from_conversion=_flag(data, "excluded_from_conversion", where),
     )
@@ -667,7 +681,7 @@ def _immutability_point(raw: Any, where: str) -> ImmutabilityPoint:
         raise DomainProfileInvalid(
             f"{where}.addenda: {addenda!r} is not a lawful-later-write this "
             f"engine knows; the declared values are {list(KNOWN_ADDENDA)}")
-    note = _opt_text(data, "note")
+    note = _opt_text(data, "note", where)
     if addenda == NEVER_FREEZES and note is None:
         raise DomainProfileInvalid(
             f"{where}: an immutability point declaring {NEVER_FREEZES!r} says this "
@@ -691,10 +705,10 @@ def _transition(raw: Any, where: str) -> Transition:
         from_status=origin,
         to=_text(_require(data, "to", where), f"{where}.to"),
         authority=_text(_require(data, "authority", where), f"{where}.authority"),
-        act=_opt_text(data, "act"),
-        destination_kind=_opt_text(data, "destination_kind"),
-        basis=_opt_text(data, "basis"),
-        reverse_of=_opt_text(data, "reverse_of"),
+        act=_opt_text(data, "act", where),
+        destination_kind=_opt_text(data, "destination_kind", where),
+        basis=_opt_text(data, "basis", where),
+        reverse_of=_opt_text(data, "reverse_of", where),
     )
 
 
@@ -778,7 +792,7 @@ def _artifact_kind(raw: Any, index: int) -> ArtifactKind:
     return ArtifactKind(
         id=_text(_require(data, "id", where), f"{where}.id"),
         label=_text(_require(data, "label", where), f"{where}.label"),
-        description=_opt_text(data, "description"),
+        description=_opt_text(data, "description", where),
         locations=_tuple_of_text(data.get("locations"), f"{where}.locations"),
     )
 
@@ -789,8 +803,8 @@ def _act(raw: Any, index: int) -> Act:
     return Act(
         id=_text(_require(data, "id", where), f"{where}.id"),
         gate=_text(_require(data, "gate", where), f"{where}.gate"),
-        label=_opt_text(data, "label"),
-        target_kind=_opt_text(data, "target_kind"),
+        label=_opt_text(data, "label", where),
+        target_kind=_opt_text(data, "target_kind", where),
         requires_evidence=_tuple_of_text(
             data.get("requires_evidence"), f"{where}.requires_evidence"),
     )
@@ -802,8 +816,8 @@ def _gate(raw: Any, index: int) -> Gate:
     return Gate(
         id=_text(_require(data, "id", where), f"{where}.id"),
         actor_class=_text(_require(data, "actor_class", where), f"{where}.actor_class"),
-        label=_opt_text(data, "label"),
-        description=_opt_text(data, "description"),
+        label=_opt_text(data, "label", where),
+        description=_opt_text(data, "description", where),
     )
 
 
@@ -812,8 +826,8 @@ def _evidence_class(raw: Any, index: int) -> EvidenceClass:
     data = _as_mapping(raw, where)
     return EvidenceClass(
         id=_text(_require(data, "id", where), f"{where}.id"),
-        label=_opt_text(data, "label"),
-        description=_opt_text(data, "description"),
+        label=_opt_text(data, "label", where),
+        description=_opt_text(data, "description", where),
     )
 
 
@@ -823,7 +837,7 @@ def _authority(raw: Any, index: int) -> Authority:
     return Authority(
         id=_text(_require(data, "id", where), f"{where}.id"),
         label=_text(_require(data, "label", where), f"{where}.label"),
-        description=_opt_text(data, "description"),
+        description=_opt_text(data, "description", where),
         human_only=_flag(data, "human_only", where),
     )
 
@@ -836,7 +850,7 @@ def _truth_store(raw: Any) -> TruthStore:
         external_enforcement_point=_text(
             _require(data, "external_enforcement_point", where),
             f"{where}.external_enforcement_point"),
-        description=_opt_text(data, "description"),
+        description=_opt_text(data, "description", where),
     )
 
 
@@ -926,8 +940,8 @@ def load(source: str | Path | Mapping[str, Any]) -> DomainProfile:
     profile = DomainProfile(
         mapping_id=_text(data["mapping_id"], f"{where}.mapping_id"),
         neutral=False,
-        domain_label=_opt_text(data, "domain_label"),
-        declared_by=_opt_text(data, "declared_by"),
+        domain_label=_opt_text(data, "domain_label", where),
+        declared_by=_opt_text(data, "declared_by", where),
         basis=_tuple_of_text(data.get("basis"), f"{where}.basis"),
         artifact_kinds=tuple(
             _artifact_kind(v, i)
