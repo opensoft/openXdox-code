@@ -496,7 +496,22 @@ class DomainProfile:
         have always carried.
         """
         rows = self.transitions_for(act)
-        values = tuple(sorted({t.destination_kind for t in rows if t.destination_kind}))
+        declared = [t.destination_kind for t in rows]
+        present = [d for d in declared if d]
+        if present and len(present) != len(declared):
+            # NOT the same as "disagree about a value" (`_one` below already
+            # refuses that): here SOME rows for this act name a destination
+            # kind and OTHERS say nothing at all. Filtering the missing ones
+            # out before comparing would silently answer with whichever rows
+            # DID declare it, as if every row had agreed — when one of them
+            # declared nothing.
+            raise ProfileLookupError(
+                f"the transitions for act {act!r} in domain profile "
+                f"{self.mapping_id!r} disagree about destination_kind: "
+                f"{len(present)} of {len(declared)} declare one and the rest "
+                "declare none; either every transition for this act names a "
+                "destination_kind or none of them does")
+        values = tuple(sorted(set(present)))
         return self._one(rows, act, "destination_kind", values)
 
     def destination_role_status(self, act: str, role: str) -> str:

@@ -575,3 +575,29 @@ def test_destination_role_status_matches_the_old_accessor_when_the_words_agree(p
     assert (profile.destination_role_status("demote", "organized")
             == profile.destination_status("demote")
             == "staged")
+
+
+# --------------------------------------------------- fix-round regression case
+#
+# Closes a Copilot review thread from the SECOND round on openXdox-code #14
+# (2026-09-11, domain_profile.py:500, raised against the first round's own
+# `destination_role_status`): `destination_kind()` filtered out rows with no
+# declared `destination_kind` BEFORE comparing values, so if one `demote`
+# transition named a destination kind and another said nothing at all, the
+# filtered set held only the declared value and `_one()` saw no disagreement —
+# answering as if every row had agreed, when one of them had not.
+
+
+def test_destination_kind_refused_when_only_some_transitions_declare_it(raw):
+    """`demote` is declared on TWO rows (from draft, from ratified). If one
+    names `destination_kind` and the other omits it, the old filter-then-
+    compare logic silently returned the one row that DID declare it."""
+    for entry in raw["lifecycle"]:
+        if entry["artifact_kind"] != "governance-document":
+            continue
+        for transition in entry["transitions"]:
+            if transition.get("from") == "ratified" and transition.get("act") == "demote":
+                del transition["destination_kind"]
+    profile = dp.load(raw)
+    with pytest.raises(dp.ProfileLookupError, match="destination_kind"):
+        profile.destination_kind("demote")
