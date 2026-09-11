@@ -327,6 +327,19 @@ def declared_origin_staging(folder: Path) -> str | None:
 
 
 
+def _picked_register_state() -> str:
+    """The register-possible vocabulary's "already carries a pick edge" state.
+
+    RULING C2 / § 4.4: this was the literal `"picked"`, the same possibles-
+    register word `gate_console._picked_register_state` resolves through the
+    profile for the identical reason — a descendant renaming the register's
+    words must not leave the cluster-lineage funnel below reading a word this
+    domain-neutral package no longer owns.
+    """
+    profile = domain_profile.current()
+    return profile.status("proposed", kind=profile.kind_declaring("promote-to-staging"))
+
+
 def _declared_origin_kind() -> str:
     """The `kind:` token a change's declared `origin:` block carries.
 
@@ -913,8 +926,9 @@ def _cluster_lineage(
         sid for sid, topics in staged_topic_topics.items() if topic in topics)
 
     change_ids: set[str] = set()
+    picked_state = _picked_register_state()
     for poss in possibles:
-        if cid in (poss.get("claiming_clusters") or []) and poss.get("state") == "picked":
+        if cid in (poss.get("claiming_clusters") or []) and poss.get("state") == picked_state:
             change_id = (poss.get("pick") or {}).get("change_id")
             if change_id:
                 change_ids.add(change_id)

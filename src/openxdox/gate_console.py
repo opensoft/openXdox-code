@@ -1207,7 +1207,27 @@ def demote(
 # awaiting a real ruling.
 # --------------------------------------------------------------------------
 
-_PROMOTABLE_STATE = "latent"
+def _promotable_register_state() -> str:
+    """The register-possible vocabulary's ONLY promotable state.
+
+    Resolved through the same profile/kind lookup as `_terminal_register_states`
+    (RULED ASK-4 Q4's kind): a descendant renaming this domain's `latent` must
+    not leave this predicate stuck reading openxFactory's own word for it.
+    """
+    profile = domain_profile.current()
+    return profile.status("captured", kind=profile.kind_declaring(PROMOTE_TO_STAGING_ACT))
+
+
+def _picked_register_state() -> str:
+    """The register-possible vocabulary's "already carries a pick edge" state.
+
+    Resolved the same way as `_promotable_register_state`: the word is this
+    domain's own, not a literal the engine may assume.
+    """
+    profile = domain_profile.current()
+    return profile.status("proposed", kind=profile.kind_declaring(PROMOTE_TO_STAGING_ACT))
+
+
 _ORIGIN_AI_DERIVED = "ai-derived"
 _ORIGIN_HUMAN = "human-authored"
 _ACCEPTED = "accepted"
@@ -1222,14 +1242,15 @@ def promotability_refusal(entry: Any) -> str | None:
     if not isinstance(entry, dict):
         return "no such possible in the pinned checkout's register"
     state = entry.get("state")
-    if state != _PROMOTABLE_STATE:
+    promotable_state = _promotable_register_state()
+    if state != promotable_state:
         if state in _terminal_register_states():
             return (f"possible is {state!r} — a terminal state; a revived "
                     "candidate is a NEW register entry with a new id")
-        if state == "picked":
-            return ("possible is 'picked' — it already carries its own pick "
+        if state == _picked_register_state():
+            return (f"possible is {state!r} — it already carries its own pick "
                     "edge, so promoting it again would duplicate it")
-        return (f"possible has state {state!r}, and only a 'latent' possible "
+        return (f"possible has state {state!r}, and only {promotable_state!r} "
                 "is promotable")
     origin = entry.get("origin")
     if origin in (None, _ORIGIN_HUMAN):

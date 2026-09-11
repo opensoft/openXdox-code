@@ -53,7 +53,16 @@ TAXONOMY_WORDS = frozenset({
 #: register's own word and is named here so the pair cannot come back together.
 REGISTER_TERMINAL_WORDS = frozenset({"rejected"})
 
-WATCHED_WORDS = TAXONOMY_WORDS | REGISTER_TERMINAL_WORDS
+#: The register's other two lifecycle words: `_PROMOTABLE_STATE = "latent"` and
+#: a literal `"picked"` check in `gate_console.promotability_refusal`, plus a
+#: second `"picked"` literal in `generator._cluster_lineage` — a fix-round
+#: review caught the first pair and a sweep for the same word found the third
+#: site. All three now resolve through `gate_console._promotable_register_state`
+#: / `_picked_register_state` or `generator._picked_register_state`. Named here,
+#: like `REGISTER_TERMINAL_WORDS` above, so none of the three can come back.
+REGISTER_OTHER_WORDS = frozenset({"latent", "picked"})
+
+WATCHED_WORDS = TAXONOMY_WORDS | REGISTER_TERMINAL_WORDS | REGISTER_OTHER_WORDS
 
 
 def _module_source(name: str) -> tuple[str, ast.Module]:
