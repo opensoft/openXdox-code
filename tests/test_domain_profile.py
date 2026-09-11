@@ -413,3 +413,43 @@ def test_the_upstream_registry_is_consulted_only_as_a_delegation(unregistered_pr
     upstream.is_registered = lambda: False         # type: ignore[attr-defined]
     with pytest.raises(dp.DomainProfileNotRegistered):
         dp.current()
+
+
+# ------------------------------- review findings, kept as regression cases
+
+
+def test_an_undeclared_status_is_refused_even_for_a_kind_that_never_freezes(profile):
+    """The vocabulary check runs BEFORE the never-freezes arm.
+
+    Answering `False` for a word the kind does not declare would hand a typo the
+    same answer as a lawful projection and drop the vocabulary enforcement RULED
+    ASK-4 Q3 for a whole class of kinds.
+    """
+    with pytest.raises(dp.ProfileLookupError, match="typo"):
+        profile.is_immutable("projection", "typo")
+
+
+@pytest.mark.parametrize("bad", [1, {"a": 1}, "one-string"])
+def test_a_scalar_where_a_list_belongs_is_refused_by_name(raw, bad):
+    """`load()` refuses once, naming the field — never a raw TypeError."""
+    raw["lifecycle"][0]["terminal_statuses"] = bad
+    with pytest.raises(dp.DomainProfileInvalid, match="terminal_statuses"):
+        dp.load(raw)
+
+
+def test_a_second_registration_is_refused_not_silently_applied(unregistered_profile,
+                                                               profile, raw):
+    """ONE registration (RULED ASK-4 Q5).
+
+    Swapping the vocabulary under a running engine would leave half a process
+    reading words the other half had stopped using, with nothing reporting it.
+    """
+    dp.register(profile)
+    assert dp.register(profile) is profile, "re-registering the same profile is a no-op"
+    raw["mapping_id"] = "some-other-domain"
+    with pytest.raises(dp.AlreadyRegistered, match="unregister"):
+        dp.register(dp.load(raw))
+    assert dp.current() is profile
+    dp.unregister()
+    other = dp.register(dp.load(raw))
+    assert dp.current() is other

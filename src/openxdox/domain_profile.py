@@ -102,6 +102,7 @@ import yaml
 
 __all__ = [
     "Act",
+    "AlreadyRegistered",
     "ArtifactKind",
     "Authority",
     "DomainProfile",
@@ -173,6 +174,15 @@ class DomainProfileInvalid(ValueError):
     Raised by `load()` at the ONE point a profile enters the process, naming the
     field, so a malformed declaration fails once, on the way in, rather than at
     each of the sites that consume it.
+    """
+
+
+class AlreadyRegistered(RuntimeError):
+    """A second domain profile was registered over a first.
+
+    ONE registration is the contract (RULED ASK-4 Q5). Swapping the vocabulary
+    under a running engine is refused rather than applied; `unregister()` makes
+    a deliberate swap explicit.
     """
 
 
@@ -412,14 +422,17 @@ class DomainProfile:
         the correct act, not a violation.
         """
         lc = self.lifecycle_for(kind)
+        # THE VOCABULARY CHECK COMES FIRST, and specifically before the
+        # never-freezes arm. Answering `False` for a status the kind does not
+        # declare would hand a typo the same answer as a lawful projection and
+        # quietly drop the vocabulary enforcement RULED ASK-4 Q3 for a whole
+        # class of kinds. An undeclared word is a refusal whatever the kind's
+        # immutability point says.
+        self.require_status(kind, status)
         point = lc.immutability_point
         if point.never_freezes:
             return False
         order = lc.status_ids()
-        if status not in order:
-            raise ProfileLookupError(
-                f"{status!r} is not in the declared vocabulary of kind {kind!r} "
-                f"in domain profile {self.mapping_id!r}: {list(order)}")
         return order.index(status) >= order.index(point.status)
 
     def require_status(self, kind: str, status: str) -> str:
@@ -569,10 +582,19 @@ def _flag(mapping: Mapping[str, Any], key: str) -> bool:
 
 
 def _tuple_of_text(value: Any, where: str) -> tuple[str, ...]:
+    """A declared list of strings, or ().
+
+    Every shape that is not a list of strings is refused HERE, by name. A scalar
+    (`terminal_statuses: 1`) or a mapping would otherwise reach `enumerate()`
+    and surface as a raw `TypeError` from inside the loader — which is the one
+    thing `load()` promises not to do: a malformed profile is refused once, on
+    the way in, naming the field.
+    """
     if value is None:
         return ()
-    if isinstance(value, str):
-        raise DomainProfileInvalid(f"{where}: expected a list of strings, got a string")
+    if isinstance(value, (str, bytes, Mapping)) or not isinstance(value, Iterable):
+        raise DomainProfileInvalid(
+            f"{where}: expected a list of strings, got {type(value).__name__}")
     return tuple(_text(v, f"{where}[{i}]") for i, v in enumerate(value))
 
 
@@ -876,6 +898,22 @@ def register(profile: DomainProfile) -> DomainProfile:
         raise TypeError(
             "register() takes a DomainProfile; build one with "
             "openxdox.domain_profile.load(<profile.yaml>)")
+    if _registered is not None and _registered is not profile:
+        # ONE registration is the contract (RULED ASK-4 Q5), so a SECOND one is
+        # refused rather than applied. Silently swapping the vocabulary under a
+        # running engine is worse than either profile: half a process would go
+        # on reading words the other half had already stopped using, and nothing
+        # would report it. Re-registering the SAME object is a no-op, so an
+        # idempotent host start-up is not punished; a deliberate swap says so by
+        # calling `unregister()` first.
+        raise AlreadyRegistered(
+            f"a domain profile is already registered ({_registered.mapping_id!r}"
+            f"), and {profile.mapping_id!r} would replace it. Registration "
+            "happens ONCE, at process start (RULED ASK-4 Q5): a second one "
+            "would change this engine's vocabulary underneath callers that have "
+            "already read the first. Call "
+            "openxdox.domain_profile.unregister() first if the swap is "
+            "deliberate.")
     _registered = profile
     return profile
 
