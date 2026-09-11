@@ -27,6 +27,7 @@ A CREATED FILE: no manifest row (RULED OQ-C).
 from __future__ import annotations
 
 import ast
+import re
 from pathlib import Path
 
 import pytest
@@ -63,6 +64,29 @@ REGISTER_TERMINAL_WORDS = frozenset({"rejected"})
 REGISTER_OTHER_WORDS = frozenset({"latent", "picked"})
 
 WATCHED_WORDS = TAXONOMY_WORDS | REGISTER_TERMINAL_WORDS | REGISTER_OTHER_WORDS
+
+#: `\bword\b` for each watched word — a STANDALONE-TOKEN match, not a bare
+#: substring search: it catches `f"status={state} (staged)"` (a longer
+#: Constant part the old two narrow patterns both missed) without also
+#: matching a word merely embedded in a longer one (`unstaged` does not trip
+#: `staged`).
+_STANDALONE_WORD_RE = {w: re.compile(rf"\b{re.escape(w)}\b") for w in WATCHED_WORDS}
+
+#: Individually audited f-string literal parts, by (module, JoinedStr lineno),
+#: where a taxonomy word appears as ordinary English prose or an established
+#: identifier — never as a value this engine compares against or writes into
+#: a status field. A NEW finding is not silenced by adding a line here: it is
+#: read first, and only added if it really is prose, with the same kind of
+#: justification as its neighbours.
+PROSE_EXEMPT: frozenset[tuple[str, int]] = frozenset({
+    ("gate_console.py", 315),   # "the record's provenance names one of" (OutputBoundary refusal prose)
+    ("gate_console.py", 319),   # the same sentence's other raise site
+    ("gate_console.py", 829),   # "gate-action record " — the audit-record noun, not a status
+    ("gate_console.py", 1066),  # "'Returned drafts' record" / "returned draft proposals" — README/INDEX prose
+    ("gate_console.py", 1675),  # "draft workspace" / "draft ideas" / "draft-proposal convention" — prose
+    ("gate_console.py", 1848),  # ".ratification-record.yaml" — a filename, not a written status
+    ("gate_console.py", 1851),  # "the ratified state" — prose
+})
 
 
 def _module_source(name: str) -> tuple[str, ast.Module]:
@@ -109,28 +133,68 @@ def test_no_status_word_survives_as_a_literal(module):
         "operates on it rather than by its domain name.")
 
 
+def _f_string_offenders(text: str, module: str = "<test>") -> list[tuple[int, str, str]]:
+    """Every (lineno, literal part, word) where an f-string carries a watched
+    word as a standalone token, outside `PROSE_EXEMPT`. Factored out of the
+    test below so the SWEEP LOGIC can be proven against a synthetic snippet,
+    not only against however `gate_console.py`/`generator.py` happen to read
+    today."""
+    tree = ast.parse(text)
+    return [
+        (node.lineno, part.value, word)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.JoinedStr)
+        and (module, node.lineno) not in PROSE_EXEMPT
+        for part in node.values
+        if isinstance(part, ast.Constant) and isinstance(part.value, str)
+        for word in WATCHED_WORDS
+        if _STANDALONE_WORD_RE[word].search(part.value)
+    ]
+
+
 @pytest.mark.parametrize("module", ENGINE_MODULES)
 def test_no_status_word_survives_inside_an_f_string(module):
     """An f-string's literal halves are `Constant` nodes too, and are swept.
 
-    Asserted separately because `f"Status: draft"` is how the word would come
-    back most naturally — the old `gate_console.py:1569` wrote exactly that
-    header, through a constant — and a sweep that only looked at whole-string
-    equality of `ast.Str` nodes would miss a word embedded in a longer piece.
+    Matched as a STANDALONE TOKEN (`_STANDALONE_WORD_RE`), not the two narrow
+    shapes this test used to check (`"Status: <word>"` and a part that IS just
+    the word, nothing else): `f"status={state} (staged)"` carries the word in
+    a longer `Constant` part neither of those two shapes recognizes, and a
+    sweep that only looked for them would miss it. The wider match is a
+    superset of both — anything that used to trip this test still does.
+
+    `PROSE_EXEMPT` names the lines already audited as ordinary English prose
+    or an established identifier (a filename, "gate-action record") rather
+    than a status value; everything else in these two modules is swept.
     """
-    _text, tree = _module_source(module)
-    offenders = [
-        (node.lineno, part.value)
-        for node in ast.walk(tree)
-        if isinstance(node, ast.JoinedStr)
-        for part in node.values
-        if isinstance(part, ast.Constant) and isinstance(part.value, str)
-        for word in WATCHED_WORDS
-        if f"Status: {word}" in part.value or part.value.strip() == word
-    ]
+    text, _tree = _module_source(module)
+    offenders = _f_string_offenders(text, module)
     assert not offenders, (
         f"{module} writes a status word into an f-string at {offenders}; the "
         "word belongs to the registered profile")
+
+
+def test_the_f_string_sweep_catches_a_word_embedded_in_a_longer_literal():
+    """The regression case the second-round review named directly: neither of
+    the two shapes this test used to recognize (`"Status: <word>"`, or a part
+    that IS just the word) matches a status word sitting beside an
+    interpolated value in a longer literal."""
+    offenders = _f_string_offenders('state = "x"\nmsg = f"status={state} (staged)"\n')
+    assert [word for _lineno, _part, word in offenders] == ["staged"]
+
+
+def test_the_f_string_sweep_still_catches_the_original_two_shapes():
+    """No regression: the wider standalone-token match is a superset of the
+    two narrower shapes this test used to check on their own."""
+    offenders = _f_string_offenders('word = "x"\na = f"Status: {word}"\nb = f"draft"\n')
+    assert {w for _lineno, _part, w in offenders} == {"draft"}
+
+
+def test_the_f_string_sweep_does_not_flag_a_word_embedded_in_a_longer_word():
+    """A STANDALONE token, not a bare substring: `unstaged` must not trip
+    `staged`."""
+    offenders = _f_string_offenders('x = "y"\nmsg = f"an unstaged {x}"\n')
+    assert offenders == []
 
 
 @pytest.mark.parametrize("module", ENGINE_MODULES)
