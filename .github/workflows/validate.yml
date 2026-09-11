@@ -53,9 +53,30 @@ jobs:
       # the same class as `test_leg_shape.py` — it parses trees, it does not
       # import the carved modules — so it does NOT un-narrow Q-L8 (b′): the
       # carved suites stay out until the BUILD arc makes them runnable.
+      # `tests/test_domain_profile.py` and
+      # `tests/test_no_hardcoded_status_words.py` join them under
+      # `split-opendox-two-layer-product` § 4.4 (RULING C2; ASK-4 RULED
+      # `openxFactory#656` comment `5634195861`), on exactly the grounds
+      # `test_dependency_direction.py` joined under § 4.1. Both are SHAPE
+      # assertions authored HERE: the guard PARSES `gate_console.py` and
+      # `generator.py` with `ast` and never imports them, and the profile suite
+      # imports `openxdox.domain_profile` alone — `yaml` and the standard
+      # library, no `doc_health`, no carved module. So they do NOT un-narrow
+      # RULED Q-L8 (b'): the carved suites stay out until the BUILD arc makes
+      # them runnable.
+      #
+      # The guard is the reason § 4.4 is a fix rather than a cleanup. "A
+      # hardcoded status word is a defect under `domain-mapping-declaration`"
+      # (tasks.md § 4.4), and the literals it removes were the OBVIOUS way to
+      # write the code when the engine and its one domain lived in the same
+      # repository — they will be the obvious way again the next time someone
+      # adds a status-bearing step. A defect class that recurs by default needs
+      # a required check, not a commit message.
       - name: pytest
         run: >-
           python -m pytest -q
           tests/test_leg_shape.py
           tests/test_dependency_direction.py
+          tests/test_domain_profile.py
+          tests/test_no_hardcoded_status_words.py
           --noconftest

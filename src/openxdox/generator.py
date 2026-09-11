@@ -69,6 +69,7 @@ from doc_health.lines import split_keepends
 
 from opendox import GENERATOR_VERSION, fixtures
 from . import completeness
+from . import domain_profile
 from .register import CrossReferenceIndexAdapter, ProjectRegisterAdapter
 
 # Header window matches doc_health.corpus.STATUS_SCAN_LINES: governance headers
@@ -325,6 +326,41 @@ def declared_origin_staging(folder: Path) -> str | None:
     return staging_id
 
 
+
+def _picked_register_state() -> str:
+    """The register-possible vocabulary's "already carries a pick edge" state.
+
+    RULING C2 / § 4.4: this was the literal `"picked"`, the same possibles-
+    register word `gate_console._picked_register_state` resolves through the
+    profile for the identical reason — a descendant renaming the register's
+    words must not leave the cluster-lineage funnel below reading a word this
+    domain-neutral package no longer owns.
+    """
+    profile = domain_profile.current()
+    return profile.status("proposed", kind=profile.kind_declaring("promote-to-staging"))
+
+
+def _declared_origin_kind() -> str:
+    """The `kind:` token a change's declared `origin:` block carries.
+
+    RULING C2 / § 4.4: this was the literal `"staged"`, which is openxFactory's
+    OWN word living in the domain-neutral package. It is the word the artifact
+    carries once it exists as the `demote` act's DESTINATION kind (a staging
+    topic) — `domain_profile.destination_role_status`, not `destination_status`,
+    which reads the transition's `to:` spelling on the kind demote departs FROM
+    and is validated only against THAT kind's vocabulary, a different question
+    the two happen to answer identically only in openxFactory's own fixture.
+    One accessor serves both this reader and the manifest `gate_console.py`
+    writes: the record the forward gate writes and the record the reverse gate
+    reads must agree, and now they agree BY CONSTRUCTION rather than by two
+    call sites that happen to resolve the same way today.
+
+    Resolved LATE, per call, never at import time (`domain_profile.current()`);
+    a process that has registered no profile is refused, not defaulted.
+    """
+    return domain_profile.current().destination_role_status("demote", "organized")
+
+
 def declared_origin_state(folder: Path) -> tuple[str, str | None]:
     """Classify a change origin without collapsing invalid data into absence.
 
@@ -346,7 +382,7 @@ def declared_origin_state(folder: Path) -> tuple[str, str | None]:
     origin = loaded.get("origin")
     if not isinstance(origin, dict):
         return "invalid", None
-    if origin.get("kind") != "staged":
+    if origin.get("kind") != _declared_origin_kind():
         return "non-staged", None
     path = origin.get("path")
     if not isinstance(path, str):
@@ -364,7 +400,7 @@ def declared_origin_state(folder: Path) -> tuple[str, str | None]:
     parts = [part for part in normalized.split("/") if part not in ("", ".")]
     if parts[:2] != ["ideation", "staging"] or len(parts) < 3:
         return "invalid", None
-    return "staged", parts[2]
+    return _declared_origin_kind(), parts[2]
 
 
 # Compatibility aliases. Cleanup now consumes the same declared origin reader
@@ -890,8 +926,9 @@ def _cluster_lineage(
         sid for sid, topics in staged_topic_topics.items() if topic in topics)
 
     change_ids: set[str] = set()
+    picked_state = _picked_register_state()
     for poss in possibles:
-        if cid in (poss.get("claiming_clusters") or []) and poss.get("state") == "picked":
+        if cid in (poss.get("claiming_clusters") or []) and poss.get("state") == picked_state:
             change_id = (poss.get("pick") or {}).get("change_id")
             if change_id:
                 change_ids.add(change_id)

@@ -269,3 +269,30 @@ FORBIDDEN_PUSH_TOKENS: tuple[str, ...] = (".push(", "open_or_update(", "git push
 # argument order — see its docstring in `tests/hermeticity.py` for the
 # mechanism, and never add the call to `tests/conftest.py` (issue #305).
 claim_conftest_slot(globals())
+
+
+# ---------------------------------------------------------------------------
+# § 4.4: the REGISTERED domain profile, and the way to take it away again.
+#
+# The registration itself is made at process start by the repository-root
+# `conftest.py` — the host contract, exercised rather than simulated. This
+# fixture is for the tests that must see the OTHER side of it: `current()`
+# refusing when nothing is registered. It removes the registration for the
+# duration of one test and puts it back, so no test can leave the suite without
+# the words every other test needs.
+import pytest as _pytest  # noqa: E402
+
+from openxdox import domain_profile as _domain_profile  # noqa: E402
+
+
+@_pytest.fixture()
+def unregistered_profile():
+    """Run one test with NO domain profile registered, then restore it."""
+    previous = _domain_profile.current() if _domain_profile.is_registered() else None
+    _domain_profile.unregister()
+    try:
+        yield
+    finally:
+        _domain_profile.unregister()
+        if previous is not None:
+            _domain_profile.register(previous)
