@@ -976,6 +976,57 @@ def load(source: str | Path | Mapping[str, Any]) -> DomainProfile:
                 "than one lifecycle entry; lifecycle_for() would silently "
                 "return only the first and ignore the rest")
         seen_lifecycle_kinds.add(lc.artifact_kind)
+
+    # CROSS-AXIS REFERENTIAL INTEGRITY. Until now, an id declared on one axis
+    # (a transition's `authority`/`act`/`destination_kind`; an act's
+    # `gate`/`target_kind`/`requires_evidence`) and consumed on another was
+    # never checked against what that OTHER axis actually declares. A typo'd
+    # `authority: gaet-actor` loaded cleanly and was only ever discovered if
+    # some caller happened to look that exact id up later
+    # (`profile.authority(...)`); `kind_declaring()` could select an `act` no
+    # `acts:` entry names at all. Refused HERE instead, at load time, on the
+    # same footing as `to`/`from` are already checked against a kind's OWN
+    # vocabulary above. `gates` is the one axis that is genuinely OPTIONAL
+    # (`REQUIRED_TOP_LEVEL` does not name it), so an act's `gate` reference is
+    # checked only when the profile declares any gates at all; every other
+    # axis checked below is required and therefore never empty in a validly
+    # constructed profile.
+    declared_authorities = {a.id for a in profile.authorities}
+    declared_acts = {a.id for a in profile.acts}
+    declared_evidence = {e.id for e in profile.evidence_classes}
+    declared_gates = {g.id for g in profile.gates}
+
+    for lc in profile.lifecycle:
+        for i, t in enumerate(lc.transitions):
+            twhere = f"lifecycle[{lc.artifact_kind}].transitions[{i}]"
+            if t.authority not in declared_authorities:
+                raise DomainProfileInvalid(
+                    f"{twhere}.authority: {t.authority!r} is not declared in "
+                    f"`authorities` ({sorted(declared_authorities)})")
+            if t.act is not None and t.act not in declared_acts:
+                raise DomainProfileInvalid(
+                    f"{twhere}.act: {t.act!r} is not declared in `acts` "
+                    f"({sorted(declared_acts)})")
+            if t.destination_kind is not None and t.destination_kind not in declared_kinds:
+                raise DomainProfileInvalid(
+                    f"{twhere}.destination_kind: {t.destination_kind!r} is not "
+                    f"declared in `artifact_kinds` ({sorted(declared_kinds)})")
+
+    for i, a in enumerate(profile.acts):
+        awhere = f"acts[{i}]"
+        if declared_gates and a.gate not in declared_gates:
+            raise DomainProfileInvalid(
+                f"{awhere}.gate: {a.gate!r} is not declared in `gates` "
+                f"({sorted(declared_gates)})")
+        if a.target_kind is not None and a.target_kind not in declared_kinds:
+            raise DomainProfileInvalid(
+                f"{awhere}.target_kind: {a.target_kind!r} is not declared in "
+                f"`artifact_kinds` ({sorted(declared_kinds)})")
+        for ev in a.requires_evidence:
+            if ev not in declared_evidence:
+                raise DomainProfileInvalid(
+                    f"{awhere}.requires_evidence: {ev!r} is not declared in "
+                    f"`evidence_classes` ({sorted(declared_evidence)})")
     return profile
 
 

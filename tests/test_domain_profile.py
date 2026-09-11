@@ -643,3 +643,70 @@ def test_destination_kind_refused_when_only_some_transitions_declare_it(raw):
     profile = dp.load(raw)
     with pytest.raises(dp.ProfileLookupError, match="destination_kind"):
         profile.destination_kind("demote")
+
+
+# --------------------------------------------------- fix-round regression case
+#
+# Closes a second-round Copilot review thread on PR #14 (2026-09-11,
+# domain_profile.py:923): the post-construction validation checked lifecycle
+# kinds and duplicate ids, but never the CROSS-AXIS references a transition or
+# an act carries. An id declared on one axis and consumed on another — a
+# transition's `authority`/`act`/`destination_kind`, an act's
+# `gate`/`target_kind`/`requires_evidence` — was never checked against what
+# that OTHER axis actually declares: a typo'd `authority: gaet-actor` loaded
+# cleanly and surfaced only if some caller happened to look that exact id up
+# later.
+
+
+def test_a_transition_naming_an_undeclared_authority_is_refused(raw):
+    for transition in raw["lifecycle"][0]["transitions"]:
+        if transition.get("from") == "brainstorm":
+            transition["authority"] = "not-a-real-authority"
+            break
+    with pytest.raises(dp.DomainProfileInvalid, match="not-a-real-authority"):
+        dp.load(raw)
+
+
+def test_a_transition_naming_an_undeclared_act_is_refused(raw):
+    for transition in raw["lifecycle"][0]["transitions"]:
+        if transition.get("act") == "propose":
+            transition["act"] = "not-a-real-act"
+            break
+    with pytest.raises(dp.DomainProfileInvalid, match="not-a-real-act"):
+        dp.load(raw)
+
+
+def test_a_transition_naming_an_undeclared_destination_kind_is_refused(raw):
+    for transition in raw["lifecycle"][0]["transitions"]:
+        if transition.get("act") == "demote" and transition.get("from") == "draft":
+            transition["destination_kind"] = "not-a-real-kind"
+            break
+    with pytest.raises(dp.DomainProfileInvalid, match="not-a-real-kind"):
+        dp.load(raw)
+
+
+def test_an_act_naming_an_undeclared_gate_is_refused(raw):
+    raw["acts"][0]["gate"] = "not-a-real-gate"
+    with pytest.raises(dp.DomainProfileInvalid, match="not-a-real-gate"):
+        dp.load(raw)
+
+
+def test_an_act_naming_an_undeclared_target_kind_is_refused(raw):
+    raw["acts"][0]["target_kind"] = "not-a-real-kind"
+    with pytest.raises(dp.DomainProfileInvalid, match="not-a-real-kind"):
+        dp.load(raw)
+
+
+def test_an_act_naming_an_undeclared_evidence_class_is_refused(raw):
+    raw["acts"][0]["requires_evidence"] = ["not-a-real-evidence"]
+    with pytest.raises(dp.DomainProfileInvalid, match="not-a-real-evidence"):
+        dp.load(raw)
+
+
+def test_gate_reference_is_not_checked_when_the_profile_declares_no_gates(raw):
+    """`gates` is the one axis `REQUIRED_TOP_LEVEL` does not name; a profile
+    that omits it entirely is not held to a reference it never made."""
+    del raw["gates"]
+    raw["acts"][0]["gate"] = "whatever-a-gate-less-profile-likes"
+    profile = dp.load(raw)  # must not raise
+    assert profile.act("demote").gate == "whatever-a-gate-less-profile-likes"
