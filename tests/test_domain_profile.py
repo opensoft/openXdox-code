@@ -453,3 +453,45 @@ def test_a_second_registration_is_refused_not_silently_applied(unregistered_prof
     dp.unregister()
     other = dp.register(dp.load(raw))
     assert dp.current() is other
+
+
+# --------------------------------------------------- fix-round regression case
+#
+# Closes the unresolved thread from the Copilot review round on
+# openXdox-code #14 (2026-09-11, domain_profile.py:568): a boolean field was
+# silently coerced (`bool(...)`) instead of refused.
+
+
+@pytest.mark.parametrize("bad", ["false", "true", 0, 1, ["nested"], {"x": 1}])
+def test_a_non_bool_where_a_flag_belongs_is_refused_by_name(raw, bad):
+    """`bool(...)` would COERCE every one of these; the loader must not.
+
+    `human_only: "false"` is the motivating case: a non-empty string is truthy
+    in Python, so the old `bool(mapping.get(key, False))` silently turned a
+    NEGATIVE declaration into `True`, changing the authority metadata instead
+    of refusing the malformed field.
+    """
+    raw["authorities"][0]["human_only"] = bad
+    with pytest.raises(dp.DomainProfileInvalid, match="human_only"):
+        dp.load(raw)
+
+
+def test_an_absent_flag_still_defaults_to_false(raw):
+    """No regression: an authority that omits the key keeps its default."""
+    del raw["authorities"][0]["human_only"]
+    profile = dp.load(raw)
+    assert profile.authority("lane-author").human_only is False
+
+
+def test_a_declared_bool_flag_still_loads(raw):
+    """No regression: an actual `bool` still loads, whichever way it points."""
+    raw["authorities"][0]["human_only"] = True
+    profile = dp.load(raw)
+    assert profile.authority("lane-author").human_only is True
+
+
+def test_a_non_bool_status_flag_is_also_refused(raw):
+    """The same `_flag` helper backs `Status.contradiction_legal` too."""
+    raw["lifecycle"][0]["vocabulary"][0]["contradiction_legal"] = "true"
+    with pytest.raises(dp.DomainProfileInvalid, match="contradiction_legal"):
+        dp.load(raw)

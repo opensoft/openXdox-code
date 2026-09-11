@@ -577,8 +577,21 @@ def _opt_text(mapping: Mapping[str, Any], key: str) -> str | None:
     return value if isinstance(value, str) and value.strip() else None
 
 
-def _flag(mapping: Mapping[str, Any], key: str) -> bool:
-    return bool(mapping.get(key, False))
+def _flag(mapping: Mapping[str, Any], key: str, where: str) -> bool:
+    """A declared boolean, refused if the YAML did not actually declare one.
+
+    `bool(value)` would COERCE any value — a stray string `human_only: "false"`
+    is truthy in Python and becomes `True`, silently changing the authority
+    metadata rather than refusing the malformed field. The schema declares
+    these fields as booleans, so the loader accepts exactly a `bool` (or an
+    absent key, which keeps its default) and refuses every other shape, naming
+    the field the way every other loader helper here does.
+    """
+    value = mapping.get(key, False)
+    if not isinstance(value, bool):
+        raise DomainProfileInvalid(
+            f"{where}.{key}: expected a bool, got {type(value).__name__}")
+    return value
 
 
 def _tuple_of_text(value: Any, where: str) -> tuple[str, ...]:
@@ -610,8 +623,8 @@ def _status(raw: Any, where: str) -> Status:
         role=role,
         label=_opt_text(data, "label"),
         meaning=_opt_text(data, "meaning"),
-        contradiction_legal=_flag(data, "contradiction_legal"),
-        excluded_from_conversion=_flag(data, "excluded_from_conversion"),
+        contradiction_legal=_flag(data, "contradiction_legal", where),
+        excluded_from_conversion=_flag(data, "excluded_from_conversion", where),
     )
 
 
@@ -753,7 +766,7 @@ def _authority(raw: Any, index: int) -> Authority:
         id=_text(_require(data, "id", where), f"{where}.id"),
         label=_text(_require(data, "label", where), f"{where}.label"),
         description=_opt_text(data, "description"),
-        human_only=_flag(data, "human_only"),
+        human_only=_flag(data, "human_only", where),
     )
 
 
