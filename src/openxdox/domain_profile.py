@@ -499,6 +499,23 @@ class DomainProfile:
         values = tuple(sorted({t.destination_kind for t in rows if t.destination_kind}))
         return self._one(rows, act, "destination_kind", values)
 
+    def destination_role_status(self, act: str, role: str) -> str:
+        """The word the artifact carries once it EXISTS as `act`'s destination kind.
+
+        Deliberately NOT `status(role, kind=kind_declaring(act))` and NOT
+        `destination_status(act)`. Those two ask the kind `act` departs FROM:
+        `destination_status` reads the transition's own `to:` spelling, which
+        the loader validates only against the SOURCE kind's vocabulary. But an
+        act like `demote` creates an artifact of a DIFFERENT kind
+        (`destination_kind(act)`, e.g. `staging-topic` for `governance-document`'s
+        `demote`), and that new artifact's status header must carry ITS OWN
+        kind's word for `role` — not whatever the source kind happened to spell
+        the same transition endpoint as. The two words coincide in
+        openxFactory's own fixture, which is exactly the coincidence a
+        descendant profile is not obliged to share.
+        """
+        return self.status(role, kind=self.destination_kind(act))
+
     def _one(self, rows: tuple[Transition, ...], act: str, fieldname: str,
              values: tuple[str, ...]) -> str:
         if not rows:

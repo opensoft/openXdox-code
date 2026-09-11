@@ -331,17 +331,21 @@ def _declared_origin_kind() -> str:
     """The `kind:` token a change's declared `origin:` block carries.
 
     RULING C2 / § 4.4: this was the literal `"staged"`, which is openxFactory's
-    OWN word living in the domain-neutral package. It is the status the
-    `demote` transition lands on — declared by the profile, which is why one
-    accessor serves both the reader below and the manifest `gate_console.py`
+    OWN word living in the domain-neutral package. It is the word the artifact
+    carries once it exists as the `demote` act's DESTINATION kind (a staging
+    topic) — `domain_profile.destination_role_status`, not `destination_status`,
+    which reads the transition's `to:` spelling on the kind demote departs FROM
+    and is validated only against THAT kind's vocabulary, a different question
+    the two happen to answer identically only in openxFactory's own fixture.
+    One accessor serves both this reader and the manifest `gate_console.py`
     writes: the record the forward gate writes and the record the reverse gate
     reads must agree, and now they agree BY CONSTRUCTION rather than by two
-    literals that happened to match.
+    call sites that happen to resolve the same way today.
 
     Resolved LATE, per call, never at import time (`domain_profile.current()`);
     a process that has registered no profile is refused, not defaulted.
     """
-    return domain_profile.current().destination_status("demote")
+    return domain_profile.current().destination_role_status("demote", "organized")
 
 
 def declared_origin_state(folder: Path) -> tuple[str, str | None]:

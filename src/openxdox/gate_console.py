@@ -200,8 +200,21 @@ PROMOTE_TO_STAGING_ACT = "promote-to-staging"
 
 
 def _demote_destination() -> str:
-    """The status — and the record `kind:` token — the `demote` act lands on."""
-    return domain_profile.current().destination_status(DEMOTE_ACT)
+    """The status — and the record `kind:` token — the `demote` act lands on.
+
+    `domain_profile.destination_role_status`, not `destination_status`: the
+    latter reads the transition's `to:` spelling on the kind demote departs
+    FROM (`governance-document`), which the loader validates only against THAT
+    kind's own vocabulary. What this function must answer is the word the
+    artifact carries once it exists as the DESTINATION kind
+    (`destination_kind`, e.g. `staging-topic`) — a different vocabulary that
+    only coincidentally spells its "organized" role the same way in this
+    fixture. `generator._declared_origin_kind` reads the identical accessor for
+    the same reason: the record the forward gate writes and the record the
+    reverse gate reads must agree BY CONSTRUCTION, not by two call sites that
+    happen to resolve the same way today.
+    """
+    return domain_profile.current().destination_role_status(DEMOTE_ACT, "organized")
 
 
 def _staged_status() -> str:

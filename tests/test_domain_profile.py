@@ -522,3 +522,56 @@ def test_a_duplicate_lifecycle_entry_for_one_kind_is_refused(raw):
     raw["lifecycle"].append(copy.deepcopy(raw["lifecycle"][0]))
     with pytest.raises(dp.DomainProfileInvalid, match="governance-document"):
         dp.load(raw)
+
+
+# --------------------------------------------------- fix-round regression case
+#
+# Closes the unresolved thread from the Copilot review round on
+# openXdox-code #14 (2026-09-11, gate_console.py:214): `_demote_destination`
+# read the `demote` transition's `to:` spelling — validated only against the
+# SOURCE kind's (`governance-document`) vocabulary — instead of asking the
+# DESTINATION kind (`staging-topic`) for its own "organized" word. The two
+# words only coincide by construction in openxFactory's own fixture.
+# `generator._declared_origin_kind` read the identical, and identically
+# wrong, accessor for the same underlying reason; both now call the new
+# `destination_role_status`, added here.
+
+
+def test_destination_role_status_resolves_via_the_destination_kind(raw):
+    """The regression case: source and destination kinds may spell a role
+    differently, and the artifact that gets created is the DESTINATION kind.
+
+    `destination_status("demote")` reads the transition's own `to:` spelling —
+    a word the loader validates only against the SOURCE kind's vocabulary
+    (`governance-document`). The artifact actually created is of the
+    DESTINATION kind (`staging-topic`), whose own vocabulary is free to spell
+    the same "organized" role differently. `destination_role_status` must
+    resolve through the destination kind, not the source's `to:` literal —
+    which is exactly what `gate_console._demote_destination` and
+    `generator._declared_origin_kind` both now call.
+    """
+    for entry in raw["lifecycle"]:
+        if entry["artifact_kind"] != "staging-topic":
+            continue
+        for status in entry["vocabulary"]:
+            if status["id"] == "staged":
+                status["id"] = "collected"
+        for transition in entry["transitions"]:
+            for end in ("from", "to"):
+                if transition.get(end) == "staged":
+                    transition[end] = "collected"
+    profile = dp.load(raw)
+    # The SOURCE kind's transition is untouched: it still says `to: staged`.
+    assert profile.destination_status("demote") == "staged"
+    assert profile.destination_kind("demote") == "staging-topic"
+    # But the artifact that actually exists as a staging-topic now carries
+    # THAT kind's own word for "organized", which is no longer "staged".
+    assert profile.destination_role_status("demote", "organized") == "collected"
+
+
+def test_destination_role_status_matches_the_old_accessor_when_the_words_agree(profile):
+    """No regression: when source and destination happen to agree (this
+    fixture's own shape), the two accessors answer the same question."""
+    assert (profile.destination_role_status("demote", "organized")
+            == profile.destination_status("demote")
+            == "staged")
