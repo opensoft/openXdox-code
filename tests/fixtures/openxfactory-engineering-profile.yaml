@@ -1,0 +1,314 @@
+# TEST FIXTURE — a VENDORED COPY of openXdox-spec's worked example profile.
+#
+# Source: `opensoft/openXdox-spec` `contracts/schemas/domain-profile.example.yaml`
+# at `main` `446a13f` (landed by openXdox-spec #8, `446a13f5`), which is
+# openxFactory's OWN engineering profile written against
+# `contracts/schemas/domain-profile.schema.yaml`. It is vendored here, and not
+# fetched at test time, because this leg's suite is hermetic: a test that
+# reaches the network is a test that fails for a reason that has nothing to do
+# with the code under it.
+#
+# THIS IS A FIXTURE, NOT AN INSTANCE. The REAL openxFactory profile is authored
+# at `opensoft/openxFactory` (design.md § D3's third column, RULING DQ-1) in
+# § 4.4's openxFactory half, and registered by ITS adapter at process start.
+# Nothing in `src/openxdox/` loads this file; only `tests/conftest.py` does, to
+# stand in for the host's registration — which is exactly the host contract:
+# registration happens once, at process start.
+#
+# ONE DELIBERATE DIFFERENCE FROM THE SOURCE, and the reason this is a copy
+# rather than a symlink: the taxonomy is NINE words, not eight. The source
+# example was authored against a stale reading of
+# `openxFactory/docs/document-lifecycle.md` and omits the ninth status,
+# `projection` — "deterministic RE-DERIVED rendering of a declared source of
+# truth, rewritten in place by a named generator; never authoritative, never
+# hand-edited, and not immutable". That is retracted in `openxFactory#656`
+# comment `5633989351` and corrected by openXdox-spec #11, which also adds the
+# `addenda: regenerated` immutability-point value a never-freezing kind needs.
+# This fixture carries the ninth word and a `projection` artifact kind declaring
+# `addenda: regenerated`, so the loader and the engine are proven against the
+# CORRECTED shape: an out-of-band, non-immutable status loads, and the
+# immutability point stays REQUIRED and enforced for every other kind.
+# `tests/test_domain_profile.py` asserts both halves of that sentence.
+schema_version: 1
+kind: domain-profile
+
+mapping_id: openxfactory-engineering
+domain_label: "xFactory engineering governance"
+declared_by: "opensoft/openxFactory"
+neutral: false
+
+basis:
+  - "openxFactory/docs/document-lifecycle.md (Status: standard) — the controlled Status table, Status Claim Rules, and Gates In Practice"
+  - "openXdox-spec contracts/schemas/gate-action-record.schema.yaml:165 — the act enum and the per-action artifact requirements"
+  - "openxFactory openspec/changes/split-opendox-two-layer-product/specs/domain-mapping-declaration/spec.md — the five axes and the two refusals"
+  - "RULING C2, openxFactory#656 2026-09-04T17:47Z; RULED OQ-3, comment 5547107565; RULING DQ-1, comment 5547049745"
+
+# ------------------------------------------------------------------- AXIS 1
+artifact_kinds:
+  - id: governance-document
+    label: "Governance document"
+    description: >-
+      A prose document carrying the controlled `Status:` header. The thing the
+      lifecycle spine is written for.
+    locations: ["docs/**/*.md", "ideation/**/*.md", "review/**/*.md"]
+  - id: staging-topic
+    label: "Staging topic"
+    description: >-
+      A feat-spec-shaped fragment in the work queue, declaring target
+      capability, delta type, claims, open questions and exit path.
+    locations: ["ideation/staging/<topic>/"]
+  - id: openspec-change
+    label: "OpenSpec change"
+    description: "An active proposal: proposal.md, tasks.md, design.md and spec deltas."
+    locations: ["openspec/changes/<change-id>/"]
+  - id: projection
+    label: "Projection"
+    description: >-
+      A re-derived rendering of a declared source of truth, rewritten in place
+      by its named generator. Never authoritative, never hand-edited, and the
+      one kind in this domain that never freezes.
+    locations: ["ideation/dashboard/", "health/reports/"]
+  - id: evidence-record
+    label: "Evidence record"
+    description: >-
+      A generated report, simulation, audit or gate-action record. Immutable on
+      write; excluded from prose-to-spec conversion and contradiction checks.
+    locations: ["health/", "review/", "ideation/dashboard/gate-records/"]
+
+# ------------------------------------------------------------------- AXIS 2
+lifecycle:
+
+  - artifact_kind: governance-document
+    vocabulary:
+      - {id: brainstorm,  role: captured,    label: "Brainstorm",  meaning: "Non-normative; lives in ideation/brainstorm/", contradiction_legal: true}
+      - {id: staged,      role: organized,   label: "Staged",      meaning: "Structured toward a proposal; not yet policy"}
+      - {id: draft,       role: proposed,    label: "Draft",       meaning: "Normative intent, not yet ratified"}
+      - {id: ratified,    role: ratified,    label: "Ratified",    meaning: "Backed by an approved OpenSpec change, or by a durable ratification record; the header names it"}
+      - {id: standard,    role: promoted,    label: "Standard",    meaning: "Backed by a promoted spec or canonical contract; the only status allowed to claim shared-standard authority"}
+      - {id: superseded,  role: superseded,  label: "Superseded",  meaning: "Kept for provenance; the header names the successor"}
+      - {id: retired,     role: retired,     label: "Retired",     meaning: "Withdrawn; the header names the reason or decision record"}
+      - {id: record,      role: out-of-band, label: "Record",      meaning: "Immutable evidence artifact", excluded_from_conversion: true}
+      - {id: projection,  role: out-of-band, label: "Projection",  meaning: "Deterministic RE-DERIVED rendering of a declared source of truth, rewritten in place by a named generator; never authoritative, never hand-edited, and NOT immutable — regenerating it is the correct act, not a violation", excluded_from_conversion: true}
+
+    terminal_statuses: [superseded, retired]
+
+    immutability_point:
+      status: ratified
+      addenda: cited-change
+      note: >-
+        Past ratification a document changes only through a cited OpenSpec
+        change — the addendum. Post-ratification mutation of a proposal's
+        declared origin is reported by the nightly `proposal-origin` doc-health
+        family as a CONTESTED finding (document-lifecycle.md, "Origin at the
+        proposal gate").
+
+    transitions:
+      - from: brainstorm
+        to: staged
+        authority: lane-author
+        basis: "captured -> organized: brainstorm material is selected, deduplicated, and targeted into ideation/staging/ or a candidate register"
+      - from: staged
+        to: draft
+        authority: change-author
+        act: propose
+        basis: "organized -> proposed: an OpenSpec change is created carrying the spec deltas; proposed prose becomes `draft`"
+      - from: draft
+        to: ratified
+        authority: ratifying-authority
+        act: ratify
+        basis: "proposed -> ratified -> implemented: standard OpenSpec flow; a `ratified` header names its ratification on exactly ONE citation line"
+      - from: ratified
+        to: standard
+        authority: promoting-authority
+        basis: "implemented -> promoted: the change archives and its requirements live under canonical specs; affected docs may claim `standard`. No document may claim `standard` unless a promoted spec or canonical contract backs the claim."
+      - from: draft
+        to: staged
+        authority: gate-actor
+        act: demote
+        destination_kind: staging-topic
+        reverse_of: "staged -> draft"
+        basis: >-
+          The mechanized reverse transition (D16) — the gate console's
+          `demote`, the same move as the 2026-07-13 manual demotion, tooled. A
+          demotion without a recorded `reason` is invalid.
+      - from: ratified
+        to: staged
+        authority: gate-actor
+        act: demote
+        destination_kind: staging-topic
+        reverse_of: "staged -> draft"
+        basis: "The same act applied to a ratified change being returned to the queue."
+      - from: ratified
+        to: superseded
+        authority: ratifying-authority
+        basis: "superseded: kept for provenance; the header names the successor"
+      - from: standard
+        to: superseded
+        authority: ratifying-authority
+        basis: "the same rule applied to a promoted document"
+      - from: ratified
+        to: retired
+        authority: ratifying-authority
+        basis: "retired: withdrawn; the header names the reason or decision record"
+      - from: standard
+        to: retired
+        authority: ratifying-authority
+        basis: "the same rule applied to a promoted document"
+      - from: null
+        to: record
+        authority: evidence-producer
+        basis: >-
+          An ENTRY transition. A record is written AS a record and does not
+          travel the spine: "immutable evidence stays `record`" at the proposal
+          gate, and out of band elsewhere.
+
+  - artifact_kind: openspec-change
+    vocabulary:
+      - {id: draft,      role: proposed,   label: "Active proposal"}
+      - {id: ratified,   role: ratified,   label: "Ratified"}
+      - {id: standard,   role: promoted,   label: "Archived with promotion"}
+      - {id: superseded, role: superseded, label: "Superseded"}
+    terminal_statuses: [standard, superseded]
+    immutability_point:
+      status: ratified
+      addenda: cited-change
+      note: >-
+        A change's declared origin is "fixed at creation and immutable for the
+        life of the change"; strict per-change verification and the archive
+        gate reject missing, malformed, dual-kind or manifest-disagreeing
+        origins.
+    transitions:
+      - {from: null,     to: draft,      authority: change-author,       basis: "proposal-support.py transition writes the staged origin automatically"}
+      - {from: draft,    to: ratified,   authority: ratifying-authority, act: ratify}
+      - {from: ratified, to: standard,   authority: promoting-authority, basis: "the change archives and its requirements live under canonical specs"}
+      - {from: draft,    to: superseded, authority: ratifying-authority}
+
+  - artifact_kind: staging-topic
+    vocabulary:
+      - {id: staged, role: organized, label: "Staged"}
+      - {id: draft,  role: proposed,  label: "Carried into a proposal"}
+    terminal_statuses: [draft]
+    immutability_point:
+      status: draft
+      addenda: cited-change
+      note: >-
+        A topic's material MOVES with Git history into the change's
+        supporting-docs at the proposal gate; ideation/staging/ is a live
+        queue, not permanent storage.
+    transitions:
+      - {from: staged, to: draft, authority: change-author, act: propose, basis: "organized -> proposed"}
+
+  - artifact_kind: projection
+    vocabulary:
+      - {id: projection, role: out-of-band, label: "Projection", excluded_from_conversion: true}
+    terminal_statuses: []
+    immutability_point:
+      status: projection
+      addenda: regenerated
+      note: >-
+        A projection NEVER freezes. It is "rewritten in place by a named
+        generator" and "regenerating it is the correct act, not a violation"
+        (openxFactory docs/document-lifecycle.md, the controlled Status table).
+        The field stays REQUIRED and the honest answer is written INTO it
+        rather than omitted, so nothing about the refusal
+        `domain-mapping-declaration` makes ("a vocabulary with no declared
+        immutability point SHALL be refused rather than defaulted to 'never'")
+        is weakened for the kinds that DO freeze.
+    transitions:
+      - {from: null, to: projection, authority: evidence-producer, basis: "written by its generator; out of band, and re-written by the same generator whenever the source of truth moves"}
+
+  - artifact_kind: evidence-record
+    vocabulary:
+      - {id: record, role: out-of-band, label: "Record", excluded_from_conversion: true}
+    terminal_statuses: [record]
+    immutability_point:
+      status: record
+      addenda: separate-document
+      note: >-
+        An error in a record is corrected by a SEPARATE document, never by an
+        edit. This repository carries the worked example:
+        docs/stale-citations-erratum-2026-09-10.md names stale citations in
+        three arrived files "without mutating the frozen, byte-identical
+        documents".
+    transitions:
+      - {from: null, to: record, authority: evidence-producer, basis: "written as a record; out of band"}
+
+# ------------------------------------------------------------------- AXIS 3
+gates:
+  - id: human-gate-console
+    label: "The human gate console"
+    actor_class: human
+    description: >-
+      Agents are structurally unable to author a gate-action record at all: the
+      gate console rejects any agent-invoked action before one is ever written
+      (gate-action-record.schema.yaml, scenario "An agent invokes a gate
+      action"). The gate is authority-bearing.
+
+acts:
+  - {id: demote,                    gate: human-gate-console, target_kind: openspec-change,      requires_evidence: [transition-manifest]}
+  - {id: edit-apply,                gate: human-gate-console, target_kind: openspec-change}
+  - {id: ratify,                    gate: human-gate-console, target_kind: openspec-change,      requires_evidence: [ratification-record]}
+  - {id: kickoff,                   gate: human-gate-console, target_kind: openspec-change,      requires_evidence: [workflow-job]}
+  - {id: propose,                   gate: human-gate-console, target_kind: staging-topic,        requires_evidence: [workflow-job]}
+  - {id: promote-to-staging,        gate: human-gate-console, target_kind: staging-topic,        requires_evidence: [workflow-job]}
+  - {id: dispose-possible,          gate: human-gate-console,                                    requires_evidence: [register-update]}
+  - {id: derive-possibles,          gate: human-gate-console,                                    requires_evidence: [workflow-job]}
+  - {id: research-brief,            gate: human-gate-console,                                    requires_evidence: [workflow-job]}
+  - {id: create-document,           gate: human-gate-console, target_kind: governance-document,  requires_evidence: [document]}
+  - {id: edit-document,             gate: human-gate-console, target_kind: governance-document,  requires_evidence: [commit]}
+  - {id: open-pr,                   gate: human-gate-console,                                    requires_evidence: [pull-request]}
+  - {id: abandon-session,           gate: human-gate-console}
+  - {id: share-session,             gate: human-gate-console}
+  - {id: cleanup-abandoned-branch,  gate: human-gate-console}
+  - {id: approve-model,             gate: human-gate-console}
+  - {id: create-project,            gate: human-gate-console}
+  - {id: edit-project,              gate: human-gate-console}
+  - {id: lens-save-recipe,          gate: human-gate-console}
+  - {id: lens-add-as-cluster,       gate: human-gate-console}
+
+# ------------------------------------------------------------------- AXIS 4
+evidence_classes:
+  - {id: ratification-record,  label: "Ratification record",  description: "Required by `ratify` — the durable record a ratified header cites."}
+  - {id: workflow-job,         label: "Workflow job",         description: "Required by the dispatching acts; a recorded dispatch, never a decision."}
+  - {id: register-update,      label: "Register update",      description: "Required by `dispose-possible` — the updated cross-reference index."}
+  - {id: document,             label: "Document",             description: "Required by `create-document`; the created document's relpath is its reference."}
+  - {id: commit,               label: "Commit",               description: "Required by `edit-document`; its reference is the record's own action stamp, never a sha."}
+  - {id: pull-request,         label: "Pull request",         description: "Required by `open-pr`; the session branch's PR into the Merge-Master ritual."}
+  - {id: transition-manifest,  label: "Transition manifest",  description: "The demote plan's executed manifest, naming origin and destination."}
+
+# ------------------------------------------------------------------- AXIS 5
+authorities:
+  - {id: lane-author,          label: "Lane author",           human_only: false, description: "Selects, deduplicates and targets brainstorm material into the queue."}
+  - {id: change-author,        label: "Change author",         human_only: false, description: "Creates the OpenSpec change and carries the staged material into it with its declared origin."}
+  - {id: gate-actor,           label: "Gate actor",            human_only: true,  description: "The authenticated human at the gate console. An agent cannot hold this role by construction."}
+  - {id: ratifying-authority,  label: "Ratifying authority",   human_only: true,  description: "Ratifies, supersedes and retires. Named as a role; the person holding it is not this declaration's business."}
+  - {id: promoting-authority,  label: "Promoting authority",   human_only: true,  description: "Archives with promotion, past which a document may claim `standard`."}
+  - {id: evidence-producer,    label: "Evidence producer",     human_only: false, description: "Writes a record. May be a machine: a record is evidence, not an authority claim."}
+
+truth_store:
+  name: "The repository and its branch protection"
+  external_enforcement_point: >-
+    The repository ruleset that makes `validate` a required status check on
+    `main` (docs/branch-protection.md), plus code-owner review.
+  description: >-
+    Named by `domain-mapping-declaration`'s third requirement itself: "the
+    repository and its branch protection for an engineering domain". A derived
+    model in this domain may propose; it may never write `main`. When the
+    enforcement point cannot be reached, the acts that gate on it refuse rather
+    than proceeding on the neutral layer's own verdict alone.
+
+notes:
+  - >-
+    The controlled table in document-lifecycle.md carries NINE statuses, and
+    this fixture declares all nine. The source example declared eight: it was
+    read off a stale checkout and omitted `projection`, which is retracted in
+    openxFactory#656 comment 5633989351 and corrected by openXdox-spec #11.
+    See this file's own header.
+  - >-
+    `terminal_statuses` on `governance-document` is `[superseded, retired]`.
+    The `("rejected", "superseded")` pair hardcoded at
+    `openXdox-code gate_console.py:1151` is a REGISTER-POSSIBLE vocabulary,
+    not a document one — which is exactly why ASK-4 Q4 asks whether
+    `terminal_statuses` is per-kind. This example answers yes and would gain a
+    fifth artifact kind (`register-possible`) when the register's own
+    vocabulary is declared.
