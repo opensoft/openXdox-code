@@ -304,15 +304,39 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 # 3 — the RATCHET over the pinned openDox. Does not hold yet, by construction.
 # --------------------------------------------------------------------------
 
-#: The openDox → openXdox back-imports, MEASURED at the commit this leg pins
-#: (`pyproject.toml`: `opendox @ git+…@8e9ffa628e96f621ab23af47873e5f2c2267b8db`)
-#: and identical at `ce53b489`, the commit openDox's ASSEMBLY ROOT pins. The 13
-#: import-time reaches are the census RULED 5626260214 calls "the 13-line
-#: openDox→openXdox inversion" — recorded on openxFactory#656 as
-#: `cli.py ×5, serve.py ×5, serve_workbench.py, branch_session.py,
-#: workbench.py`. Removing them is BUILD-arc work (§ 3.5/3.6) at
-#: `opensoft/openDox-code`, through the § 2.4 extension points; this leg
-#: already supplies its half of those seams.
+#: The openDox -> openXdox back-imports, MEASURED at the commit this leg pins.
+#:
+#: LOWERED BY BUILD SLICE 2 — `opensoft/openDox-code` #9, main `da8aae969b40`,
+#: which this file's pin now names (`pyproject.toml`). The census RULED
+#: 5626260214 calls "the 13-line openDox->openXdox inversion" stood at **13
+#: import-time / 19 deferred over six modules** at `8e9ffa62` (`cli.py ×5,
+#: serve.py ×5, serve_workbench.py, branch_session.py, workbench.py`). Slice 2
+#: removed FOUR of the thirteen through a late seam of openDox's own
+#: (`opendox/consumer_reach.py` — the shape § 4.1 landed here, mirrored):
+#: `cli.py` :72 :74, `serve_workbench.py` :49 and `workbench.py` :70.
+#: `workbench.py` reached (0, 0) and is therefore GONE from the table, as the
+#: refusal below instructs. **9 import-time / 19 deferred over five modules.**
+#:
+#: THE NINE THAT REMAIN ARE NOT WAITING ON AN AUTHOR. Every one needs a line
+#: that openxFactory's `docs/opendox-carve-manifest.yaml` does not declare for
+#: its row — a multi-line import statement's continuation lines, the
+#: `DashboardHandler` mixin base list, the `profile_openxfactory` composition
+#: point — so they are owed a DECLARED-EDIT RULING and are enumerated on
+#: openDox-code #9 § 4. Two of them (`serve.py` :135, `branch_session.py` :77)
+#: were converted, measured and REVERTED there: both modules evaluate
+#: `<consumer module>.<CONSTANT>` as a DEFAULT ARGUMENT (7 sites and 2), which
+#: runs at import time, so the import rewrite alone would have lowered THIS
+#: census while the module still could not be imported without openXdox.
+#:
+#: WHICH IS THIS CENSUS'S ONE BLIND SPOT, RECORDED RATHER THAN PAPERED OVER:
+#: `_census` counts `ast.Import` / `ast.ImportFrom` nodes, and a default
+#: argument, an annotation or a decorator that reaches the consumer is none of
+#: those. A module can therefore reach (0, n) here and still fail to import.
+#: openDox-code asserts the property directly — `tests/test_consumer_reach.py`
+#: imports each converted module in a subprocess with `openxdox` blocked — and
+#: that is the right home for it: this leg measures a repository it does not
+#: write, and cannot import openDox's modules to find out (`cli_gate` imports
+#: `opendox.branch_session`, which imports `openxdox.gate_console`).
 #:
 #: A RATCHET, not a target: the numbers may only FALL. When a BUILD-arc slice
 #: lands, lower them here in the same act — the suite refuses a silent
@@ -320,11 +344,10 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 OPENDOX_BACK_IMPORTS: dict[str, tuple[int, int]] = {
     # module                        (import-time, deferred)
     "opendox/branch_session.py":    (1, 7),
-    "opendox/cli.py":               (5, 1),
+    "opendox/cli.py":               (3, 1),
     "opendox/serve.py":             (5, 2),
     "opendox/serve_project.py":     (0, 2),
-    "opendox/serve_workbench.py":   (1, 7),
-    "opendox/workbench.py":         (1, 0),
+    "opendox/serve_workbench.py":   (0, 7),
 }
 #: Derived from the table above, never typed twice — a second hand-kept copy
 #: is exactly how a compensating fall-and-rise slips past a total.
