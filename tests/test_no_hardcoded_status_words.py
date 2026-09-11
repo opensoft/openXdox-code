@@ -268,15 +268,21 @@ def test_the_engine_names_no_artifact_kind_of_any_domain():
         f"{offenders}. Reach it with `kind_declaring(<act>)` instead.")
 
 
-def test_the_seventeen_sites_are_gone_and_the_count_is_recorded():
+def test_the_eighteen_sites_are_gone_and_the_count_is_recorded():
     """The number § 4.4 works from, kept in the tree rather than in a thread.
 
-    Seventeen occurrences over fifteen lines across the two modules, re-swept
-    live against `openXdox-code` `main` for the design note
-    (`openXdox-spec docs/domain-profile-design-note.md` § 1) and again in this
-    branch. The sweep that measured them is the one above; this test states the
-    number it was measured at, so a future reader of a commit message that says
-    "seventeen" can see where the number came from.
+    Eighteen occurrences over sixteen lines across the two modules. The design
+    note's own sweep (`openXdox-spec docs/domain-profile-design-note.md` § 1),
+    re-run live against `openXdox-code` `main` and again in this branch,
+    counted SEVENTEEN over fifteen lines and missed one: `gate_console.py:1550`
+    on `main`, `f"# {topic}\n\nStatus: staged\n"` — the word embedded in a
+    longer f-string, exactly the class of site this guard's OWN f-string sweep
+    exists to catch. A first-round review caught the eighteenth site and it was
+    corrected in the same commit that added this guard (`6c877a9`); this test
+    name and count were never updated to match, until now. The sweep that
+    measures them is the one above; this test states the number it was
+    measured at, so a future reader of a commit message that says "eighteen"
+    can see where the number came from.
     """
     total = 0
     for module in ENGINE_MODULES:
@@ -287,5 +293,5 @@ def test_the_seventeen_sites_are_gone_and_the_count_is_recorded():
             if isinstance(node, ast.Constant) and isinstance(node.value, str)
             and node.value in WATCHED_WORDS and id(node) not in keys)
     assert total == 0, (
-        "the seventeen literal occurrences over fifteen lines that § 4.4 "
+        "the eighteen literal occurrences over sixteen lines that § 4.4 "
         f"migrated have not all gone: {total} remain")
