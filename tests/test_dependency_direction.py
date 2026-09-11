@@ -306,7 +306,7 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 
 #: The openDox -> openXdox back-imports, MEASURED at the commit this leg pins.
 #:
-#: LOWERED BY BUILD SLICE 2 — `opensoft/openDox-code` #9, head `551ad4d5a18f`,
+#: LOWERED BY BUILD SLICE 2 — `opensoft/openDox-code` #9, main `da8aae969b40`,
 #: which this file's pin now names (`pyproject.toml`). The census RULED
 #: 5626260214 calls "the 13-line openDox->openXdox inversion" stood at **13
 #: import-time / 19 deferred over six modules** at `8e9ffa62` (`cli.py ×5,

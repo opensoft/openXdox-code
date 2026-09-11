@@ -103,7 +103,7 @@ requires-python = ">=3.12"
 # PR) — and not an arbitrary choice: `Draft202012Validator`, the name
 # `gate_console.py:563` imports, was added in jsonschema 4.18.0.
 dependencies = [
-    "opendox @ git+https://github.com/opensoft/openDox-code@551ad4d5a18fe97bce925e00d74ded615eafd418",
+    "opendox @ git+https://github.com/opensoft/openDox-code@da8aae969b4057bd46d2550c265e5bb363142458",
     "PyYAML>=6.0",
     "jsonschema>=4.18",
 ]
