@@ -233,6 +233,27 @@ def test_an_unknown_addenda_value_is_refused(raw):
         dp.load(raw)
 
 
+# --------------------------------------------------- fix-round regression case
+#
+# Closes a second-round Copilot review thread on PR #14 (2026-09-11,
+# domain_profile.py:705): checking only that `note` is present when
+# `addenda: regenerated` let a profile declare an ORDINARY spine status —
+# `ratified`, role `ratified` — as never-freezing, silently turning off v1's
+# immutability enforcement (`is_immutable()` answers `False` at every status
+# once `never_freezes` is true) for a status this domain otherwise treats as
+# part of its normal progression.
+
+
+def test_regenerated_is_refused_unless_the_status_is_out_of_band(raw):
+    """`addenda: regenerated` must also be honest about WHICH status it excuses:
+    only a status whose declared role is `out-of-band` may claim it."""
+    point = raw["lifecycle"][0]["immutability_point"]
+    point["addenda"] = "regenerated"
+    point["note"] = "test: this status does not actually never-freeze"
+    with pytest.raises(dp.DomainProfileInvalid, match="out-of-band"):
+        dp.load(raw)
+
+
 # ------------------------------------------------------------- the accessors
 
 

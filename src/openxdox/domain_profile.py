@@ -718,6 +718,23 @@ def _lifecycle(raw: Any, index: int) -> Lifecycle:
         raise DomainProfileInvalid(
             f"{where}.immutability_point.status: {point.status!r} is not in this "
             f"kind's declared vocabulary {ids}")
+    if point.never_freezes:
+        # `addenda: regenerated` says this KIND never freezes (openxFactory's
+        # `projection`) — and that claim is only honest when the immutability
+        # point's own status is the out-of-band word nothing else in this
+        # kind's spine claims. Checking only that `note` is present (already
+        # done in `_immutability_point`) lets a profile declare an ordinary
+        # spine status such as `ratified` as "regenerated", silently turning
+        # off v1's immutability enforcement for it (`is_immutable()` answers
+        # `False` at every status once `never_freezes` is true).
+        point_status = next(s for s in vocabulary if s.id == point.status)
+        if point_status.role != "out-of-band":
+            raise DomainProfileInvalid(
+                f"{where}.immutability_point: addenda 'regenerated' says "
+                f"{point.status!r} never freezes, but its declared role is "
+                f"{point_status.role!r}, not 'out-of-band' — a status this "
+                "kind otherwise treats as part of its ordinary spine cannot "
+                "also claim it never reaches an immutability point")
     transitions = tuple(
         _transition(t, f"{where}.transitions[{i}]")
         for i, t in enumerate(_as_sequence(_require(data, "transitions", where),
