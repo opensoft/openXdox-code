@@ -1025,6 +1025,27 @@ def load(source: str | Path | Mapping[str, Any]) -> DomainProfile:
     # checked only when the profile declares any gates at all; every other
     # axis checked below is required and therefore never empty in a validly
     # constructed profile.
+
+    # Each `{x.id for x in ...}` below collapses a duplicate id with no error —
+    # a set does not care that it absorbed two entries instead of one — and
+    # `act()`/`authority()` return the FIRST matching entry, so a profile
+    # carrying two declarations with the same id but different metadata would
+    # load cleanly and make cross-axis validation, and every later lookup,
+    # order-dependent on which declaration happened to load first. Refused
+    # HERE, on the same footing as the `artifact_kinds` and per-kind
+    # `vocabulary` duplicate checks above.
+    for axis_name, entries in (
+        ("acts", profile.acts),
+        ("gates", profile.gates),
+        ("evidence_classes", profile.evidence_classes),
+        ("authorities", profile.authorities),
+    ):
+        entry_ids = [e.id for e in entries]
+        entry_id_dupes = sorted({eid for eid in entry_ids if entry_ids.count(eid) > 1})
+        if entry_id_dupes:
+            raise DomainProfileInvalid(
+                f"{axis_name}: id declared more than once: {entry_id_dupes}")
+
     declared_authorities = {a.id for a in profile.authorities}
     declared_acts = {a.id for a in profile.acts}
     declared_evidence = {e.id for e in profile.evidence_classes}
