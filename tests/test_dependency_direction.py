@@ -306,27 +306,38 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 
 #: The openDox -> openXdox back-imports, MEASURED at the commit this leg pins.
 #:
-#: LOWERED BY BUILD SLICE 2 — `opensoft/openDox-code` #9, main `da8aae969b40`,
-#: which this file's pin now names (`pyproject.toml`). The census RULED
-#: 5626260214 calls "the 13-line openDox->openXdox inversion" stood at **13
-#: import-time / 19 deferred over six modules** at `8e9ffa62` (`cli.py ×5,
-#: serve.py ×5, serve_workbench.py, branch_session.py, workbench.py`). Slice 2
-#: removed FOUR of the thirteen through a late seam of openDox's own
-#: (`opendox/consumer_reach.py` — the shape § 4.1 landed here, mirrored):
-#: `cli.py` :72 :74, `serve_workbench.py` :49 and `workbench.py` :70.
-#: `workbench.py` reached (0, 0) and is therefore GONE from the table, as the
-#: refusal below instructs. **9 import-time / 19 deferred over five modules.**
+#: LOWERED TO ZERO AT IMPORT TIME BY BUILD SLICE 2b — `opensoft/openDox-code`
+#: #10, which this file's pin now names (`pyproject.toml`). **0 import-time /
+#: 19 deferred over five modules**, from 9 / 19 at the head of that slice and
+#: from the 13 / 19 over six modules that the census RULED 5626260214 called
+#: "the 13-line openDox->openXdox inversion" stood at.
 #:
-#: THE NINE THAT REMAIN ARE NOT WAITING ON AN AUTHOR. Every one needs a line
-#: that openxFactory's `docs/opendox-carve-manifest.yaml` does not declare for
-#: its row — a multi-line import statement's continuation lines, the
-#: `DashboardHandler` mixin base list, the `profile_openxfactory` composition
-#: point — so they are owed a DECLARED-EDIT RULING and are enumerated on
-#: openDox-code #9 § 4. Two of them (`serve.py` :135, `branch_session.py` :77)
-#: were converted, measured and REVERTED there: both modules evaluate
-#: `<consumer module>.<CONSTANT>` as a DEFAULT ARGUMENT (7 sites and 2), which
-#: runs at import time, so the import rewrite alone would have lowered THIS
-#: census while the module still could not be imported without openXdox.
+#: THE WHOLE OF THE INVERSION IS GONE, which is worth stating plainly because
+#: this table has never been able to say it before: no module of the pinned
+#: openDox names `openxdox` at import time. The 19 deferred reaches are NOT a
+#: lesser version of the same defect and are not owed a slice. They resolve
+#: inside verbs — the direction working, not the direction surviving
+#: (`design.md`:243) — and § 4.3/§ 4.5 injection is what removes the calls
+#: themselves, at THIS leg, on its own schedule.
+#:
+#: HOW SLICE 2b DID IT, in the two shapes slice 2 could not:
+#:   - A DEFAULT ARGUMENT cannot be deferred by any stand-in, because it is
+#:     evaluated where the `def` sits. openDox now OWNS those values
+#:     (`opendox/defaults.py`): `DEFAULT_RECORDS_DIR` at `branch_session.py`'s
+#:     nine `records_dir` sites, `DEFAULT_INDEX_NAME` and `PEEK_TTL_SECONDS` at
+#:     `serve.py`'s two. Eleven sites, three values, and
+#:     `test_the_opendox_owned_defaults_match_this_leg` below is the drift
+#:     guard that holds the two spellings together.
+#:   - A MIXIN BASE cannot be deferred either, because a class needs its bases
+#:     before its first instance exists. `DashboardHandler`'s two consumer
+#:     bases are now stand-in bases openDox owns, each forwarding one method per
+#:     name to the same function object with the same `self`.
+#:
+#: A COUNT CORRECTED, since this file carried it too. The note below used to say
+#: the reverted default-argument conversions were "(7 sites and 2)". It is NINE
+#: and 2: slice 2 miscounted `branch_session.py`, openDox-code's own
+#: `tests/test_consumer_reach.py` repeated it, and a review pass on #10 caught
+#: it there. Corrected in both files in the same window.
 #:
 #: WHICH IS THIS CENSUS'S ONE BLIND SPOT, RECORDED RATHER THAN PAPERED OVER:
 #: `_census` counts `ast.Import` / `ast.ImportFrom` nodes, and a default
@@ -335,17 +346,27 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 #: openDox-code asserts the property directly — `tests/test_consumer_reach.py`
 #: imports each converted module in a subprocess with `openxdox` blocked — and
 #: that is the right home for it: this leg measures a repository it does not
-#: write, and cannot import openDox's modules to find out (`cli_gate` imports
-#: `opendox.branch_session`, which imports `openxdox.gate_console`).
+#: write, and cannot import openDox's modules to find out. That file's
+#: `NEUTRAL_MODULES` is the asserted half and now holds `branch_session`,
+#: `workbench`, `serve_workbench` and `consumer_reach`.
+#:
+#: TWO MODULES STILL DO NOT IMPORT WITHOUT A CONSUMER, and NEITHER is blocked by
+#: `openxdox` any more. `opendox.serve` and `opendox.cli` are blocked by
+#: `ideation_dashboard` — openxFactory's PRE-CARVE package name, a
+#: `stays_openxfactory_adapter` row (RULING DQ-1) present at neither carve
+#: destination, so the carve's `import rewrites` class had nothing lawful to
+#: rewrite it to. It is the same defect class § 4.1 fixed on this side, it is
+#: censused at openDox-code, and it is owed a later act. It is invisible to THIS
+#: table by construction: the table counts `openxdox` and nothing else.
 #:
 #: A RATCHET, not a target: the numbers may only FALL. When a BUILD-arc slice
 #: lands, lower them here in the same act — the suite refuses a silent
 #: improvement as well as a regression, so the number in the tree stays true.
 OPENDOX_BACK_IMPORTS: dict[str, tuple[int, int]] = {
     # module                        (import-time, deferred)
-    "opendox/branch_session.py":    (1, 7),
-    "opendox/cli.py":               (3, 1),
-    "opendox/serve.py":             (5, 2),
+    "opendox/branch_session.py":    (0, 7),
+    "opendox/cli.py":               (0, 1),
+    "opendox/serve.py":             (0, 2),
     "opendox/serve_project.py":     (0, 2),
     "opendox/serve_workbench.py":   (0, 7),
 }
@@ -379,6 +400,94 @@ def _back_import_census() -> dict[str, list[int]]:
             slot = observed.setdefault(rel, [0, 0])
             slot[0 if at_import_time else 1] += 1
     return observed
+
+
+#: The values openDox now OWNS, and where each one's CANONICAL spelling lives
+#: at this leg. `opendox/defaults.py` restates the literal; this table is what
+#: makes the restatement safe.
+#:
+#: WHY A RESTATEMENT NEEDED A GUARD AT ALL. A default argument is evaluated
+#: where the `def` sits, so openDox could not defer these reaches behind a
+#: stand-in the way it deferred the rest — it had to stop reaching and hold the
+#: value itself. That is the right answer for values openDox owns, and it buys
+#: the one failure mode a reach does not have: the two copies can DRIFT, and
+#: nothing in either repository would notice, because neither module imports the
+#: other any more. That is precisely what the direction fix removed.
+#:
+#: SO THE GUARD LIVES HERE, not at openDox-code, and the asymmetry is
+#: deliberate: this leg pins openDox and can read both spellings, while openDox
+#: pins nothing back and by construction cannot read this one (design.md:243,
+#: RULED OQ-2). A drift guard at the neutral leg would be the back-import all
+#: over again.
+#:
+#: READ BY AST, NOT BY IMPORT. `openxdox.gate_console` pulls in `doc_health`
+#: and the rest of this leg's runtime, and a literal comparison should not need
+#: any of it — nor should a drift in a CONSTANT be reportable only when every
+#: unrelated dependency of its module happens to be installed.
+OPENDOX_OWNED_DEFAULTS = {
+    # opendox/defaults.py name       this leg's module,   this leg's name
+    "DEFAULT_RECORDS_DIR":          ("gate_console",      "DEFAULT_RECORDS_DIR"),
+    "DEFAULT_INDEX_NAME":           ("snapshot_registry", "DEFAULT_INDEX_NAME"),
+    "PEEK_TTL_SECONDS":             ("snapshot_registry", "PEEK_TTL_SECONDS"),
+}
+
+
+def _module_level_literals(path: Path) -> dict[str, object]:
+    """Every `NAME = <literal>` at a module's top level, without importing it."""
+    found: dict[str, object] = {}
+    for node in ast.iter_child_nodes(ast.parse(path.read_text(encoding="utf-8"))):
+        targets = []
+        if isinstance(node, ast.Assign):
+            targets = [t for t in node.targets if isinstance(t, ast.Name)]
+            value = node.value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) \
+                and node.value is not None:
+            targets = [node.target]
+            value = node.value
+        else:
+            continue
+        for target in targets:
+            try:
+                found[target.id] = ast.literal_eval(value)
+            except ValueError:
+                continue  # a derived value, not a literal — not this guard's business
+    return found
+
+
+@pytest.mark.parametrize("owned_name", sorted(OPENDOX_OWNED_DEFAULTS))
+def test_the_opendox_owned_defaults_match_this_leg(owned_name: str) -> None:
+    """openDox's restated literal still equals the value this leg publishes.
+
+    BUILD slice 2b moved eleven default arguments off this leg's constants —
+    `branch_session.py`'s nine `records_dir` sites and `serve.py`'s two in
+    `build_server` — onto `opendox/defaults.py`, because a default argument
+    cannot be deferred. If these two spellings ever disagree, a gate record
+    would be written to one directory and looked for in another, or a snapshot
+    peeked with one TTL and served with another, and every suite on both sides
+    would stay green while it happened.
+    """
+    module_name, leg_name = OPENDOX_OWNED_DEFAULTS[owned_name]
+    owned = _module_level_literals(_pinned_opendox_root() / "defaults.py")
+    assert owned_name in owned, (
+        f"`opendox/defaults.py` no longer defines {owned_name!r} as a "
+        f"module-level literal. It holds the value for openDox's default "
+        f"arguments; if it moved, this guard has to follow it in the same act "
+        f"or the two spellings are unwatched")
+
+    here = _module_level_literals(SRC / "openxdox" / f"{module_name}.py")
+    assert leg_name in here, (
+        f"`openxdox/{module_name}.py` no longer defines {leg_name!r} as a "
+        f"module-level literal — so the value openDox restates has moved at "
+        f"THIS leg, and openDox cannot see that it has")
+
+    assert owned[owned_name] == here[leg_name], (
+        f"DRIFT: `opendox/defaults.py`'s {owned_name} is "
+        f"{owned[owned_name]!r} and `openxdox/{module_name}.py`'s {leg_name} "
+        f"is {here[leg_name]!r}. openDox restates this literal because a "
+        f"default argument is evaluated at import time and cannot be deferred "
+        f"behind a stand-in (BUILD slice 2b); the restatement is only safe "
+        f"while this guard holds. Change both, in one act, or move the value "
+        f"across the § 2.4 seam so there is only one copy")
 
 
 def test_the_pinned_opendox_does_not_import_openxdox_back() -> None:
