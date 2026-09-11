@@ -81,7 +81,7 @@ requires-python = ">=3.12"
 # (openxFactory) itself runs (`requirements/hermes-runtime-contracts.lock`
 # pins `pyyaml==6.0.3`), not the oldest release that might parse.
 dependencies = [
-    "opendox @ git+https://github.com/opensoft/openDox-code@8e9ffa628e96f621ab23af47873e5f2c2267b8db",
+    "opendox @ git+https://github.com/opensoft/openDox-code@f03988556643738f9b5dc9e771c94a5c1cb535b4",
     "PyYAML>=6.0",
 ]
 
