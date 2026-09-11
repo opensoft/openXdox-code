@@ -80,9 +80,32 @@ requires-python = ">=3.12"
 # than guessed, for the same reason — it is what this source tree
 # (openxFactory) itself runs (`requirements/hermes-runtime-contracts.lock`
 # pins `pyyaml==6.0.3`), not the oldest release that might parse.
+#
+# jsonschema, BUILD-arc slice 3 (opensoft/openxFactory#656 comment 5627156620,
+# correction (c)): the round-2 walk above stopped at module bodies and
+# module-level `if`/`try`/`with` — the same shape as `test_dependency_
+# direction.py`'s own `_census` when it only asked "does this run at import
+# time", so a name reached solely from inside a FUNCTION body never reached
+# either scope. `jsonschema` is exactly that: one reach, `src/openxdox/
+# gate_console.py:563` (`_validate_contract_document`, `from jsonschema import
+# Draft202012Validator, FormatChecker`), which only runs when a caller asks to
+# validate a contract document. Landed round 2 recorded it as a correction, not
+# a fix, and allowlisted it in the test's `DEFERRED_ALSO_ALLOWED` with that
+# reasoning; this slice is the owed fix — the allowlist entry comes back out
+# in the same act. `referencing` and `rfc3339-validator` (named alongside
+# jsonschema in this leg's own `DEPENDENCY_REMEDY` string, `src/openxdox/
+# snapshot.py:105`) are NOT added here: neither is imported anywhere under
+# `src/` — they are jsonschema's own optional format-checking companions, and
+# adding an undeclared dependency is not what any reach in this tree calls for.
+#
+# LOWER BOUND: `>=4.18`, this leg's own already-stated floor
+# (`DEPENDENCY_REMEDY` at `src/openxdox/snapshot.py:105`, unchanged by this
+# PR) — and not an arbitrary choice: `Draft202012Validator`, the name
+# `gate_console.py:563` imports, was added in jsonschema 4.18.0.
 dependencies = [
     "opendox @ git+https://github.com/opensoft/openDox-code@f03988556643738f9b5dc9e771c94a5c1cb535b4",
     "PyYAML>=6.0",
+    "jsonschema>=4.18",
 ]
 
 [project.optional-dependencies]
