@@ -65,39 +65,52 @@ IMPORT_TIME_ALLOWED = frozenset({"opendox", "yaml", "doc_health"})
 def _declared_runtime_dependency_import_names() -> frozenset[str]:
     """Top-level import name of every `[project] dependencies` entry.
 
-    Read back with `tomllib` (stdlib at the interpreter this leg pins,
-    `>=3.12`) rather than re-deriving the `ast`-walk this file's
-    `pyproject.toml` documents for HOW the list was built — that walk is how
-    the names get INTO the list; this only reads them back out, so the two
-    cannot drift apart with one hand-maintained twice. A PEP 508 requirement's
+    Two steps, not one hand-maintained table. First, read the DECLARED
+    distribution names back out of `pyproject.toml` with `tomllib` (stdlib at
+    the interpreter this leg pins, `>=3.12`) — a PEP 508 requirement's
     distinguishing name is everything before its first version/marker/URL
-    separator; the PyPI distribution name and the import name differ for
-    exactly one entry here, `PyYAML` -> `yaml`, mapped by hand because no
-    general rule covers it.
+    separator. Second, resolve each distribution to the import root(s) it
+    actually installs via `importlib.metadata.packages_distributions()` —
+    the same RECORD/top-level metadata `pip` itself relies on — rather than a
+    hand-written `{"pyyaml": "yaml"}`-shaped map: a review finding on this
+    same PR (Sourcery) noted that a fixed map silently mis-reports the next
+    dependency whose distribution and import names differ (`scikit-learn` ->
+    `sklearn`, say) as undeclared. Reading the metadata instead means no
+    second table to keep in step with `pyproject.toml` as dependencies change.
     """
     import re
     import tomllib
+    from importlib.metadata import packages_distributions
 
     data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
-    names = {
+    declared_distributions = {
         re.split(r"[ @\[<>=!~;]", requirement, maxsplit=1)[0].strip().lower()
         for requirement in data["project"]["dependencies"]
     }
-    return frozenset("yaml" if name == "pyyaml" else name for name in names)
+    return frozenset(
+        import_name
+        for import_name, dist_names in packages_distributions().items()
+        if any(dist.lower() in declared_distributions for dist in dist_names)
+    )
 
 
-#: Cross-package roots reachable ONLY inside a function body, where the name
-#: IS a declared runtime dependency — DERIVED from `pyproject.toml` rather
-#: than hand-listed, so this set can only ever say "declared", never merely
-#: "allowlisted". `jsonschema` is the one example today: reached once,
-#: `gate_console.py:563`'s `_validate_contract_document`, exercised only when
-#: a caller asks to validate a contract document. It was the BUILD-arc slice 3
-#: finding recorded on opensoft/openxFactory#656 comment 5627156620,
-#: correction (c) — undeclared because the derivation walk `pyproject.toml`
-#: documents covers module bodies and module-level `if`/`try`/`with` only,
-#: never a function body, the same gap `DEFERRED_ALLOWED` closes for the
-#: CHECK: declaring the name (this same PR) is what makes it appear here, not
-#: a second hand-typed copy of it.
+#: Cross-package roots permitted for a DEFERRED (function-body-only) reach,
+#: because the name is a declared runtime dependency — DERIVED from
+#: `pyproject.toml` rather than hand-listed, so this set can only ever say
+#: "declared", never merely "allowlisted". It overlaps `IMPORT_TIME_ALLOWED`
+#: on purpose (`opendox` and `yaml` are declared AND reached at import time;
+#: a name does not stop being a declared dependency because it is also
+#: reached early) — the union of the two below is what actually gates a
+#: deferred reach. `jsonschema` is the one name declared but never reached at
+#: import time: one reach, `gate_console.py:563`'s
+#: `_validate_contract_document`, exercised only when a caller asks to
+#: validate a contract document. It was the BUILD-arc slice 3 finding
+#: recorded on opensoft/openxFactory#656 comment 5627156620, correction (c)
+#: — undeclared because the derivation walk `pyproject.toml` documents covers
+#: module bodies and module-level `if`/`try`/`with` only, never a function
+#: body, the same gap this set closes for the CHECK: declaring the name
+#: (this same PR) is what makes it appear here, not a second hand-typed copy
+#: of it.
 DEFERRED_ALLOWED = _declared_runtime_dependency_import_names()
 
 #: The pre-carve package name. Every arrived module's `import rewrites` edit
