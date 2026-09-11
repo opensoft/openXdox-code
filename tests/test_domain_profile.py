@@ -495,3 +495,30 @@ def test_a_non_bool_status_flag_is_also_refused(raw):
     raw["lifecycle"][0]["vocabulary"][0]["contradiction_legal"] = "true"
     with pytest.raises(dp.DomainProfileInvalid, match="contradiction_legal"):
         dp.load(raw)
+
+
+# --------------------------------------------------- fix-round regression case
+#
+# Closes the unresolved thread from the Copilot review round on
+# openXdox-code #14 (2026-09-11, domain_profile.py:882): `load()` checked that
+# each lifecycle's `artifact_kind` was DECLARED, but not that it was declared
+# only ONCE — a set silently absorbs a duplicate `artifact_kinds[].id`, and
+# `lifecycle_for()` returns the first matching entry, so a later lifecycle for
+# an already-used kind loaded with no effect and no refusal.
+
+
+def test_a_duplicate_artifact_kind_id_is_refused(raw):
+    """A set comprehension would otherwise absorb the duplicate with no error."""
+    raw["artifact_kinds"].append(copy.deepcopy(raw["artifact_kinds"][0]))
+    with pytest.raises(dp.DomainProfileInvalid, match="artifact_kinds"):
+        dp.load(raw)
+
+
+def test_a_duplicate_lifecycle_entry_for_one_kind_is_refused(raw):
+    """`lifecycle_for()` returns the FIRST match; a second entry for the same
+    kind must be refused at load time rather than silently ignored — the
+    second entry's vocabulary, immutability point or transitions would
+    otherwise have no effect at all."""
+    raw["lifecycle"].append(copy.deepcopy(raw["lifecycle"][0]))
+    with pytest.raises(dp.DomainProfileInvalid, match="governance-document"):
+        dp.load(raw)

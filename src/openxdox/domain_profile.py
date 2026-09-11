@@ -886,12 +886,32 @@ def load(source: str | Path | Mapping[str, Any]) -> DomainProfile:
         extra={k: v for k, v in data.items() if k not in _STRUCTURAL_KEYS},
     )
 
-    declared_kinds = {k.id for k in profile.artifact_kinds}
+    # Both checks below refuse a DUPLICATE id rather than silently keeping the
+    # first: `declared_kinds` is a set, which would otherwise absorb a repeated
+    # `artifact_kinds[].id` with no error, and `lifecycle_for()` returns the
+    # FIRST matching entry, which would otherwise let a later lifecycle for the
+    # same kind — a different vocabulary, immutability point or transition set
+    # — load without effect. A malformed profile is refused once, on the way
+    # in, exactly like every other shape this loader enforces.
+    kind_ids = [k.id for k in profile.artifact_kinds]
+    kind_id_dupes = sorted({kid for kid in kind_ids if kind_ids.count(kid) > 1})
+    if kind_id_dupes:
+        raise DomainProfileInvalid(
+            f"artifact_kinds: id declared more than once: {kind_id_dupes}")
+
+    declared_kinds = set(kind_ids)
+    seen_lifecycle_kinds: set[str] = set()
     for lc in profile.lifecycle:
         if lc.artifact_kind not in declared_kinds:
             raise DomainProfileInvalid(
                 f"lifecycle[{lc.artifact_kind}]: no such entry in `artifact_kinds` "
                 f"({sorted(declared_kinds)})")
+        if lc.artifact_kind in seen_lifecycle_kinds:
+            raise DomainProfileInvalid(
+                f"lifecycle: artifact_kind {lc.artifact_kind!r} declares more "
+                "than one lifecycle entry; lifecycle_for() would silently "
+                "return only the first and ignore the rest")
+        seen_lifecycle_kinds.add(lc.artifact_kind)
     return profile
 
 
