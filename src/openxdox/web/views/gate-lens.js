@@ -10,11 +10,12 @@
 // `openxdox.serve_views`. The binding that declares it is in
 // `src/openxdox/view_extensions.py`.
 //
-// WHAT IT MAY IMPORT FROM THE BUNDLE (counterpart Q6). `./views/helpers.js` is
-// the RULED guarantee; every other openDox module reached from here is declared
-// in `view_extensions.BUNDLE_REACH` and held there by
-// `tests/test_gate_loop_views.py`, so the reach is NAMED and checkable instead
-// of silent. This module reaches: `./helpers.js` (RULED guarantee), `./lens-model.js`.
+// WHAT IT MAY IMPORT FROM THE BUNDLE (RULED counterpart Q6, openxFactory#656
+// comment `5649094228`, Brett Heap, 2026-09-12): `./views/helpers.js` AND
+// NOTHING ELSE — every other need reaches the binding through its `ctx` (the
+// names are declared in `view_extensions.CTX_MODEL_REACH`) or its own package.
+// `tests/test_gate_loop_views.py` holds every module to it. This module
+// imports: `./helpers.js` (the RULED guarantee) and nothing else; openDox's lens model arrives as `ctx.model`.
 // ---------------------------------------------------------------------------
 // THE LENS'S TWO GATE VERBS — class B, and the first half of slice S4's answer
 // to RULED Q3 (openxFactory#656 comment `5642758731`, Brett Heap, 2026-09-12):

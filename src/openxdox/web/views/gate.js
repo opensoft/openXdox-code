@@ -1,21 +1,3 @@
-// ---------------------------------------------------------------------------
-// THIS FILE IS openXdox's NOW — § 3.4 slice S5, "contribute the gate loop"
-// (openDox-spec `docs/front-end-package-boundary.md` § 5 row S5 @ `7d12428c`).
-// It arrived here from openDox-code `src/opendox/web/views/gate.js` and is
-// SHIPPED AS PACKAGE DATA: RULED Q5 (openxFactory#656 comment `5648044785`,
-// Brett Heap, 2026-09-12) — "the COMPOSED DEPLOYMENT assembles the bundle …
-// the composed install copies them into openDox's one `--web-dir` at assembly;
-// a contributed GET route is the declared hosted fallback". The bytes are
-// placed by `openxdox.web_assets.install_view_modules()`; the fallback is
-// `openxdox.serve_views`. The binding that declares it is in
-// `src/openxdox/view_extensions.py`.
-//
-// WHAT IT MAY IMPORT FROM THE BUNDLE (counterpart Q6). `./views/helpers.js` is
-// the RULED guarantee; every other openDox module reached from here is declared
-// in `view_extensions.BUNDLE_REACH` and held there by
-// `tests/test_gate_loop_views.py`, so the reach is NAMED and checkable instead
-// of silent. This module reaches: `none — this module is import-free and keeps its own `el()``.
-// ---------------------------------------------------------------------------
 // Human gate console bar (US9; D16/D17). The READ-ONLY web v1 surfaces the four
 // gate affordances (demote / edit / ratify / kickoff) on a gate-bearing artifact
 // and produces the ACTION DESCRIPTOR — the exact `cli.py gate ...` command a
