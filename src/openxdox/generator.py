@@ -63,7 +63,7 @@ from typing import Any
 
 import yaml
 
-from doc_health import TAXONOMY, corpus
+from doc_health import corpus
 from doc_health.corpus import RealGit
 from doc_health.lines import split_keepends
 
@@ -75,12 +75,6 @@ from .register import CrossReferenceIndexAdapter, ProjectRegisterAdapter
 # Header window matches doc_health.corpus.STATUS_SCAN_LINES: governance headers
 # live in the doc's first lines.
 HEADER_SCAN_LINES = corpus.STATUS_SCAN_LINES
-
-# The lifecycle vocabulary the snapshot schema's document `stage`
-# (lifecycle_status enum) accepts, reused verbatim from the doc-health suite's
-# status-validity family (doc_health.TAXONOMY) rather than restated from the
-# schema — this module never restates the schema (see snapshot.validate_or_raise).
-LIFECYCLE_STATUSES = TAXONOMY
 
 _CHECKED_RE = re.compile(r"(?m)^\s*[-*]\s*\[[xX]\]")
 _UNCHECKED_RE = re.compile(r"(?m)^\s*[-*]\s*\[ \]")
@@ -473,6 +467,30 @@ def _change_files(folder: Path, repo_root: Path) -> list[str]:
 
 # --------------------------- per-document degradation ---------------------------
 
+def _document_status_vocabulary() -> frozenset[str]:
+    """The closed set of status words a governance document's `Status:` header
+    may declare, read from the REGISTERED domain profile.
+
+    RULING C2 / § 4.4: this was `doc_health.TAXONOMY` — openxFactory's own
+    controlled Status vocabulary, imported wholesale into this domain-neutral
+    package as `LIFECYCLE_STATUSES`. `kind_declaring("demote")` names the kind
+    without hardcoding it: `demote`'s declared transitions depart FROM the
+    document spine (`governance-document` in this domain's fixture) — the same
+    kind `_declared_origin_kind` and `gate_console._draft_status` resolve
+    through for the identical reason — so asking that kind for its FULL
+    vocabulary is asking for exactly the set a document's `Status:` header may
+    carry, whatever a descendant profile spells its own words.
+
+    Resolved LATE, per call (`domain_profile.current()`), never cached at
+    import time: a process that has registered no profile is REFUSED
+    (`DomainProfileNotRegistered` propagates to the caller) rather than
+    answered with a hardcoded fallback — the fallback IS the defect RULING C2
+    names.
+    """
+    profile = domain_profile.current()
+    return frozenset(profile.statuses(kind=profile.kind_declaring("demote")))
+
+
 def _document_exclusion_reason(doc: corpus.Doc) -> str | None:
     """Why this document cannot produce a schema-valid `documents[]` entry, or
     None when it can.
@@ -490,10 +508,16 @@ def _document_exclusion_reason(doc: corpus.Doc) -> str | None:
     a snapshot the pinned validator rejects wholesale. A missing/invalid Status
     header is a corpus defect the governed doc-health status-validity family
     already errors on; the dashboard is a downstream projection and must not be
-    DoSed by it (it surfaces the exclusion via lane detail instead)."""
+    DoSed by it (it surfaces the exclusion via lane detail instead).
+
+    The recognized vocabulary is `_document_status_vocabulary()` — the
+    registered domain profile's own words, never a literal list (RULING C2 /
+    § 4.4). A process with no profile registered gets `DomainProfileNotRegistered`
+    here, propagated from `domain_profile.current()` rather than answered with
+    a hardcoded fallback."""
     if doc.status is None:
         return "missing or unparseable Status: header"
-    if doc.status not in LIFECYCLE_STATUSES:
+    if doc.status not in _document_status_vocabulary():
         return f"unrecognized lifecycle status {doc.status!r}"
     return None
 
