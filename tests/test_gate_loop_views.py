@@ -25,7 +25,9 @@ A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
 
 from __future__ import annotations
 
+import ast
 import re
+from pathlib import Path
 
 import pytest
 
@@ -69,6 +71,23 @@ def _exported_names(text: str) -> set[str]:
         r"^export\s+(?:async\s+)?(?:function|const|let|var|class)\s+"
         r"([A-Za-z_$][A-Za-z0-9_$]*)",
         text, re.MULTILINE))
+
+
+def _module_constant(path: Path, name: str) -> tuple[str, ...]:
+    """Read one module-level tuple constant out of a Python file by PARSING it.
+
+    This package's heavier modules reach `doc_health` at import time and this
+    suite is `--noconftest` and consumer-free by construction, so a declaration
+    is read the way `tests/test_no_hardcoded_status_words.py` reads one: with
+    `ast`, never with an import."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    for node in tree.body:
+        targets = (node.targets if isinstance(node, ast.Assign)
+                   else [node.target] if isinstance(node, ast.AnnAssign) else [])
+        for target in targets:
+            if isinstance(target, ast.Name) and target.id == name:
+                return tuple(ast.literal_eval(node.value))
+    raise AssertionError(f"{name} is not declared in {path}")
 
 
 def _relative_imports(text: str) -> set[str]:
@@ -455,27 +474,103 @@ def test_this_column_names_neither_unhosted_region() -> None:
 # Counterpart Q6 — what a contributed module may IMPORT from the bundle.
 # ---------------------------------------------------------------------------
 
-def test_the_bundle_reach_is_exactly_declared() -> None:
-    """The reach is NAMED and checkable instead of silent. `./helpers.js` is the
-    RULED guarantee; a module of this column is not a bundle reach at all (the
-    assembly places both side by side); everything else is measured here so a
-    guarantee-list ruling has a number to be made against and so the reach
-    cannot widen unobserved."""
+def test_no_module_imports_anything_but_the_one_guaranteed_bundle_module() -> None:
+    """RULED counterpart Q6, the whole of it: "`./views/helpers.js` and NOTHING
+    ELSE". A specifier naming a module of THIS column is not a bundle reach at
+    all — the assembly (RULED Q5) places both side by side — and every other
+    specifier is a reach into a module openDox owns, may move and may rename."""
     own = {f"./{name}" for name in web_assets.VIEW_MODULE_NAMES}
+    offenders: dict[str, tuple[str, ...]] = {}
+    for name in web_assets.VIEW_MODULE_NAMES:
+        reach = tuple(sorted(
+            path for path in _relative_imports(_module_text(name))
+            if path != view_extensions.GUARANTEED_BUNDLE_MODULE
+            and path not in own))
+        if reach:
+            offenders[name] = reach
+    assert offenders == {}, (
+        "a contributed module imports openDox's bundle past the guarantee: "
+        f"{offenders}. RULED counterpart Q6 (openxFactory#656 comment "
+        "5649094228): `./views/helpers.js` and nothing else; every other need "
+        "reaches the binding through its `ctx` or its own package")
+
+
+def test_the_bundle_reach_is_exactly_declared() -> None:
+    """The reach is NAMED as well as narrow: what each module imports is what
+    `BUNDLE_REACH` says it imports, so a widening shows up as a failing
+    declaration and not only as a failing rule."""
     observed = {name: tuple(sorted(_relative_imports(_module_text(name))))
                 for name in web_assets.VIEW_MODULE_NAMES}
     declared = {name: tuple(sorted(paths))
                 for name, paths in view_extensions.BUNDLE_REACH.items()}
     assert observed == declared, (
         "this column's reach into openDox's bundle moved.\n"
-        f"declared: {declared}\nobserved: {observed}\n"
-        "Counterpart Q6: `./views/helpers.js` is the guarantee; every other "
-        "reach is declared here or vendored")
-    for name, paths in observed.items():
-        for path in paths:
-            assert path == view_extensions.GUARANTEED_BUNDLE_MODULE \
-                or path in own \
-                or path in view_extensions.BUNDLE_REACH[name], path
+        f"declared: {declared}\nobserved: {observed}")
+
+
+def test_every_binding_declares_what_it_asks_the_shell_for() -> None:
+    """Counterpart Q6's other half: what left the import list arrived on `ctx`,
+    and `CTX_MODEL_REACH` is the whole of it. Every binding has an entry (an
+    absent one would be a silence, not a zero) and every name it declares is
+    really read out of `ctx` by the module that declares it."""
+    ids = {spec["id"] for spec in view_extensions.VIEW_BINDING_SPECS}
+    assert set(view_extensions.CTX_MODEL_REACH) == ids
+
+    module_of = {spec["id"]: spec["module"].rsplit("/", 1)[-1]
+                 for spec in view_extensions.VIEW_BINDING_SPECS}
+    for binding_id, facets in view_extensions.CTX_MODEL_REACH.items():
+        text = _module_text(module_of[binding_id])
+        for facet, names in facets.items():
+            for name in names:
+                assert f'"{name}"' in text or f".{name}" in text, (
+                    f"{binding_id} declares ctx.{facet}.{name} and "
+                    f"{module_of[binding_id]} never reads it")
+
+
+def test_the_three_reaches_the_ruling_closed_are_gone_from_every_module() -> None:
+    """The three class-A modules this column used to import BY NAME —
+    `lens-model.js`, `intent-binding.js`, `staging-workbench-model.js` — are
+    named in no module's import list and in no binding's declared reach. The
+    record at `01b06c94` carried all three as measured residue; RULED
+    counterpart Q6 granted no guarantee list, so they became `ctx` facets."""
+    closed = ("./lens-model.js", "./intent-binding.js",
+              "./staging-workbench-model.js")
+    for name in web_assets.VIEW_MODULE_NAMES:
+        imports = _relative_imports(_module_text(name))
+        for specifier in closed:
+            assert specifier not in imports, (name, specifier)
+    for paths in view_extensions.BUNDLE_REACH.values():
+        for specifier in closed:
+            assert specifier not in paths, specifier
+
+
+def test_the_session_vocabulary_is_declared_by_the_binding_that_posts_it() -> None:
+    """The six affordance tokens key this module's OWN route table at module
+    scope and name the gate verbs this column's own `serve_gate.py` answers, so
+    they are declared here rather than taken from `ctx` (RULED Q3's precedent
+    from slice S4: a constant travels with the binding that calls it). The
+    verbs are held to `gate_routes.SESSION_BEARING_VERBS` so the two halves of
+    this column cannot drift apart.
+
+    `gate_routes.py` is PARSED, never imported — it reaches `gate_console` and
+    `doc_health` at import time, and this suite runs `--noconftest` against this
+    package's own files. The same posture `test_no_hardcoded_status_words.py`
+    takes with `generator.py`."""
+    session_bearing = _module_constant(
+        Path(view_extensions.__file__).with_name("gate_routes.py"),
+        "SESSION_BEARING_VERBS")
+
+    text = _module_text("swb-session.js")
+    for token in ("SESSION_EDIT", "SESSION_SAVE", "SESSION_ABANDON",
+                  "SESSION_SHARE", "SESSION_FIRST_EDIT",
+                  "SESSION_REFRESH_NOTEBOOK", "SESSION_AFFORDANCES",
+                  "SESSION_VERBS", "SESSION_LABELS"):
+        assert re.search(rf"^export const {token}\b", text, re.M), token
+    verbs = re.findall(r'\]: "([a-z-]+)",', text)
+    for verb in ("edit-document", "open-pr", "abandon-session",
+                 "share-session"):
+        assert verb in verbs, verb
+        assert verb in session_bearing, verb
 
 
 def test_the_style_residue_is_recorded_rather_than_skipped() -> None:

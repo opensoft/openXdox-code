@@ -50,8 +50,10 @@ sitting rather than against this module's own account of it:
   Q5  the bytes are package data placed by `openxdox.web_assets`; the hosted
       fallback is `openxdox.serve_views`.
   Q6  (counterpart) what a contributed module may import from the bundle:
-      `./views/helpers.js` is the guarantee, everything else is DECLARED in
-      `BUNDLE_REACH` and held there by `tests/test_gate_loop_views.py`.
+      `./views/helpers.js` AND NOTHING ELSE. Every other need reaches the
+      binding through its `ctx` — `CTX_MODEL_REACH` below is the whole of what
+      each binding asks the shell for — and `BUNDLE_REACH` is held to the
+      guarantee by `tests/test_gate_loop_views.py`.
   Q7  a contributed binding's CSS lives with the binding. NOT realized in this
       slice and NOT silently skipped: see `STYLE_RESIDUE` below.
   Q8  `page-overlay`, the declared host for page-level panels — the region
@@ -79,6 +81,7 @@ from openxdox import web_assets
 
 __all__ = [
     "BUNDLE_REACH",
+    "CTX_MODEL_REACH",
     "GUARANTEED_BUNDLE_MODULE",
     "STYLE_RESIDUE",
     "VIEW_BINDING_SPECS",
@@ -100,35 +103,67 @@ class ViewContractUnsupported(RuntimeError):
     """
 
 
-#: The ONE openDox bundle module a contributed binding may import without a
-#: declaration — the counterpart note's Q6 recommendation, adopted in the same
-#: sitting ("all the RECOMMENDED answers adopted", `5648044785`; "All twelve
-#: counterpart questions … are now RULED", `5648065587`).
+#: The ONE openDox bundle module a contributed binding may import — RULED
+#: counterpart Q6, Brett Heap, 2026-09-12, `opensoft/openxFactory#656` comment
+#: `5649094228`: "what a CONTRIBUTED view module may IMPORT from openDox's
+#: bundle: `./views/helpers.js` and NOTHING ELSE. Every other need reaches the
+#: binding through its `ctx` (Q1-Q4) or its own package (Q5)."
 GUARANTEED_BUNDLE_MODULE = "./helpers.js"
 
-#: WHAT EACH CONTRIBUTED MODULE IMPORTS FROM openDox's BUNDLE — counterpart Q6,
-#: declared rather than discovered. `./helpers.js` is the guarantee above; a
-#: module of THIS column (`./dispose.js`) is not a bundle reach at all, since
-#: the assembly places both side by side; everything else is a reach into a
-#: module openDox owns and may move, and is named here so that it is checkable.
+#: WHAT EACH CONTRIBUTED MODULE IMPORTS — counterpart Q6, DECLARED and held to
+#: the guarantee. `./helpers.js` is the one permitted bundle reach; a module of
+#: THIS column (`./dispose.js`) is not a bundle reach at all, since the assembly
+#: (RULED Q5) places both side by side in the same `views/` directory.
 #:
-#: THE RESIDUE IS REAL AND IS NOT HIDDEN. `swb-create.js` and `swb-session.js`
-#: take six and eighteen names from `./staging-workbench-model.js`, and
-#: `gate-lens.js` takes two from `./lens-model.js` — both class-A openDox
-#: modules. Q6's recommendation is that such a reach is "either vendored by the
-#: contributing column or added to a declared guarantee list by a ruling"; this
-#: table is the measurement a guarantee-list ruling would be made against, and
-#: `tests/test_gate_loop_views.py` holds the modules to it so the reach cannot
-#: widen unobserved.
+#: THE RESIDUE THAT WAS HERE IS GONE. At `01b06c94` this table also carried
+#: `./lens-model.js` (`gate-lens.js`), `./intent-binding.js` (`dispose.js`) and
+#: `./staging-workbench-model.js` (`swb-create.js`, `swb-session.js`) — three
+#: class-A openDox modules — and the record said the reach was measured "so a
+#: guarantee-list ruling has a number to be made against". The ruling came, and
+#: it granted no list: `./views/helpers.js` and nothing else. Every one of those
+#: reaches is now a `ctx` facet (`CTX_MODEL_REACH`), so openDox's model stays in
+#: openDox, single-sourced, and the dependency is VISIBLE at the seam rather
+#: than resolved silently by a bundler.
 BUNDLE_REACH: dict[str, tuple[str, ...]] = {
     "gate.js": (),
-    "gate-lens.js": ("./helpers.js", "./lens-model.js"),
+    "gate-lens.js": ("./helpers.js",),
     "gate-projects.js": ("./helpers.js",),
-    "dispose.js": ("./helpers.js", "./intent-binding.js"),
-    "swb-create.js": ("./helpers.js", "./dispose.js",
-                      "./staging-workbench-model.js"),
-    "swb-session.js": ("./helpers.js", "./dispose.js",
-                       "./staging-workbench-model.js"),
+    "dispose.js": ("./helpers.js",),
+    "swb-create.js": ("./helpers.js", "./dispose.js"),
+    "swb-session.js": ("./helpers.js", "./dispose.js"),
+}
+
+#: WHAT EACH BINDING ASKS THE SHELL FOR — counterpart Q6's other half. A name
+#: here is a name the mount reads off `ctx` and refuses BY NAME when it is
+#: absent; nothing reaches openDox except through this table.
+#:
+#: `model` is openDox's `views/staging-workbench-model.js` / `views/lens-model.js`
+#: namespace (behaviour openDox owns and keeps); `intent` is the hosted intent
+#: feed's emitter and chip renderer, which openDox's `views/intent-binding.js`
+#: supplies to the shell that starts the feed.
+#:
+#: THE AFFORDANCE VOCABULARY IS NOT HERE, deliberately: the six session tokens,
+#: `SESSION_AFFORDANCES`, `SESSION_VERBS` and `SESSION_LABELS` are DECLARED by
+#: `swb-session.js` itself, on RULED Q3's precedent from slice S4 ("a route
+#: constant travels with the binding that calls it, never with the model that
+#: happens to declare it", `5642758731`) — they key this column's own route
+#: table at module scope, they name the gate verbs this column's own
+#: `openxdox/serve_gate.py` answers, and after S5 no file in openDox's bundle
+#: reads one of them.
+CTX_MODEL_REACH: dict[str, dict[str, tuple[str, ...]]] = {
+    "gate.bar": {},
+    "gate.lens": {"model": ("recipeRequest", "clusterRequest")},
+    "gate.projects": {},
+    "gate.dispose": {"intent": ("emit", "renderChips")},
+    "gate.workbench.create": {"model": ("createRequest", "createDocumentCommand",
+                                        "consoleHeaders", "withConsoleRepair",
+                                        "CONTINUATIONS")},
+    "gate.workbench.session": {"model": ("sessionRequest", "sessionCommand",
+                                         "sessionActionsLive",
+                                         "sessionSurfaceHidden",
+                                         "consoleHeaders", "withConsoleRepair",
+                                         "notebookRefreshCommand",
+                                         "firstEditBody", "firstEditVerdict")},
 }
 
 #: Q7's UNFINISHED HALF, stated rather than skipped. RULED Q7 (`5648049748`):

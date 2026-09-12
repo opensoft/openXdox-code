@@ -41,7 +41,21 @@
 // consults, and the tile shows the verdict with a regenerate hint.
 
 import { el } from "./helpers.js";
-import { emitIntent, renderIntentChips } from "./intent-binding.js";
+
+// THE INTENT BINDING IS NOT IMPORTED HERE ANY MORE — RULED counterpart Q6
+// (Brett Heap, 2026-09-12, `opensoft/openxFactory#656` comment `5649094228`):
+// "what a CONTRIBUTED view module may IMPORT from openDox's bundle:
+// `./views/helpers.js` and NOTHING ELSE. Every other need reaches the binding
+// through its `ctx` (Q1-Q4) or its own package (Q5)."
+//
+// This module named `{ emitIntent, renderIntentChips }` from openDox's
+// `./intent-binding.js`. That module is openDox's OWN optional-binding shim for
+// the hosted intent feed (slice S2) — a class-A file this column does not own —
+// and the tray already took its hosted context through `opts.intent`, so the
+// emitter and the chip renderer travel the SAME way: `ctx.intent.emit` and
+// `ctx.intent.renderChips`, supplied by the shell that starts the feed
+// (`views/wheel.js`) and absent exactly where the feed is. A hosted tray whose
+// shell supplied neither refuses IN THE PANEL, naming what was missing.
 
 export const GATE_DISPOSE_ROUTE = "/actions/gate/dispose-possible";
 export const GATE_PROPOSE_ROUTE = "/actions/gate/propose";
@@ -296,7 +310,19 @@ export function mountDisposeTray(container, possible, opts) {
         // is the only target — intent_apply_lane.shape_error), so the verb's
         // arguments travel WITHOUT `possible_id`.
         const { possible_id: _target, ...args } = body;
-        const result = await (intent.emit || emitIntent)({
+        // RULED counterpart Q6: the emitter is the shell's to supply. It was
+        // `intent.emit || emitIntent` — the bundle import as the fallback —
+        // and a fallback into a module this column may not import is a
+        // refusal, not a default.
+        if (typeof intent.emit !== "function") {
+          tray.classList.remove("is-busy");
+          panelEntry("refused", possible.id + " → dispose-possible " +
+            v.outcome + ": the shell supplied no ctx.intent.emit — a " +
+            "contributed binding reaches openDox's intent binding through ctx " +
+            "(RULED counterpart Q6, openxFactory#656 comment 5649094228)");
+          return;
+        }
+        const result = await intent.emit({
           verb: "dispose-possible",
           targetId: possible.id,
           args,
@@ -324,8 +350,12 @@ export function mountDisposeTray(container, possible, opts) {
     tray.appendChild(btn);
   }
   container.appendChild(tray);
-  if (intent) {
-    container.appendChild(renderIntentChips(el("span", "intentchips"),
+  // RULED counterpart Q6: the chip renderer is the shell's too. No
+  // `renderChips` is "this shell renders no chips" — the same silence a
+  // plane with no feed already produced — and never an import of openDox's
+  // `./intent-binding.js` from here.
+  if (intent && typeof intent.renderChips === "function") {
+    container.appendChild(intent.renderChips(el("span", "intentchips"),
       possible.id, intent.rows, intent.error));
   }
   return tray;

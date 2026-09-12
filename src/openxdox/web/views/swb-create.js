@@ -45,11 +45,75 @@
 // only innerHTML assignments are literal "" clears.
 
 import { el } from "./helpers.js";
+// `./dispose.js` is THIS COLUMN's own module, placed beside this one by the
+// same assembly step (RULED Q5) — not a reach into openDox's bundle.
 import { panelEntry } from "./dispose.js";
-import {
-  CONTINUATIONS, consoleHeaders, createDocumentCommand,
-  createRequest, withConsoleRepair,
-} from "./staging-workbench-model.js";
+
+// ---- openDox's WORKBENCH MODEL, REACHED THROUGH `ctx` (RULED Q6) -----------
+//
+// RULED counterpart Q6 — Brett Heap, 2026-09-12, `opensoft/openxFactory#656`
+// comment `5649094228`: "what a CONTRIBUTED view module may IMPORT from
+// openDox's bundle: `./views/helpers.js` and NOTHING ELSE. Every other need
+// reaches the binding through its `ctx` (Q1-Q4) or its own package (Q5)."
+//
+// This module named five things from openDox's `./staging-workbench-model.js`:
+// the wire-shaping FUNCTIONS `createRequest`, `createDocumentCommand`,
+// `consoleHeaders` and `withConsoleRepair`, and the VALUE `CONTINUATIONS`. All
+// five are openDox's model — the shell hands them down as `ctx.model` (the
+// module namespace it already imports), `installModel` takes it at each of the
+// two entries, and every call site below reads exactly as it read before.
+//
+// ONE SOURCE OF TRUTH, NOT A COPY. Vendoring those five here would have put a
+// second spelling of openDox's request bodies in a repository that does not own
+// them, and the first divergence would be silent. Reaching through `ctx` keeps
+// the model where it is and makes the dependency VISIBLE: `MODEL_NAMES` below
+// is the whole of what this binding needs from the shell, and the mount refuses
+// by name when the shell supplies less.
+let MODEL = null;
+
+function installModel(ctx) {
+  MODEL = (ctx && ctx.model) || null;
+  return MODEL;
+}
+
+//: What this binding needs from `ctx.model` — the four callables and the one
+//: value, kept apart because a missing callable and a missing table refuse with
+//: different words.
+const MODEL_NAMES = ["createRequest", "createDocumentCommand",
+                     "consoleHeaders", "withConsoleRepair"];
+const MODEL_VALUES = ["CONTINUATIONS"];
+
+function missingModelNames() {
+  return [
+    ...MODEL_NAMES.filter((n) => typeof (MODEL && MODEL[n]) !== "function"),
+    ...MODEL_VALUES.filter((n) => (MODEL && MODEL[n]) === undefined),
+  ];
+}
+
+function model(name) {
+  const fn = MODEL && MODEL[name];
+  if (typeof fn !== "function") {
+    throw new Error("gate.workbench.create: ctx.model." + name + " was not " +
+      "supplied — a contributed binding reaches openDox's model through ctx " +
+      "(RULED counterpart Q6, openxFactory#656 comment 5649094228)");
+  }
+  return fn;
+}
+
+function value(name) {
+  const held = MODEL && MODEL[name];
+  if (held === undefined) {
+    throw new Error("gate.workbench.create: ctx.model." + name + " was not " +
+      "supplied — a contributed binding reaches openDox's model through ctx " +
+      "(RULED counterpart Q6, openxFactory#656 comment 5649094228)");
+  }
+  return held;
+}
+
+const consoleHeaders = (...args) => model("consoleHeaders")(...args);
+const createDocumentCommand = (...args) => model("createDocumentCommand")(...args);
+const createRequest = (...args) => model("createRequest")(...args);
+const withConsoleRepair = (...args) => model("withConsoleRepair")(...args);
 
 // THE CREATE-DOCUMENT GATE ROUTE, DECLARED WHERE IT IS CALLED (§ 3.4 slice S4).
 // It stood at `views/staging-workbench-model.js`:543 at the carve commit and
@@ -189,7 +253,7 @@ function continuationPicker(host) {
   unset.value = "";
   unset.textContent = "(none — be shown the choice)";
   select.appendChild(unset);
-  for (const token of CONTINUATIONS) {
+  for (const token of value("CONTINUATIONS")) {
     const option = document.createElement("option");
     option.value = token;
     option.textContent = token === "resume"
@@ -372,6 +436,24 @@ function renderDescriptor(host, seed, opts) {
 // the read-only viewer (the same seam the docs rows use), and
 // `onSessionOpened(result)` tells the shell the create opened or joined a BRANCH
 // SESSION, so its posture indicator stops reading from a boot-time roster.
+// RULED counterpart Q6's REFUSAL, taken at every entry rather than at the
+// first call site. `installModel` is the one place `ctx.model` is read; a shell
+// that supplied none — or supplied one missing a name this binding needs —
+// gets a NAMED refusal in the host, in the shape `renderRefused` already gives
+// an engine refusal, and the affordance is not offered. Silence would have
+// meant a create button that throws on click.
+function modelRefusal(host, o) {
+  installModel(o);
+  const missing = missingModelNames();
+  if (!missing.length) return false;
+  renderRefused(host, { message:
+    "gate.workbench.create: the shell supplied no ctx.model." +
+    missing.join(", no ctx.model.") + " — a contributed binding reaches " +
+    "openDox's model through ctx (RULED counterpart Q6, openxFactory#656 " +
+    "comment 5649094228)" });
+  return true;
+}
+
 // RULED Q3 (openxFactory#656 comment `5648044785`): ONE mount signature,
 // `mount(host, snapshot, ctx)`, with per-invocation data carried in `ctx`. The
 // SEED — the staging context this affordance creates into — is exactly such
@@ -382,6 +464,7 @@ export function mountCreateAffordance(host, snapshot, ctx) {
   const o = ctx || {};
   const seed = o.seed;
   if (!seed) return null;
+  if (modelRefusal(host, o)) return null;
   if (!createGateLive(o.caps)) return renderDescriptor(host, seed, o);
   const wrap = el("div", "swb-cwrap");
   // `opts.slot` lets a caller share ONE dialog host between this button and
@@ -409,6 +492,7 @@ export function openCreateDialog(host, snapshot, ctx) {
   const seed = o.seed;
   if (!seed) return null;
   host.innerHTML = "";
+  if (modelRefusal(host, o)) return null;
   if (!createGateLive(o.caps)) return renderDescriptor(host, seed, o);
   return renderForm(host, seed, o);
 }

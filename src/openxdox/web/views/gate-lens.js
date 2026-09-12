@@ -73,7 +73,48 @@
 // (RULED OQ-C), admitted by path in `docs/opendox-carve-admissions.yaml`.
 
 import { el } from "./helpers.js";
-import { clusterRequest, recipeRequest } from "./lens-model.js";
+
+// ---- openDox's MODEL, REACHED THROUGH `ctx` (RULED counterpart Q6) ---------
+//
+// RULED counterpart Q6 — Brett Heap, 2026-09-12, `opensoft/openxFactory#656`
+// comment `5649094228`: "what a CONTRIBUTED view module may IMPORT from
+// openDox's bundle: `./views/helpers.js` and NOTHING ELSE. Every other need
+// reaches the binding through its `ctx` (Q1-Q4) or its own package (Q5)."
+//
+// This module used to name `import { clusterRequest, recipeRequest } from
+// "./lens-model.js"` — a static reach into a class-A module openDox owns, may
+// move and may rename, and the reach that would break this column silently the
+// first time it did. Both are openDox's MODEL (each shapes a request BODY out
+// of the plan the lens already built), so they arrive the ctx way: the shell
+// hands the binding `ctx.model`, `installModel` takes it at the ONE entry, and
+// the two names below keep every call site exactly as it was.
+let MODEL = null;
+
+function installModel(ctx) {
+  MODEL = (ctx && ctx.model) || null;
+  return MODEL;
+}
+
+//: The names this binding needs from `ctx.model`, in one place so the mount's
+//: refusal below and this file's call sites cannot drift apart.
+const MODEL_NAMES = ["recipeRequest", "clusterRequest"];
+
+function missingModelNames() {
+  return MODEL_NAMES.filter((name) => typeof (MODEL && MODEL[name]) !== "function");
+}
+
+function model(name) {
+  const fn = MODEL && MODEL[name];
+  if (typeof fn !== "function") {
+    throw new Error("gate.lens: ctx.model." + name + " was not supplied — a " +
+      "contributed binding reaches openDox's model through ctx (RULED " +
+      "counterpart Q6, openxFactory#656 comment 5649094228)");
+  }
+  return fn;
+}
+
+const clusterRequest = (...args) => model("clusterRequest")(...args);
+const recipeRequest = (...args) => model("recipeRequest")(...args);
 
 // The two gate routes the lens verbs post to (add-lens-gate-verbs). They sit
 // under `openxdox/serve_gate.py`'s `ACTIONS_GATE_PREFIX` and are declared by
@@ -199,6 +240,20 @@ export function mountLensGate(host, snapshot, ctx) {
   if (!host || !plan) return null;
   const result = el("div", "dc-result");
   result.setAttribute("aria-live", "polite");
+  // RULED counterpart Q6: openDox's model arrives through `ctx`, and a shell
+  // that supplies none is REFUSED HERE — at the mount, in the panel, naming
+  // the binding and the missing names — rather than inside a click handler
+  // three frames down, where the human would see a dead button.
+  installModel(o);
+  const missing = missingModelNames();
+  if (missing.length) {
+    renderOutcome(result, { ok: false, message:
+      "gate.lens: the shell supplied no ctx.model." + missing.join("/ctx.model.") +
+      " — a contributed binding reaches openDox's model through ctx (RULED " +
+      "counterpart Q6, openxFactory#656 comment 5649094228)" });
+    host.appendChild(result);
+    return null;
+  }
   const bar = el("div", "dc-exec");
   const run = el("button", "cbtn",
     plan.kind === "add-as-cluster" ? "execute → add as cluster" : "execute → save recipe");

@@ -85,15 +85,117 @@
 // refusal on the page.
 
 import { el } from "./helpers.js";
+// `./dispose.js` is THIS COLUMN's own module, placed beside this one by the
+// same assembly step (RULED Q5) — not a reach into openDox's bundle.
 import { panelEntry } from "./dispose.js";
-import {
-  SESSION_ABANDON, SESSION_AFFORDANCES, SESSION_EDIT, SESSION_LABELS,
-  SESSION_FIRST_EDIT, SESSION_REFRESH_NOTEBOOK, SESSION_SAVE, SESSION_SHARE,
-  SESSION_VERBS,
-  consoleHeaders, firstEditBody, firstEditVerdict, notebookRefreshCommand,
-  sessionActionsLive, sessionCommand, sessionRequest,
-  sessionSurfaceHidden, withConsoleRepair,
-} from "./staging-workbench-model.js";
+
+// ---- WHAT THIS BINDING TAKES FROM openDox, AND WHAT IT OWNS (RULED Q6) -----
+//
+// RULED counterpart Q6 — Brett Heap, 2026-09-12, `opensoft/openxFactory#656`
+// comment `5649094228`: "what a CONTRIBUTED view module may IMPORT from
+// openDox's bundle: `./views/helpers.js` and NOTHING ELSE. Every other need
+// reaches the binding through its `ctx` (Q1-Q4) or its own package (Q5)."
+//
+// This module named EIGHTEEN things from openDox's
+// `./staging-workbench-model.js`. They divide, and the division is the ruling's
+// own two clauses rather than a convenience:
+//
+//   BEHAVIOUR — the nine model FUNCTIONS (`sessionRequest`, `sessionCommand`,
+//   `sessionActionsLive`, `sessionSurfaceHidden`, `consoleHeaders`,
+//   `withConsoleRepair`, `notebookRefreshCommand`, `firstEditBody`,
+//   `firstEditVerdict`) — is openDox's, stays openDox's, and reaches this
+//   binding through `ctx.model`. Copying them here would have put a second
+//   spelling of openDox's request bodies in a repository that does not own
+//   them, and the first divergence would be silent.
+//
+//   THE AFFORDANCE VOCABULARY — the six tokens, the affordance list and the two
+//   tables below — is DECLARED HERE, on RULED Q3's own precedent from slice S4
+//   (`openxFactory#656` comment `5642758731`: "a route constant travels with
+//   the binding that calls it, never with the model that happens to declare
+//   it"). These tokens KEY this module's own `SESSION_ROUTES` table at MODULE
+//   SCOPE, they name the gate verbs this column's own `openxdox/serve_gate.py`
+//   answers, and after slice S5 no file in openDox's bundle reads one of them.
+//   A value a ctx-installed model cannot supply in time, that this column posts
+//   and this column serves, is this column's.
+//
+// THE DRIFT GUARD IS EXECUTED, not asserted in prose: `tests/…_probes.py` runs
+// the assembled bundle and holds these tokens to the model's own
+// `SESSION_AFFORDANCES`, so a rename on either side fails a test rather than
+// producing an unknown affordance on the wire.
+let MODEL = null;
+
+function installModel(ctx) {
+  MODEL = (ctx && ctx.model) || null;
+  return MODEL;
+}
+
+//: The nine names this binding needs from `ctx.model`, in one place so the
+//: refusals below and the call sites cannot drift apart.
+const MODEL_NAMES = [
+  "sessionRequest", "sessionCommand", "sessionActionsLive",
+  "sessionSurfaceHidden", "consoleHeaders", "withConsoleRepair",
+  "notebookRefreshCommand", "firstEditBody", "firstEditVerdict",
+];
+
+function missingModelNames() {
+  return MODEL_NAMES.filter((n) => typeof (MODEL && MODEL[n]) !== "function");
+}
+
+function model(name) {
+  const fn = MODEL && MODEL[name];
+  if (typeof fn !== "function") {
+    throw new Error("gate.workbench.session: ctx.model." + name + " was not " +
+      "supplied — a contributed binding reaches openDox's model through ctx " +
+      "(RULED counterpart Q6, openxFactory#656 comment 5649094228)");
+  }
+  return fn;
+}
+
+const consoleHeaders = (...args) => model("consoleHeaders")(...args);
+const firstEditBody = (...args) => model("firstEditBody")(...args);
+const firstEditVerdict = (...args) => model("firstEditVerdict")(...args);
+const notebookRefreshCommand = (...args) => model("notebookRefreshCommand")(...args);
+const sessionActionsLive = (...args) => model("sessionActionsLive")(...args);
+const sessionCommand = (...args) => model("sessionCommand")(...args);
+const sessionRequest = (...args) => model("sessionRequest")(...args);
+const sessionSurfaceHidden = (...args) => model("sessionSurfaceHidden")(...args);
+const withConsoleRepair = (...args) => model("withConsoleRepair")(...args);
+
+// ---- THE AFFORDANCE VOCABULARY THIS BINDING OWNS ---------------------------
+//
+// Byte-identical to the tokens openDox's model carried at `cb343ae8` — the
+// SAME strings, because they are the wire's and the wire did not move — but
+// DECLARED where the routes they key are declared. `SESSION_AFFORDANCES` is
+// FR-044's four plus §12's share, in the order the session bar renders them;
+// `SESSION_VERBS` is the affordance → gate verb map, which is also the
+// `cli.py gate <verb>` name (FR-020's parity is one vocabulary, not two);
+// `SESSION_LABELS` is this column's own rendering of them.
+export const SESSION_EDIT = "edit";
+export const SESSION_FIRST_EDIT = "first-edit";
+export const SESSION_SAVE = "save";
+export const SESSION_ABANDON = "abandon";
+export const SESSION_SHARE = "share";
+export const SESSION_REFRESH_NOTEBOOK = "refresh-notebook";
+
+export const SESSION_AFFORDANCES = [SESSION_EDIT, SESSION_SHARE, SESSION_SAVE,
+                                    SESSION_ABANDON, SESSION_REFRESH_NOTEBOOK];
+
+export const SESSION_VERBS = {
+  [SESSION_EDIT]: "edit-document",
+  [SESSION_SAVE]: "open-pr",
+  [SESSION_ABANDON]: "abandon-session",
+  [SESSION_SHARE]: "share-session",
+};
+
+export const SESSION_LABELS = {
+  [SESSION_EDIT]: "✎ rewrite a document in this session",
+  [SESSION_SAVE]: "⇪ save — open the pull request",
+  [SESSION_ABANDON]: "⌧ abandon this session",
+  // Named for what it DOES and what it does not: a colleague can resume, and no
+  // pull request is opened. "share" alone reads like publishing to the world.
+  [SESSION_SHARE]: "⇧ share — push the branch for a colleague (no pull request)",
+  [SESSION_REFRESH_NOTEBOOK]: "↻ re-sync the session notebook",
+};
 
 // ---- THE FIVE SESSION GATE ROUTES, DECLARED WHERE THEY ARE CALLED ---------
 //
@@ -252,7 +354,23 @@ async function submitSession(affordance, body, fetcher, caps, repair) {
 // this module keeps its no-sibling-import harness discipline. Both wire
 // translations are the MODEL's pure functions; nothing here invents
 // vocabulary. One request per buffer, in the order the planner sends them.
-export function firstEditTransport({ fetcher, caps, repair } = {}) {
+export function firstEditTransport({ fetcher, caps, repair, model: bundleModel } = {}) {
+  // RULED Q10 reaches this export through the REGISTRY and not through a mount,
+  // so RULED counterpart Q6's `ctx.model` reaches it the same way: as a field of
+  // the ONE options object its caller already builds. Installed here, before the
+  // returned transport can be called, so a Save never discovers a missing model
+  // mid-request.
+  installModel({ model: bundleModel });
+  const missing = missingModelNames();
+  if (missing.length) {
+    return async () => ({
+      ok: false,
+      message: "gate.workbench.session: the shell supplied no ctx.model." +
+        missing.join(", no ctx.model.") + " to firstEditTransport — a " +
+        "contributed binding reaches openDox's model through ctx (RULED " +
+        "counterpart Q6, openxFactory#656 comment 5649094228)",
+    });
+  }
   return async (req) => firstEditVerdict(
     await submitSession(
       SESSION_FIRST_EDIT,
@@ -650,6 +768,26 @@ function renderForm(host, affordance, ctx, opts) {
 export function mountSessionAffordances(host, snapshot, ctx) {
   const o = ctx || {};
   const session = o.session || {};
+  // RULED counterpart Q6: openDox's model arrives through `ctx`, and it is read
+  // ONCE, here, at the mount. A shell that supplied none — or one missing a
+  // name this binding needs — is refused BY NAME in the host, in the shape
+  // every other refusal on this surface takes, rather than throwing inside a
+  // click handler where the human would see a dead button.
+  installModel(o);
+  const missing = missingModelNames();
+  if (missing.length) {
+    const refused = el("div", "swb-crefused");
+    refused.appendChild(el("div", "swb-ch", "refused ✕"));
+    refused.appendChild(el("div", "swb-cline",
+      "gate.workbench.session: the shell supplied no ctx.model." +
+      missing.join(", no ctx.model.") + " — a contributed binding reaches " +
+      "openDox's model through ctx (RULED counterpart Q6, openxFactory#656 " +
+      "comment 5649094228)"));
+    host.appendChild(refused);
+    panelEntry("refused", "the session verbs were not offered: ctx.model." +
+      missing.join(", ctx.model.") + " was not supplied");
+    return null;
+  }
   // FR-048 FIRST: a plane that declares `session: false` is the HOSTED plane and
   // exposes NOTHING of this capability — not a live control, and not a
   // descriptor naming the verb and the branch (review finding 14).
