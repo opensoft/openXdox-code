@@ -85,10 +85,14 @@ def test_assembles_beside_the_two_existing_contribution_columns() -> None:
         RoleAuthorityProjectionExtension(),
     ]
     bindings = route_extension.collect_bindings(extensions)
-    # 1 (gate prefix) + 3 (snapshot-index exact, bare-source exact, source
-    # prefix) + 1 (this projection's exact GET) = 5, and no
-    # RouteBindingError means none of the five collide or nest.
-    assert len(bindings) == 5
+    # 1 (gate prefix) + 1 (snapshot-index exact) + 1 (this projection's
+    # exact GET) = 3, and no RouteBindingError means none of the three
+    # collide or nest.
+    # WAS 5 UNTIL § 3.4 SLICE S6 (RULED Q4, `#656` comment `5642758731`):
+    # `/source` (exact) and `/source/` (prefix) left this column with the
+    # route, and are fixed core arms of `opendox/serve.py` now. The count is
+    # the seam's own arithmetic, so it moves with the contribution.
+    assert len(bindings) == 3
     assert ROLE_AUTHORITY_ROUTE in {b.pattern for b in bindings}
 
 
@@ -103,14 +107,18 @@ def test_assembly_is_order_insensitive() -> None:
         ProjectionRoutesExtension(),
     ]
     bindings = route_extension.collect_bindings(extensions)
-    assert len(bindings) == 5
+    assert len(bindings) == 3
 
 
 def test_role_authority_route_does_not_sit_under_either_declared_prefix() -> None:
     # Belt and braces beyond the collect_bindings proof above: the pattern
-    # itself must not share either existing prefix's namespace, so a future
-    # third prefix declared alongside "/source/" or "/actions/gate/" can
-    # never retroactively swallow this route.
+    # itself must not share either prefix's namespace, so a future prefix
+    # declared alongside "/source/" or "/actions/gate/" can never
+    # retroactively swallow this route. `/source/` is `opendox/serve.py`'s
+    # CORE prefix since § 3.4 slice S6 rather than this column's contributed
+    # one, which makes this check more necessary and not less: a contributed
+    # route must not sit under a core prefix either, and `collect_bindings`
+    # never sees the core arms to refuse it.
     assert not ROLE_AUTHORITY_ROUTE.startswith("/source/")
     assert not ROLE_AUTHORITY_ROUTE.startswith("/actions/gate/")
 
