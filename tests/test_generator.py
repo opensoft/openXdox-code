@@ -5,6 +5,8 @@ declared keyword index, and project grouping (FR-003/FR-004/FR-007; spec US1).""
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from conftest import (  # noqa: F401  (sys.path side effect)
@@ -349,6 +351,82 @@ def test_exclusion_reporting_is_opt_in(tmp_path):
     snap = generate_snapshot(corpus_root, "fixture-repo",
                              source_revision=PINNED_REVISION, git=FakeGit())
     assert {d["id"] for d in snap["documents"]} == {"ideation/brainstorm/good.md"}
+
+
+# ---- the exclusion check reads its vocabulary from the DomainProfile -----------
+#
+# RULING C2 / § 4.4 follow-up (openxFactory#656 comment 5640381252):
+# `_document_exclusion_reason` used to compare `doc.status` against
+# `LIFECYCLE_STATUSES` — `doc_health.TAXONOMY` imported wholesale into this
+# domain-neutral package. It now asks the REGISTERED profile
+# (`_document_status_vocabulary()`) for the kind `demote` departs from. These
+# tests exercise the function directly: a `status`-only stand-in is enough,
+# since `status` is the only field it reads, and it keeps the "renamed word"
+# and "refuses before registration" cases independent of the full corpus scan
+# `test_unrecognized_status_value_is_also_excluded` above already covers for
+# the ordinary path.
+
+def _status_doc(status):
+    """A stand-in for `corpus.Doc` carrying only what
+    `_document_exclusion_reason` reads."""
+    return SimpleNamespace(status=status)
+
+
+def test_exclusion_reason_accepts_every_status_the_profile_declares():
+    for status in generator._document_status_vocabulary():
+        assert generator._document_exclusion_reason(_status_doc(status)) is None
+
+
+def test_exclusion_reason_rejects_a_status_the_profile_does_not_declare():
+    reason = generator._document_exclusion_reason(_status_doc("in-progress"))
+    assert reason == "unrecognized lifecycle status 'in-progress'"
+
+
+def test_exclusion_reason_refuses_before_registration(unregistered_profile):
+    from openxdox import domain_profile
+    with pytest.raises(domain_profile.DomainProfileNotRegistered):
+        generator._document_exclusion_reason(_status_doc("draft"))
+
+
+def test_a_renamed_status_word_needs_no_engine_change():
+    """The word a document's `Status:` header may carry is whatever the
+    registered profile declares — never a name this package remembers.
+    Renaming `draft` -> `triaged` on a COPY of the fixture profile (the shared
+    registration is restored in `finally`, never left mutated for other
+    tests) proves the vocabulary is read live from the profile object, not
+    cached from `doc_health.TAXONOMY` or from any prior call."""
+    from pathlib import Path
+
+    import yaml
+
+    from openxdox import domain_profile
+
+    fixture = (Path(__file__).resolve().parent / "fixtures"
+               / "openxfactory-engineering-profile.yaml")
+    raw = yaml.safe_load(fixture.read_text(encoding="utf-8"))
+    for lifecycle in raw["lifecycle"]:
+        if lifecycle["artifact_kind"] != "governance-document":
+            continue
+        for status in lifecycle["vocabulary"]:
+            if status["id"] == "draft":
+                status["id"] = "triaged"
+        for transition in lifecycle["transitions"]:
+            if transition.get("to") == "draft":
+                transition["to"] = "triaged"
+            if transition.get("from") == "draft":
+                transition["from"] = "triaged"
+    renamed = domain_profile.load(raw)
+
+    previous = domain_profile.current()
+    domain_profile.unregister()
+    domain_profile.register(renamed)
+    try:
+        assert generator._document_exclusion_reason(_status_doc("triaged")) is None
+        reason = generator._document_exclusion_reason(_status_doc("draft"))
+        assert reason == "unrecognized lifecycle status 'draft'"
+    finally:
+        domain_profile.unregister()
+        domain_profile.register(previous)
 
 
 # ---- ratification: derived from the archive folder + governed ratifier ---------
