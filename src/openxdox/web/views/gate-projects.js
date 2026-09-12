@@ -1,3 +1,21 @@
+// ---------------------------------------------------------------------------
+// THIS FILE IS openXdox's NOW — § 3.4 slice S5, "contribute the gate loop"
+// (openDox-spec `docs/front-end-package-boundary.md` § 5 row S5 @ `7d12428c`).
+// It arrived here from openDox-code `src/opendox/web/views/gate-projects.js` and is
+// SHIPPED AS PACKAGE DATA: RULED Q5 (openxFactory#656 comment `5648044785`,
+// Brett Heap, 2026-09-12) — "the COMPOSED DEPLOYMENT assembles the bundle …
+// the composed install copies them into openDox's one `--web-dir` at assembly;
+// a contributed GET route is the declared hosted fallback". The bytes are
+// placed by `openxdox.web_assets.install_view_modules()`; the fallback is
+// `openxdox.serve_views`. The binding that declares it is in
+// `src/openxdox/view_extensions.py`.
+//
+// WHAT IT MAY IMPORT FROM THE BUNDLE (counterpart Q6). `./views/helpers.js` is
+// the RULED guarantee; every other openDox module reached from here is declared
+// in `view_extensions.BUNDLE_REACH` and held there by
+// `tests/test_gate_loop_views.py`, so the reach is NAMED and checkable instead
+// of silent. This module reaches: `./helpers.js` (RULED guarantee)`.
+// ---------------------------------------------------------------------------
 // THE PROJECT COMMISSIONS — class B, and the second half of slice S4's answer to
 // RULED Q3 (openxFactory#656 comment `5642758731`, Brett Heap, 2026-09-12):
 // **"a route constant travels with the binding that calls it, never with the
@@ -204,7 +222,11 @@ function mountCreateProject(wrap, status, roster, o, addPendingOption) {
 // (a two-click trash re-arms, a select restores its placeholder), and
 // `onRecorded(data)` hands the accepted commission back so the selector can
 // badge the pending edit (the D-e two-plane posture). Neither is required.
-export function mountProjectCommissions(host, ctx) {
+// RULED Q3 (openxFactory#656 comment `5648044785`): ONE mount signature,
+// `mount(host, snapshot, ctx)`. `snapshot` is unread here — the roster this
+// panel commissions against travels in `ctx.roster`, derived by the selector —
+// and is taken so that every contributed mount in this column has one shape.
+export function mountProjectCommissions(host, snapshot, ctx) {
   const o = ctx || {};
   const status = o.status || el("span", "repopick-msg");
   const openCreateForm = mountCreateProject(host, status, o.roster, o,

@@ -1,3 +1,21 @@
+// ---------------------------------------------------------------------------
+// THIS FILE IS openXdox's NOW — § 3.4 slice S5, "contribute the gate loop"
+// (openDox-spec `docs/front-end-package-boundary.md` § 5 row S5 @ `7d12428c`).
+// It arrived here from openDox-code `src/opendox/web/views/swb-create.js` and is
+// SHIPPED AS PACKAGE DATA: RULED Q5 (openxFactory#656 comment `5648044785`,
+// Brett Heap, 2026-09-12) — "the COMPOSED DEPLOYMENT assembles the bundle …
+// the composed install copies them into openDox's one `--web-dir` at assembly;
+// a contributed GET route is the declared hosted fallback". The bytes are
+// placed by `openxdox.web_assets.install_view_modules()`; the fallback is
+// `openxdox.serve_views`. The binding that declares it is in
+// `src/openxdox/view_extensions.py`.
+//
+// WHAT IT MAY IMPORT FROM THE BUNDLE (counterpart Q6). `./views/helpers.js` is
+// the RULED guarantee; every other openDox module reached from here is declared
+// in `view_extensions.BUNDLE_REACH` and held there by
+// `tests/test_gate_loop_views.py`, so the reach is NAMED and checkable instead
+// of silent. This module reaches: `./helpers.js` (RULED guarantee), `./dispose.js` (this column), `./staging-workbench-model.js`.
+// ---------------------------------------------------------------------------
 // The staging workbench's CREATE-DOCUMENT affordance — dialog + transport
 // (openxFactory `add-workbench-bullseye-and-create`, design D5/D7/D8).
 //
@@ -354,8 +372,16 @@ function renderDescriptor(host, seed, opts) {
 // the read-only viewer (the same seam the docs rows use), and
 // `onSessionOpened(result)` tells the shell the create opened or joined a BRANCH
 // SESSION, so its posture indicator stops reading from a boot-time roster.
-export function mountCreateAffordance(host, seed, opts) {
-  const o = opts || {};
+// RULED Q3 (openxFactory#656 comment `5648044785`): ONE mount signature,
+// `mount(host, snapshot, ctx)`, with per-invocation data carried in `ctx`. The
+// SEED — the staging context this affordance creates into — is exactly such
+// data, so it travels as `ctx.seed` rather than as a second positional the
+// shell would have to know about. `snapshot` is unread: the seed is already
+// derived from it by the caller that computed it.
+export function mountCreateAffordance(host, snapshot, ctx) {
+  const o = ctx || {};
+  const seed = o.seed;
+  if (!seed) return null;
   if (!createGateLive(o.caps)) return renderDescriptor(host, seed, o);
   const wrap = el("div", "swb-cwrap");
   // `opts.slot` lets a caller share ONE dialog host between this button and
@@ -376,8 +402,12 @@ export function mountCreateAffordance(host, seed, opts) {
 // The centre-ring gesture's opener (design D6): the SAME dialog with the SAME
 // seeding rule, so the ring and the button can never diverge. Gate-off, the ring
 // reveals the descriptor rather than a form — still no write from the page.
-export function openCreateDialog(host, seed, opts) {
-  const o = opts || {};
+// The same ONE signature (RULED Q3): a dialog is a mount, and a contributed
+// column with two mount shapes is the coupling this slice removes.
+export function openCreateDialog(host, snapshot, ctx) {
+  const o = ctx || {};
+  const seed = o.seed;
+  if (!seed) return null;
   host.innerHTML = "";
   if (!createGateLive(o.caps)) return renderDescriptor(host, seed, o);
   return renderForm(host, seed, o);

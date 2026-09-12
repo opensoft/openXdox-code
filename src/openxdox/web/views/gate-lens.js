@@ -1,3 +1,21 @@
+// ---------------------------------------------------------------------------
+// THIS FILE IS openXdox's NOW — § 3.4 slice S5, "contribute the gate loop"
+// (openDox-spec `docs/front-end-package-boundary.md` § 5 row S5 @ `7d12428c`).
+// It arrived here from openDox-code `src/opendox/web/views/gate-lens.js` and is
+// SHIPPED AS PACKAGE DATA: RULED Q5 (openxFactory#656 comment `5648044785`,
+// Brett Heap, 2026-09-12) — "the COMPOSED DEPLOYMENT assembles the bundle …
+// the composed install copies them into openDox's one `--web-dir` at assembly;
+// a contributed GET route is the declared hosted fallback". The bytes are
+// placed by `openxdox.web_assets.install_view_modules()`; the fallback is
+// `openxdox.serve_views`. The binding that declares it is in
+// `src/openxdox/view_extensions.py`.
+//
+// WHAT IT MAY IMPORT FROM THE BUNDLE (counterpart Q6). `./views/helpers.js` is
+// the RULED guarantee; every other openDox module reached from here is declared
+// in `view_extensions.BUNDLE_REACH` and held there by
+// `tests/test_gate_loop_views.py`, so the reach is NAMED and checkable instead
+// of silent. This module reaches: `./helpers.js` (RULED guarantee), `./lens-model.js`.
+// ---------------------------------------------------------------------------
 // THE LENS'S TWO GATE VERBS — class B, and the first half of slice S4's answer
 // to RULED Q3 (openxFactory#656 comment `5642758731`, Brett Heap, 2026-09-12):
 // **"a route constant travels with the binding that calls it, never with the
@@ -169,7 +187,13 @@ function renderEvidenceForm(container, actor, onSubmit) {
 // A save-recipe plan posts immediately; an add-as-cluster plan first collects
 // the human-seen organizer evidence, and the engine's refusal for an incomplete
 // submission renders here.
-export function mountLensGate(host, ctx) {
+// RULED Q3 (openxFactory#656 comment `5648044785`): ONE mount signature,
+// `mount(host, snapshot, ctx)`. This entry derives nothing from `snapshot` — the
+// plan it executes is already confirmed and travels in `ctx` — and it takes the
+// argument anyway, because a contributed column that had to remember which of
+// its mounts took a snapshot would be learning the contract by reading `app.js`
+// again, which is the coupling the registry exists to end.
+export function mountLensGate(host, snapshot, ctx) {
   const o = ctx || {};
   const plan = o.plan;
   if (!host || !plan) return null;

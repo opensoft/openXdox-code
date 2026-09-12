@@ -1,3 +1,21 @@
+// ---------------------------------------------------------------------------
+// THIS FILE IS openXdox's NOW — § 3.4 slice S5, "contribute the gate loop"
+// (openDox-spec `docs/front-end-package-boundary.md` § 5 row S5 @ `7d12428c`).
+// It arrived here from openDox-code `src/opendox/web/views/dispose.js` and is
+// SHIPPED AS PACKAGE DATA: RULED Q5 (openxFactory#656 comment `5648044785`,
+// Brett Heap, 2026-09-12) — "the COMPOSED DEPLOYMENT assembles the bundle …
+// the composed install copies them into openDox's one `--web-dir` at assembly;
+// a contributed GET route is the declared hosted fallback". The bytes are
+// placed by `openxdox.web_assets.install_view_modules()`; the fallback is
+// `openxdox.serve_views`. The binding that declares it is in
+// `src/openxdox/view_extensions.py`.
+//
+// WHAT IT MAY IMPORT FROM THE BUNDLE (counterpart Q6). `./views/helpers.js` is
+// the RULED guarantee; every other openDox module reached from here is declared
+// in `view_extensions.BUNDLE_REACH` and held there by
+// `tests/test_gate_loop_views.py`, so the reach is NAMED and checkable instead
+// of silent. This module reaches: `./helpers.js` (RULED guarantee), `./intent-binding.js`.
+// ---------------------------------------------------------------------------
 // Dispose tray + refusal panel — the LOCAL action center's first verb
 // (openxFactory add-ideation-intent-plane §3, design D5 local-first; the
 // hosted intent plane later swaps the transport, not this UI).
@@ -28,6 +46,51 @@ import { emitIntent, renderIntentChips } from "./intent-binding.js";
 export const GATE_DISPOSE_ROUTE = "/actions/gate/dispose-possible";
 export const GATE_PROPOSE_ROUTE = "/actions/gate/propose";
 
+// THE FOUR ACTION-ROW VERB ROUTES, DECLARED AS LITERALS — RULED Q12
+// (openxFactory#656 comment `5648065587`, Brett Heap, 2026-09-12): "a COMPUTED
+// route is declared as its LITERALS: the dispose binding declares four
+// `/actions/gate/<verb>` routes; no prefix semantics on the declaring side;
+// assertion 2's grep sees them."
+//
+// WHAT THIS REPLACES. `mountWheelVerb`'s dispatch posted to
+// `"/actions/gate/" + verb` (this file's :396 at openDox-code `cb343ae8`), with
+// the four verbs supplied by its caller (`views/wheel.js`:140-146). Two things
+// were wrong with that and only one of them was cosmetic. A binding's `routes:`
+// is an OWNERSHIP CLAIM the registry checks (`view_extension.py`'s
+// `_route_ownership_breach`), and a route nobody can write down is a claim
+// nobody can check; and openDox-spec § 4.5 assertion 2 greps for route
+// LITERALS, so a concatenation was invisible to the one instrument that
+// measures this boundary — "the gap is in the INSTRUMENT, not in this file"
+// (`docs/front-end-package-boundary.md` § 4.5 point 2, amendment #2, @
+// `7d12428c`). They are a closed set the caller already spells out, so
+// enumerating them keeps `routes` a declaration rather than a pattern language.
+export const GATE_PROMOTE_TO_STAGING_ROUTE = "/actions/gate/promote-to-staging";
+export const GATE_RESEARCH_BRIEF_ROUTE = "/actions/gate/research-brief";
+export const GATE_DERIVE_POSSIBLES_ROUTE = "/actions/gate/derive-possibles";
+export const GATE_DEMOTE_ROUTE = "/actions/gate/demote";
+
+//: verb -> the literal route it posts to. The dispatch reads this map; a verb
+//: with no declared route REFUSES rather than composing a path the binding
+//: never claimed.
+export const VERB_ROUTE = {
+  "promote-to-staging": GATE_PROMOTE_TO_STAGING_ROUTE,
+  "research-brief": GATE_RESEARCH_BRIEF_ROUTE,
+  "derive-possibles": GATE_DERIVE_POSSIBLES_ROUTE,
+  "demote": GATE_DEMOTE_ROUTE,
+};
+
+//: Every route this module calls, in one place, so the `gate.dispose` binding's
+//: `routes:` tuple and this module cannot drift apart — the shape
+//: `views/gate-lens.js` and `views/swb-session.js` already use.
+export const DISPOSE_GATE_ROUTES = [
+  GATE_DISPOSE_ROUTE,
+  GATE_PROPOSE_ROUTE,
+  GATE_PROMOTE_TO_STAGING_ROUTE,
+  GATE_RESEARCH_BRIEF_ROUTE,
+  GATE_DERIVE_POSSIBLES_ROUTE,
+  GATE_DEMOTE_ROUTE,
+];
+
 // verdict -> { label, needsCitation }
 const VERDICTS = [
   { outcome: "accepted", label: "✓ accept", title: "becomes first-class latent backlog (keeps ai-derived provenance)" },
@@ -48,11 +111,63 @@ export function gateCapable(caps) {
 }
 
 // ---- refusal panel (one per page; every refusal is visible, never silent) --
-
+//
+// THE HOST IS A DECLARED REGION NOW, NOT `document.body` — RULED Q8
+// (openxFactory#656 comment `5648049748`, Brett Heap, 2026-09-12): "a fourth
+// `shell` region, `page-overlay`, is the declared host for page-level panels
+// (dispose.js's refusal panel); `document.body` is never a contract surface."
+//
+// This module used to append a singleton `aside.refusalpanel` straight to
+// `document.body` — a mount point no region declared, which openXdox-spec
+// `docs/gate-loop-view-contract.md` § 8 Q8 (@ `d73767b7`) names as "exactly the
+// silence the REGIONS table exists to end, and a contributed column appending
+// to the body is a collision nothing can refuse". The shell now builds the
+// `page-overlay` host and hands it to this binding's entry
+// (`mountRefusalPanel`), and every later `panelEntry` renders into it.
+let panelHost = null;
 let panel = null;
 
+// THE BINDING'S ENTRY (`gate.dispose`), in the ONE mount signature RULED Q3.
+// `host` is the shell's `page-overlay` element. Called once per render, before
+// any view mounts, which is what makes the refusal panel available to every
+// verb this column contributes.
+export function mountRefusalPanel(host, snapshot, ctx) {
+  if (!host) {
+    throw new Error(
+      "the gate column's refusal panel was mounted with no host: its region " +
+      "`page-overlay` is a shell region, and the shell builds the host and " +
+      "hands it over (RULED Q8, openxFactory#656 comment 5648049748)");
+  }
+  if (panel && panel.parentNode !== host) panel.remove();
+  panelHost = host;
+  return ensurePanel();
+}
+
+//: TEST SEAM — the host is page-lifetime state, so a probe can read and reset it.
+export function refusalPanelHost() {
+  return panelHost;
+}
+
+export function resetRefusalPanel() {
+  if (panel) panel.remove();
+  panel = null;
+  panelHost = null;
+}
+
 function ensurePanel() {
-  if (panel && document.body.contains(panel)) return panel;
+  // REFUSAL, NOT A DEFAULT. Falling back to `document.body` here is precisely
+  // what Q8 forbids, and a silent no-op would make a refused gate verb
+  // invisible — the one thing this panel exists to prevent. A shell that
+  // reaches a gate verb without having mounted this column's `page-overlay`
+  // binding is mis-assembled, and says so.
+  if (!panelHost) {
+    throw new Error(
+      "the gate column's refusal panel has no `page-overlay` host: this shell " +
+      "reached a gate verb without mounting the `gate.dispose` binding. A " +
+      "refusal that cannot be shown is a refusal that is silent, which is what " +
+      "this panel exists to prevent (RULED Q8).");
+  }
+  if (panel && panelHost.contains(panel)) return panel;
   panel = el("aside", "refusalpanel");
   panel.hidden = true;
   const head = el("header", "refusalpanel-head");
@@ -66,7 +181,7 @@ function ensurePanel() {
   head.appendChild(clear);
   const list = el("ul", "refusalpanel-list");
   panel.append(head, list);
-  document.body.appendChild(panel);
+  panelHost.appendChild(panel);
   return panel;
 }
 
@@ -393,7 +508,19 @@ export function mountWheelVerb(container, item, opts) {
     btn.disabled = true;
     const body = { [targetField]: item.id, ...(extra || {}) };
     if (o.topic) body.topic = o.topic;
-    const result = await post("/actions/gate/" + verb, body, o.fetcher);
+    const route = VERB_ROUTE[verb];
+    if (!route) {
+      // A verb this binding never declared a route for. Refused, named, and
+      // NOT composed: the binding's `routes:` is the ownership claim the
+      // registry checks, and posting to a path outside it would be this
+      // column reaching past its own declaration (RULED Q12).
+      btn.disabled = false;
+      panelEntry("refused", "no gate route is declared for verb " +
+        JSON.stringify(verb) + "; this column declares " +
+        DISPOSE_GATE_ROUTES.join(", "));
+      return;
+    }
+    const result = await post(route, body, o.fetcher);
     if (result && result.ok) {
       // demote commissions no workflow, so the marker is per-verb, never a
       // required `workflow` field on the response (FR-033a).

@@ -1,3 +1,21 @@
+// ---------------------------------------------------------------------------
+// THIS FILE IS openXdox's NOW — § 3.4 slice S5, "contribute the gate loop"
+// (openDox-spec `docs/front-end-package-boundary.md` § 5 row S5 @ `7d12428c`).
+// It arrived here from openDox-code `src/opendox/web/views/swb-session.js` and is
+// SHIPPED AS PACKAGE DATA: RULED Q5 (openxFactory#656 comment `5648044785`,
+// Brett Heap, 2026-09-12) — "the COMPOSED DEPLOYMENT assembles the bundle …
+// the composed install copies them into openDox's one `--web-dir` at assembly;
+// a contributed GET route is the declared hosted fallback". The bytes are
+// placed by `openxdox.web_assets.install_view_modules()`; the fallback is
+// `openxdox.serve_views`. The binding that declares it is in
+// `src/openxdox/view_extensions.py`.
+//
+// WHAT IT MAY IMPORT FROM THE BUNDLE (counterpart Q6). `./views/helpers.js` is
+// the RULED guarantee; every other openDox module reached from here is declared
+// in `view_extensions.BUNDLE_REACH` and held there by
+// `tests/test_gate_loop_views.py`, so the reach is NAMED and checkable instead
+// of silent. This module reaches: `./helpers.js` (RULED guarantee), `./dispose.js` (this column), `./staging-workbench-model.js`.
+// ---------------------------------------------------------------------------
 // The staging workbench's BRANCH-SESSION affordances — the three live session
 // verbs, their outcomes, and the copyable CLI descriptors that replace them where
 // this plane has no authority (007-workbench-branch-sessions T082;
@@ -617,16 +635,29 @@ function renderForm(host, affordance, ctx, opts) {
 // control is constructed at all (FR-046). The capability is asked exactly once,
 // through the pure model's one derivation, so no branch of this file can reach a
 // different verdict than the posture indicator shows.
-export function mountSessionAffordances(host, ctx, opts) {
-  const o = opts || {};
+// RULED Q3 (openxFactory#656 comment `5648044785`): ONE mount signature,
+// `mount(host, snapshot, ctx)`. The old call took the SESSION context second
+// and the seams third; both now travel in `ctx`, the session context under its
+// own key so neither set can shadow the other:
+//
+//   ctx.session  `{ scope, posture, documents }` — the old second argument
+//   ctx.caps / ctx.fetcher / ctx.repair / ctx.actor / ctx.onSessionEnded / …
+//                the old third argument, spread at the top level
+//
+// `snapshot` is unread here: the posture this row renders was derived from it
+// by the caller, through the pure model, and deriving it twice is how two
+// answers appear.
+export function mountSessionAffordances(host, snapshot, ctx) {
+  const o = ctx || {};
+  const session = o.session || {};
   // FR-048 FIRST: a plane that declares `session: false` is the HOSTED plane and
   // exposes NOTHING of this capability — not a live control, and not a
   // descriptor naming the verb and the branch (review finding 14).
   if (sessionSurfaceHidden(o.caps)) return null;
-  if (!sessionActionsLive(o.caps)) return renderSessionDescriptors(host, ctx, o);
+  if (!sessionActionsLive(o.caps)) return renderSessionDescriptors(host, session, o);
   const wrap = el("div", "swb-sessionactions");
   const slot = el("div", "swb-cslot");
-  const ending = ctx.posture ? sessionEnding(ctx.posture.branch) : null;
+  const ending = session.posture ? sessionEnding(session.posture.branch) : null;
   for (const affordance of SESSION_AFFORDANCES) {
     if (affordance === SESSION_REFRESH_NOTEBOOK) continue;   // descriptor-only, below
     const button = el("button", "cbtn swb-sessionbtn", SESSION_LABELS[affordance]);
@@ -640,12 +671,12 @@ export function mountSessionAffordances(host, ctx, opts) {
       button.title = "this tile's session " + ending +
         " — reload to see the tile's current state";
     }
-    button.addEventListener("click", () => renderForm(slot, affordance, ctx, o));
+    button.addEventListener("click", () => renderForm(slot, affordance, session, o));
     wrap.appendChild(button);
   }
   host.appendChild(wrap);
   // DESCRIPTOR-ONLY in this posture too (spec C10) — it is not a gate verb
-  renderNotebookDescriptor(host, ctx);
+  renderNotebookDescriptor(host, session);
   host.appendChild(slot);
   // THE ENDING'S REPORT, REPLAYED (T088). The ending re-renders this row, and the
   // re-render destroyed the slot the outcome had just been written into — so the
@@ -653,7 +684,7 @@ export function mountSessionAffordances(host, ctx, opts) {
   // built, verbatim and through the SAME renderer. A reload replaces it with the
   // server's answer, exactly like every other page-lifetime overlay here.
   if (ending) {
-    const report = endedReports.get(String(ctx.posture && ctx.posture.branch));
+    const report = endedReports.get(String(session.posture && session.posture.branch));
     if (report) slot.appendChild(landedBox(report.affordance, report.result,
                                           report.ending));
   }

@@ -1,3 +1,21 @@
+// ---------------------------------------------------------------------------
+// THIS FILE IS openXdox's NOW — § 3.4 slice S5, "contribute the gate loop"
+// (openDox-spec `docs/front-end-package-boundary.md` § 5 row S5 @ `7d12428c`).
+// It arrived here from openDox-code `src/opendox/web/views/gate.js` and is
+// SHIPPED AS PACKAGE DATA: RULED Q5 (openxFactory#656 comment `5648044785`,
+// Brett Heap, 2026-09-12) — "the COMPOSED DEPLOYMENT assembles the bundle …
+// the composed install copies them into openDox's one `--web-dir` at assembly;
+// a contributed GET route is the declared hosted fallback". The bytes are
+// placed by `openxdox.web_assets.install_view_modules()`; the fallback is
+// `openxdox.serve_views`. The binding that declares it is in
+// `src/openxdox/view_extensions.py`.
+//
+// WHAT IT MAY IMPORT FROM THE BUNDLE (counterpart Q6). `./views/helpers.js` is
+// the RULED guarantee; every other openDox module reached from here is declared
+// in `view_extensions.BUNDLE_REACH` and held there by
+// `tests/test_gate_loop_views.py`, so the reach is NAMED and checkable instead
+// of silent. This module reaches: `none — this module is import-free and keeps its own `el()``.
+// ---------------------------------------------------------------------------
 // Human gate console bar (US9; D16/D17). The READ-ONLY web v1 surfaces the four
 // gate affordances (demote / edit / ratify / kickoff) on a gate-bearing artifact
 // and produces the ACTION DESCRIPTOR — the exact `cli.py gate ...` command a
@@ -133,16 +151,32 @@ async function executeRatify(ctx, fetcher) {
   }
 }
 
-// Mounts the gate bar into `container` for the gate-bearing artifact described
-// by `ctx` ({ changeId, path, repository, actor }). Each affordance reveals the
-// exact CLI command (the action descriptor); ratify additionally EXECUTES when
-// the local gate capability is live (`opts.caps` or a self-probe).
-export function mountGateBar(container, ctx, opts) {
+// THE BINDING'S ENTRY, in the ONE mount signature — RULED Q3 (openxFactory#656
+// comment `5648044785`, Brett Heap, 2026-09-12): "ONE mount signature,
+// `mount(host, snapshot, ctx)`; the gate bar's `(container, ctx, opts)` is
+// recorded as the one declared exception UNTIL S5 REWRITES IT." This is that
+// rewrite, so the declared exception ends here and the shell now has exactly
+// one mount shape.
+//
+// `host` is the `div.viewer-gate` the viewer builds per artifact and hands over
+// (`viewer-gatebar`, a "shell" region). `snapshot` is the render's snapshot,
+// passed because every mount takes it — this bar derives nothing from it, and
+// saying so is cheaper than a second signature. `ctx` carries what the two old
+// trailing arguments carried, each under its own name:
+//
+//   ctx.gate     the per-artifact descriptor context the viewer composed —
+//                `{ changeId, path, repository, actor }`, the old second argument
+//   ctx.caps     the capability probe's payload, the old `opts.caps`
+//   ctx.fetcher  the injectable transport, the old `opts.fetcher` (a test seam
+//                the shell has never supplied and this module still honours)
+export function mountGateBar(host, snapshot, ctx) {
+  const c = ctx || {};
+  const gate = c.gate || {};
   // clear only — every dynamic value below is bound via textContent
-  container.innerHTML = "";
+  host.innerHTML = "";
   const bar = el("div", "gatebar");
   bar.appendChild(el("div", "gatebar-title", "human gate console — run the command in your pinned checkout"));
-  const descriptors = gateActionDescriptors(ctx);
+  const descriptors = gateActionDescriptors(gate);
   const cmdLine = el("div", "gatebar-cmd docstatus");
   cmdLine.hidden = true;
   const actions = el("div", "gatebar-actions");
@@ -160,10 +194,9 @@ export function mountGateBar(container, ctx, opts) {
   }
   bar.appendChild(actions);
   bar.appendChild(cmdLine);
-  container.appendChild(bar);
+  host.appendChild(bar);
 
   // async executing upgrade — never blocks the descriptor render.
-  const o = opts || {};
   const upgrade = (caps) => {
     if (!caps?.actions?.gate) return;
     for (const btn of ratifyButtons) {
@@ -171,14 +204,14 @@ export function mountGateBar(container, ctx, opts) {
       btn.title = "EXECUTES via the local gate route (actor: " + (caps.actor || "local") + ")";
       btn.addEventListener("click", async () => {
         cmdLine.hidden = false;
-        cmdLine.textContent = "ratifying " + (ctx.changeId || "?") + "…";
-        const result = await executeRatify(ctx, o.fetcher);
+        cmdLine.textContent = "ratifying " + (gate.changeId || "?") + "…";
+        const result = await executeRatify(gate, c.fetcher);
         cmdLine.textContent = result.ok
           ? "ratified " + result.change_id + " by " + result.ratifier + " (" + result.date + ") — record: " + result.record
           : "refused — " + (result.message || "gate action failed");
       });
     }
   };
-  upgrade(o.caps || null);
+  upgrade(c.caps || null);
   return { descriptors };
 }
