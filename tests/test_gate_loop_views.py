@@ -654,3 +654,36 @@ def test_every_region_this_column_names_is_a_declared_shell_region() -> None:
             f"{region} is a `dom` region at openDox, so RULED Q1's generic "
             "mount pass would mount this binding — and this column's mounts are "
             "caller-driven")
+
+
+# ---------------------------------------------------------------------------
+# THE CREATE AFFORDANCE'S ONE WRITE — openDox-code's five statements, ported
+# ---------------------------------------------------------------------------
+
+def test_the_draft_views_one_action_is_the_create_forms_own_submit() -> None:
+    """FIVE STATEMENTS ABOUT `swb-create.js`, MOVED WITH IT (openDox-code#20,
+    Copilot round 2). They lived in openDox-code's
+    `tests/test_bullseye_widget.py::test_the_draft_view_has_one_action_called_save_reachable_from_both_tabs`,
+    where they read `src/opendox/web/views/swb-create.js` as text — a file that
+    bundle no longer ships (RULED Q5, openxFactory#656 comment `5648044785`).
+    That test keeps every statement about `views/staging-workbench.js` and
+    `styles.css`, which are openDox's own; these five come here, to the column
+    that owns the module they quote.
+
+    WHAT THEY HOLD, in the words of the review they came from (MEASURED IN A
+    BROWSER, 2026-08-10): `name it and create →` created nothing — it switched
+    tabs — and is gone; the remaining action is `save`, it lives in the draft
+    CHROME outside both panes so it is on screen from either tab, and it is the
+    create form's OWN submit RELOCATED, never a second write path. The
+    relocation is `o.actionsHost`; "never a second write path" is the count of
+    `method: "POST"`; and the TILE path is untouched, where a new document
+    really is being started and the label is still `create document`."""
+    create = _module_text("swb-create.js")
+    # the submit is RELOCATED into a host the caller supplies, not duplicated
+    assert "const actions = o.actionsHost || form;" in create
+    assert "actions.appendChild(bar);" in create
+    assert "actions.appendChild(result);" in create
+    # ONE write, and the count is the whole assertion
+    assert create.count('method: "POST"') == 1, "still exactly one write"
+    # the TILE path is untouched: there a new document really is being started
+    assert 'o.submitLabel || "create document"' in create
