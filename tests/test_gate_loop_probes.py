@@ -382,3 +382,207 @@ console.log(JSON.stringify({ mounted: mounted !== null, labels,
     assert result["mounted"] is True
     assert result["labels"], "the session bar offered no affordance"
     assert any("rewrite a document" in label for label in result["labels"])
+
+
+# ---------------------------------------------------------------------------
+# SLICE S2'S DISPOSE-TRAY PROBES, PORTED (openDox-code#20, Copilot round 2)
+# ---------------------------------------------------------------------------
+#
+# WHY THEY ARE HERE. `tests/test_intent_binding_dom.py` at openDox-code is slice
+# S2's own CREATED file, and it drove the REAL `views/dispose.js` — the module
+# graph loading with the never-carved `views/intent-feed.js` absent (RULED OQ-F
+# `not_moved`), and the tray rendering its three verdict buttons with and
+# without a contributed intent feed. `dispose.js` is THIS column's package data
+# as of slice S5, so the probes that drive it come too, on exactly the precedent
+# the five S4 probes above set: a behaviour proof that stays in the repository
+# the behaviour left is a proof of nothing. openDox-code#20 drops them from the
+# file they came from and keeps everything there that is still about its own
+# bundle (`intent-binding.js`'s six forwards, the wheel closure's own load).
+#
+# THE HARNESS COMES WITH THEM, and deliberately: these assertions were written
+# against slice S2's DOM shim — a `walk()`-able tree whose `innerHTML` setter
+# throws on any non-empty assignment — not against the stub the S4 probes above
+# use. Re-expressing them against a different shim would be rewriting the proof
+# while claiming to move it. What IS stronger here is the same thing that is
+# stronger for the S4 five: the module is imported out of an ASSEMBLED bundle,
+# so `./helpers.js` and `./intent-binding.js` resolve the way they resolve in a
+# composed install.
+
+_S2_DOM_SHIM = r"""
+class Node {
+  constructor(tag) {
+    this.tagName = String(tag).toUpperCase();
+    this.children = []; this.attributes = {}; this.listeners = {};
+    this.className = ''; this._text = ''; this.disabled = false;
+    this.value = ''; this.hidden = false; this.type = ''; this.title = '';
+    this.dataset = {};
+  }
+  get textContent() {
+    return this._text + this.children.map((c) => c.textContent).join('');
+  }
+  set textContent(value) { this.children = []; this._text = String(value); }
+  set innerHTML(value) {
+    if (String(value) !== '') throw new Error('only literal "" clears are allowed');
+    this.children = []; this._text = '';
+  }
+  appendChild(child) { child.parent = this; this.children.push(child); return child; }
+  append(...kids) { for (const k of kids) this.appendChild(k); }
+  remove() {
+    if (!this.parent) return;
+    const at = this.parent.children.indexOf(this);
+    if (at >= 0) this.parent.children.splice(at, 1);
+  }
+  classList = { add: () => {}, remove: () => {}, toggle: () => {} };
+  setAttribute(name, value) { this.attributes[name] = String(value); }
+  getAttribute(name) { return this.attributes[name]; }
+  addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); }
+  focus() {}
+  walk() {
+    return this.children.reduce((all, c) => all.concat(c.walk()), [this]);
+  }
+}
+globalThis.document = {
+  createElement: (tag) => new Node(tag),
+  createTextNode: (text) => { const n = new Node('#text'); n._text = String(text);
+    return n; },
+  body: new Node('body'),
+};
+globalThis.window = { prompt: () => { throw new Error('unused on this probe'); } };
+function byClass(root, cls) {
+  return root.walk().filter((n) => String(n.className).split(' ').includes(cls));
+}
+globalThis.Node = Node; globalThis.byClass = byClass;
+"""
+
+#: A minimal FAKE `intent-feed.js` — standing in for openxFactory's real
+#: contributed module, which NEITHER leg carries (RULED OQ-F `not_moved`). Its
+#: only job is to prove `intent-binding.js` forwards to whatever IS contributed.
+#: Carried byte-identical from openDox-code's `tests/test_intent_binding_dom.py`
+#: so the ported assertions measure what they measured there.
+_FAKE_INTENT_FEED = """\
+export function intentCapable(caps) {
+  return !!(caps && caps.actions && caps.actions.intent);
+}
+export function feedActor(caps) {
+  return "fake-actor:" + ((caps && caps.marker) || "no-marker");
+}
+export function refusalLine(rec) { return "fake-refusal:" + rec.state; }
+export function startIntentFeed(opts) {
+  return { subscribe() {}, stop() {}, marker: (opts && opts.marker) || "no-marker" };
+}
+export function statesByTarget(rows) {
+  return new Map((rows || []).map((r) => [r.id, "fake:" + r.id]));
+}
+export function renderIntentChips(container, targetId, rows, error) {
+  container.__fakeRendered = { targetId, rows, error };
+  return container;
+}
+export async function emitIntent(opts) {
+  return { state: "pending", message: "fake-queued:" + opts.verb };
+}
+"""
+
+
+def _run_s2_node(body: str, bundle: Path, *, contribute_intent_feed: bool) -> dict:
+    """Slice S2's harness, run against the ASSEMBLED bundle.
+
+    `contribute_intent_feed` is the deployment switch RULED Q5 distinguishes:
+    with the fake module dropped beside the others, `intent-binding.js`'s late
+    lookup finds a contributed feed; without it, it finds nothing and every
+    forward must answer safely rather than throw.
+    """
+    views = bundle / "views"
+    if contribute_intent_feed:
+        (views / "intent-feed.js").write_text(_FAKE_INTENT_FEED, encoding="utf-8")
+    source = _S2_DOM_SHIM + body
+    script = views / "s2-probe.mjs"
+    script.write_text(source, encoding="utf-8")
+    proc = subprocess.run([NODE, str(script)], capture_output=True, text=True,
+                          timeout=120)
+    assert proc.returncode == 0, proc.stderr
+    return json.loads(proc.stdout.strip().splitlines()[-1])
+
+
+_GRAPH_PROBE = """
+import * as W from "./wheel.js";
+import * as D from "./dispose.js";
+console.log(JSON.stringify({
+  renderWheel: typeof W.renderWheel,
+  mountDisposeTray: typeof D.mountDisposeTray,
+}));
+"""
+
+
+@pytest.mark.skipif(NODE is None, reason="node is not installed")
+@pytest.mark.parametrize("contributed", [False, True])
+def test_js_the_composed_graph_resolves_with_or_without_a_contributed_feed(
+        contributed, bundle) -> None:
+    """`app.js` -> `wheel.js` -> (formerly) the absent `intent-feed.js` used to
+    fail the WHOLE static module graph (openDox-spec § 1.2(b)): a dangling
+    `import … from` on an ABSENT file is a load-time failure, not a missing
+    render. This is that failure, gone — now measured over the COMPOSED bundle,
+    which is the only tree in which both halves of the graph exist at once:
+    `wheel.js` is openDox's and `dispose.js` is this column's package data, and
+    slice S5's assembly is what puts them in one directory."""
+    result = _run_s2_node(_GRAPH_PROBE, bundle,
+                          contribute_intent_feed=contributed)
+    assert result == {"renderWheel": "function", "mountDisposeTray": "function"}
+
+
+# RULED counterpart Q6 MOVED ONE FACT IN THIS PROBE (openxFactory#656 comment
+# `5649094228`): the tray used to reach `renderIntentChips` by importing the
+# openDox bundle's `intent-binding.js` itself, and a contributed module may now
+# import `./views/helpers.js` and nothing else — so the CHIP RENDERER arrives in
+# `opts.intent` beside the emitter, supplied by the shell that starts the feed
+# (`views/wheel.js`'s own mount, openDox-code#20). The probe is the shell here,
+# so it supplies what the shell supplies. Everything else is byte-identical to
+# slice S2's original, including the assertion that the chips were rendered BY
+# the contributed module rather than by a same-named look-alike.
+_TRAY_PROBE = """
+import { mountDisposeTray } from "./dispose.js";
+import { intentCapable, renderIntentChips } from "./intent-binding.js";
+
+const caps = { actions: { intent: true } };
+const hosted = intentCapable(caps);
+const row = new Node("div");
+mountDisposeTray(row, { id: "p1" },
+  hosted ? { intent: { snapshotRev: "r", rows: [], error: null,
+                       renderChips: renderIntentChips } } : {});
+const tray = byClass(row, "disposetray")[0];
+const chips = row.walk().find((n) => String(n.className).includes("intentchips"));
+console.log(JSON.stringify({
+  hosted,
+  verdictButtons: tray ? tray.children.length : -1,
+  chipsMounted: !!chips,
+  chipsCarryRealForward: !!(chips && chips.__fakeRendered),
+}));
+"""
+
+
+@pytest.mark.skipif(NODE is None, reason="node is not installed")
+def test_js_the_dispose_tray_renders_with_no_chips_when_the_feed_is_absent(
+        bundle) -> None:
+    """`mountDisposeTray` does not consult `intentCapable` itself — it trusts
+    its caller (`wheel.js`) to pass `opts.intent` only once `intentCapable(caps)`
+    has said yes. So the probe reproduces THAT gate rather than handing
+    `opts.intent` to the tray unconditionally, which would prove nothing."""
+    r = _run_s2_node(_TRAY_PROBE, bundle, contribute_intent_feed=False)
+    assert r["hosted"] is False
+    assert r["verdictButtons"] == 3          # accept / reject / defer, unchanged
+    assert r["chipsMounted"] is False        # no chips element at all — not
+                                             # merely an empty one: the caller
+                                             # never passed opts.intent
+    assert r["chipsCarryRealForward"] is False
+
+
+@pytest.mark.skipif(NODE is None, reason="node is not installed")
+def test_js_the_dispose_tray_renders_real_chips_when_the_feed_is_contributed(
+        bundle) -> None:
+    r = _run_s2_node(_TRAY_PROBE, bundle, contribute_intent_feed=True)
+    assert r["hosted"] is True
+    assert r["verdictButtons"] == 3
+    assert r["chipsMounted"] is True
+    assert r["chipsCarryRealForward"] is True   # not just present — actually
+                                                # rendered BY the contributed
+                                                # module, not a same-named
+                                                # look-alike
