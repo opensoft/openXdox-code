@@ -97,11 +97,13 @@ def test_assembles_beside_all_three_existing_contribution_columns() -> None:
         EvidenceProvenanceSurfaceExtension(),
     ]
     bindings = route_extension.collect_bindings(extensions)
-    # 1 (gate prefix) + 3 (projection: snapshot-index exact, bare-source
-    # exact, source prefix) + 1 (role-authority exact) + 1 (this surface's
-    # exact GET) = 6, and no RouteBindingError means none of the six
-    # collide or nest.
-    assert len(bindings) == 6
+    # 1 (gate prefix) + 1 (projection: snapshot-index exact) + 1
+    # (role-authority exact) + 1 (this surface's exact GET) = 4, and no
+    # RouteBindingError means none of the four collide or nest.
+    # WAS 6 UNTIL § 3.4 SLICE S6 (RULED Q4, `#656` comment `5642758731`):
+    # the projection's `/source` exact and `/source/` prefix bindings left
+    # this column and are fixed core arms of `opendox/serve.py` now.
+    assert len(bindings) == 4
     assert EVIDENCE_ROUTE in {b.pattern for b in bindings}
 
 
@@ -117,14 +119,18 @@ def test_assembly_is_order_insensitive() -> None:
         ProjectionRoutesExtension(),
     ]
     bindings = route_extension.collect_bindings(extensions)
-    assert len(bindings) == 6
+    assert len(bindings) == 4
 
 
 def test_evidence_route_does_not_sit_under_either_declared_prefix() -> None:
     # Belt and braces beyond the collect_bindings proof above: the pattern
-    # itself must not share either existing prefix's namespace, so a future
-    # third prefix declared alongside "/source/" or "/actions/gate/" can
-    # never retroactively swallow this route.
+    # itself must not share either prefix's namespace, so a future prefix
+    # declared alongside "/source/" or "/actions/gate/" can never
+    # retroactively swallow this route. Since § 3.4 slice S6 `/source/` is
+    # `opendox/serve.py`'s CORE prefix rather than this column's contributed
+    # one, which makes the check more necessary and not less: a contributed
+    # route must not sit under a core prefix either, and `collect_bindings`
+    # never sees the core arms to refuse it.
     assert not EVIDENCE_ROUTE.startswith("/source/")
     assert not EVIDENCE_ROUTE.startswith("/actions/gate/")
 

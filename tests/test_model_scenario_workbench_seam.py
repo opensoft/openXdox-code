@@ -118,11 +118,14 @@ def test_assembles_beside_all_four_existing_contribution_columns() -> None:
         ModelScenarioWorkbenchExtension(),
     ]
     bindings = route_extension.collect_bindings(extensions)
-    # 1 (gate prefix) + 3 (projection: snapshot-index exact, bare-source
-    # exact, source prefix) + 1 (role-authority exact) + 1 (evidence exact)
-    # + 1 (this bench's exact GET) = 7, and no RouteBindingError means none
-    # of the seven collide or nest.
-    assert len(bindings) == 7
+    # 1 (gate prefix) + 1 (projection: snapshot-index exact) + 1
+    # (role-authority exact) + 1 (evidence exact) + 1 (this bench's exact
+    # GET) = 5, and no RouteBindingError means none of the five collide or
+    # nest.
+    # WAS 7 UNTIL § 3.4 SLICE S6 (RULED Q4, `#656` comment `5642758731`):
+    # the projection's `/source` exact and `/source/` prefix bindings left
+    # this column and are fixed core arms of `opendox/serve.py` now.
+    assert len(bindings) == 5
     assert WORKBENCH_ROUTE in {b.pattern for b in bindings}
 
 
@@ -148,15 +151,19 @@ def test_assembly_is_order_insensitive() -> None:
     ]
     last = route_extension.collect_bindings(declared_last)
     first = route_extension.collect_bindings(declared_first)
-    assert len(first) == len(last) == 7
+    assert len(first) == len(last) == 5
     assert {b.key for b in first} == {b.key for b in last}
 
 
 def test_workbench_route_does_not_sit_under_either_declared_prefix() -> None:
     # Belt and braces beyond the collect_bindings proof above: the pattern
-    # itself must not share either existing prefix's namespace, so a future
-    # third prefix declared alongside "/source/" or "/actions/gate/" can
-    # never retroactively swallow this route.
+    # itself must not share either prefix's namespace, so a future prefix
+    # declared alongside "/source/" or "/actions/gate/" can never
+    # retroactively swallow this route. Since § 3.4 slice S6 `/source/` is
+    # `opendox/serve.py`'s CORE prefix rather than this column's contributed
+    # one, which makes the check more necessary and not less: a contributed
+    # route must not sit under a core prefix either, and `collect_bindings`
+    # never sees the core arms to refuse it.
     assert not WORKBENCH_ROUTE.startswith("/source/")
     assert not WORKBENCH_ROUTE.startswith("/actions/gate/")
 
