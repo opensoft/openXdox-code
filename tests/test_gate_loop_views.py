@@ -165,7 +165,12 @@ def test_the_assembly_hook_can_refuse_to_overwrite(tmp_path) -> None:
     (views / web_assets.VIEW_MODULE_NAMES[0]).write_text("// someone else's\n")
     with pytest.raises(web_assets.ViewAssetError) as clash:
         web_assets.install_view_modules(web, overwrite=False)
-    assert "already exists" in str(clash.value)
+    assert "already" in str(clash.value) and "overwrite=False" in str(clash.value)
+    # NOTHING WAS COPIED (Copilot review, round 1): the collision check runs over
+    # every module BEFORE the first write, so a refusal never leaves a
+    # half-assembled bundle behind.
+    assert sorted(p.name for p in views.iterdir()) == [
+        web_assets.VIEW_MODULE_NAMES[0]]
 
 
 def test_an_undeclared_module_name_is_refused() -> None:

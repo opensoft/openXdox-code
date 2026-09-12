@@ -152,16 +152,40 @@ def install_view_modules(web_dir: str | Path, *,
             f"view modules in `{BUNDLE_SUBDIR}/`, and every binding this column "
             "declares names `./views/<file>`. A bundle with no views directory "
             "is not the bundle these modules were declared against")
+    # EVERY COLLISION BEFORE ANY COPY (Copilot review, round 1). Checking each
+    # destination immediately before copying it left a half-assembled bundle
+    # whenever a LATER module collided: some of this column's six placed, the
+    # rest not, and an assembly that refused after mutating the tree it was
+    # refusing to mutate. `overwrite=False` exists for an installer that wants
+    # to know the bundle was clean, so the answer has to come before the first
+    # write.
+    if not overwrite:
+        collisions = [target_dir / name for name in VIEW_MODULE_NAMES
+                      if (target_dir / name).exists()]
+        if collisions:
+            raise ViewAssetError(
+                f"{', '.join(str(path) for path in collisions)} already "
+                "exist(s) and overwrite=False: this column's module(s) would "
+                "replace files the bundle already carries, which is either a "
+                "second copy of the gate loop or a name collision, and neither "
+                "is something to do silently. Nothing was copied")
     placed: list[Path] = []
     for name in VIEW_MODULE_NAMES:
         source = module_path(name)
         destination = target_dir / name
-        if destination.exists() and not overwrite:
+        # ONE EXCEPTION TYPE FOR ONE FAILURE (Copilot review, round 1). This
+        # module's whole contract is that an assembly failure is a
+        # `ViewAssetError` naming the path; an unwrapped `OSError` from the copy
+        # itself — a read-only bundle, a full disk, a permission — would reach
+        # the installer as a different exception for the same act.
+        try:
+            shutil.copyfile(source, destination)
+        except OSError as exc:
             raise ViewAssetError(
-                f"{str(destination)!r} already exists and overwrite=False: "
-                "this column's module would replace a file the bundle already "
-                "carries, which is either a second copy of the gate loop or a "
-                "name collision, and neither is something to do silently")
-        shutil.copyfile(source, destination)
+                f"could not place {name!r} at {str(destination)!r}: {exc}. "
+                "The assembly step (RULED Q5) copies this column's view modules "
+                "into openDox's bundle; a bundle that cannot receive them is an "
+                "assembly error, not a partial install to continue past"
+            ) from exc
         placed.append(destination)
     return tuple(placed)

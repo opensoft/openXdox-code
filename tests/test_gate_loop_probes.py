@@ -148,6 +148,15 @@ def bundle(tmp_path) -> Path:
     target = tmp_path / "web"
     shutil.copytree(source, target)
     web_assets.install_view_modules(target)
+    # THE COPY IS AN ES-MODULE TREE AND MUST SAY SO (Copilot review, round 1).
+    # Every module in this bundle is an ES module, but a `.js` file's type is
+    # decided by the NEAREST `package.json`, and a copy under `tmp_path` has no
+    # ancestor carrying one — so `import()` would fall to Node's CommonJS
+    # reading of `export` on any runtime without module-syntax detection. In
+    # the real deployment openDox's own package answers this; here the fixture
+    # answers it, so what the probe measures is the module the shell loads.
+    (target / "package.json").write_text('{"type": "module"}\n',
+                                         encoding="utf-8")
     return target
 
 
