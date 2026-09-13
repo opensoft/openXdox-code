@@ -76,12 +76,47 @@ def find() -> Path | None:
     return web if web.joinpath(*_MARKER).is_file() else None
 
 
+_STAGED: Path | None = None
+
+
 def require() -> Path:
-    """`find()`, or SKIP the importing module where the pin carries no bundle."""
-    web = find()
-    if web is None:
-        pytest.skip(_REASON, allow_module_level=True)
-    return web
+    """The pinned bundle, STAGED once per process as an ESM-marked tree — or
+    SKIP the importing module where the pin carries no bundle.
+
+    WHY A STAGED COPY AND NOT THE INSTALLED DIRECTORY ITSELF (Copilot review of
+    openXdox-code#19, the `test_round_trip.py` finding — accurate). Several of
+    these suites hand a module of this bundle to `node` by ABSOLUTE PATH from a
+    `.mjs` harness in `tmp_path`, and node decides a `.js` file's format from
+    the NEAREST `package.json` to the file itself. openDox-code carries one at
+    its repository root — `{"type": "module"}`, added by openDox-code#14 for
+    exactly this reason — but it is NOT under `src/opendox/web/`, so it is not
+    in the wheel's `package-data` and an installed bundle has no ESM marker
+    above it at all. Importing from there would fall to node's
+    `--experimental-detect-module` heuristic: on by default today, a warning,
+    and not a thing a required check should rest on. Staging the tree and
+    writing the marker beside it is what openDox-code's own `package.json`
+    docstring calls "an explicit, version-independent answer", and it is what
+    slice S5's `tests/test_gate_loop_probes.py::bundle` fixture already does
+    for the composed case.
+
+    READ-ONLY BY CONVENTION, like the directory it copies: every caller of this
+    root copies OUT of it into `tmp_path`. It is staged ONCE per process — the
+    suites that use it number thirty and a per-test copytree would be thirty
+    copies of a 41-file tree for no added isolation.
+    """
+    global _STAGED
+    if _STAGED is None:
+        web = find()
+        if web is None:
+            pytest.skip(_REASON, allow_module_level=True)
+        staging = Path(tempfile.mkdtemp(prefix="opendox-bundle-"))
+        atexit.register(shutil.rmtree, staging, True)
+        target = staging / "web"
+        shutil.copytree(web, target)
+        target.joinpath("package.json").write_text('{"type": "module"}\n',
+                                                   encoding="utf-8")
+        _STAGED = target
+    return _STAGED
 
 
 #: The module-level constant the carved suites bind. Importing this name is what

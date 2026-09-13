@@ -46,20 +46,10 @@ from conftest import REPO_ROOT
 from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
 
 EDITOR_JS = (
-    REPO_ROOT
-    / "scripts"
-    / "ideation_dashboard"
-    / "web"
-    / "views"
-    / "doxbench-editor.js"
+    OPENDOX_WEB / "views" / "doxbench-editor.js"
 )
 STATE_JS = (
-    REPO_ROOT
-    / "scripts"
-    / "ideation_dashboard"
-    / "web"
-    / "views"
-    / "doxbench-state.js"
+    OPENDOX_WEB / "views" / "doxbench-state.js"
 )
 VIEWER_JS = (
     OPENDOX_WEB / "views" / "viewer.js"
