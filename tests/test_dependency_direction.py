@@ -235,6 +235,16 @@ MUST_CONSUME_OPENDOX = (
     "src/openxdox/serve_gate.py",
     "src/openxdox/serve_projection.py",
     "src/openxdox/cli_gate.py",
+    # § 3.4 slice S5: the VIEW contribution surface. It contributes this
+    # column's six gate-loop panels to openDox's `view_extension` seam exactly
+    # as `serve_gate.py` contributes its routes to the `route_extension` one, so
+    # it belongs on this list for the same reason: a contribution surface that
+    # stops consuming openDox has forked it. Its reach is DEFERRED (inside
+    # `GateLoopViews.views()`) and deliberately so — this leg pins an `opendox`
+    # older than the view registry itself, and an import-time reach would make
+    # the module unimportable under its own declared dependency. The census
+    # below counts a deferred reach, which is what makes that lawful here.
+    "src/openxdox/view_extensions.py",
 )
 
 

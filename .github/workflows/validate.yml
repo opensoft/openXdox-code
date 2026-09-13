@@ -72,6 +72,43 @@ jobs:
       # repository — they will be the obvious way again the next time someone
       # adds a status-bearing step. A defect class that recurs by default needs
       # a required check, not a commit message.
+      # `split-opendox-two-layer-product` § 3.4 SLICE S5 adds
+      # `tests/test_gate_loop_views.py` on exactly the footing its four
+      # neighbours stand on. S5 is "contribute the gate loop" (openDox-spec
+      # `docs/front-end-package-boundary.md` § 5 row S5 @ `7d12428c`), and this
+      # leg's half of it is the six class-B modules arriving as PACKAGE DATA,
+      # the six `ViewBinding` specs that declare them, the assembly hook that
+      # places the bytes into openDox's one `--web-dir` and the hosted GET
+      # fallback — RULED Q1-Q12 (openxFactory#656 comments 5648044785 /
+      # 5648049748 / 5648065587, Brett Heap, 2026-09-12).
+      #
+      # It is the only place this column's contract is EXECUTED rather than
+      # described: that every declared export is really exported, that every
+      # entry takes the one RULED mount signature, that the dispose binding's
+      # four computed verbs are literals now, that the hosted fallback claims
+      # six EXACT paths and never a `/views/` prefix that would intercept
+      # openDox's own modules, and that this column's reach into openDox's
+      # bundle is exactly what it declares.
+      #
+      # `--noconftest` safe and needs no consumer: it imports this package's own
+      # modules and reads this package's own files as text. Its three
+      # materialization assertions SKIP — never fail — where the pinned
+      # `opendox` predates the view contract, which is this leg's state until
+      # the pin bump that lands with the openDox half.
+      #
+      # `tests/test_gate_loop_probes.py` joins it on the same footing and for
+      # the reason the slice exists: slice S4 proved its two new modules by
+      # DRIVING them under node, and those modules are this package's data now,
+      # so the five probes came with them (openDox-code#20 drops them from
+      # `tests/test_split_route_tails.py` in the same slice). Deleting
+      # behavioural coverage in a refactor is how a move that passes every shape
+      # assertion silently breaks a verb. Each probe assembles a COMPOSED bundle
+      # — openDox's own `web/` with this column's six modules placed into it by
+      # `web_assets.install_view_modules()`, RULED Q5's own hook — so what is
+      # measured is the shipped byte in the shipped position. Where the
+      # installed `opendox` carries no bundle (this leg's pinned state until the
+      # pin bump) every probe SKIPS with that reason named, and where `node` is
+      # absent they skip for that one.
       - name: pytest
         run: >-
           python -m pytest -q
@@ -79,4 +116,6 @@ jobs:
           tests/test_dependency_direction.py
           tests/test_domain_profile.py
           tests/test_no_hardcoded_status_words.py
+          tests/test_gate_loop_views.py
+          tests/test_gate_loop_probes.py
           --noconftest
