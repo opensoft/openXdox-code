@@ -307,14 +307,20 @@ export function sessionEndingReport(branch) {
 // reload to fix a header would discard exactly the work the refusal
 // interrupted.
 
-async function submitSession(affordance, body, fetcher, caps, repair) {
+// `bound` is the model namespace THIS caller validated, when it has one. A
+// mount reads the module-level install, which is the shape every affordance in
+// this file has always used; `firstEditTransport` passes its own, because its
+// returned transport outlives the call that built it (Copilot review, round 3).
+async function submitSession(affordance, body, fetcher, caps, repair, bound) {
   const doFetch = fetcher || fetch;
+  const headersOf = bound ? bound.consoleHeaders : consoleHeaders;
+  const repairWith = bound ? bound.withConsoleRepair : withConsoleRepair;
   const send = async () => {
     const response = await doFetch(sessionRoute(affordance), {
       method: "POST",
       // the human-console header among them (FR-019's third clause): a write that
       // cannot present this serve's token is refused before its body is parsed
-      headers: consoleHeaders(caps),
+      headers: headersOf(caps),
       body: JSON.stringify(body),
     });
     try {
@@ -323,7 +329,7 @@ async function submitSession(affordance, body, fetcher, caps, repair) {
       return { ok: false, message: "malformed response (HTTP " + response.status + ")" };
     }
   };
-  return withConsoleRepair(send, repair);
+  return repairWith(send, repair);
 }
 
 // ---- the doxBench Save transport (010-doxbench-editor-chat T080) -----------
@@ -342,7 +348,7 @@ export function firstEditTransport({ fetcher, caps, repair, model: bundleModel }
   // the ONE options object its caller already builds. Installed here, before the
   // returned transport can be called, so a Save never discovers a missing model
   // mid-request.
-  installModel({ model: bundleModel });
+  const bound = installModel({ model: bundleModel });
   const missing = missingModelNames();
   if (missing.length) {
     return async () => ({
@@ -353,11 +359,19 @@ export function firstEditTransport({ fetcher, caps, repair, model: bundleModel }
         "counterpart Q6, openxFactory#656 comment 5649094228)",
     });
   }
-  return async (req) => firstEditVerdict(
+  // THE TRANSPORT CARRIES THE MODEL IT VALIDATED, not the module-global one
+  // (Copilot review, round 3). Every other reader of `MODEL` in this file runs
+  // INSIDE the mount that installed it; this one does not — `firstEditTransport`
+  // returns a function the canvas holds and calls later, so a second mount or a
+  // second transport built in between would have re-pointed the global and this
+  // editor's Save would have been shaped and read by SOMEONE ELSE'S model (or by
+  // `null`, which `model()` turns into a throw from inside a click handler).
+  // The four names it needs are taken off the namespace this call checked.
+  return async (req) => bound.firstEditVerdict(
     await submitSession(
       SESSION_FIRST_EDIT,
-      firstEditBody(req.key.repository, req.key, req),
-      fetcher, caps, repair));
+      bound.firstEditBody(req.key.repository, req.key, req),
+      fetcher, caps, repair, bound));
 }
 
 // ---- outcomes --------------------------------------------------------------

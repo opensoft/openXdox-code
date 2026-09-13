@@ -586,3 +586,45 @@ def test_js_the_dispose_tray_renders_real_chips_when_the_feed_is_contributed(
                                                 # rendered BY the contributed
                                                 # module, not a same-named
                                                 # look-alike
+
+
+@pytest.mark.skipif(NODE is None, reason="node is not installed")
+def test_js_a_built_transport_keeps_the_model_it_validated(bundle) -> None:
+    """THE TRANSPORT OUTLIVES THE CALL THAT BUILT IT (Copilot review of this PR,
+    round 3). Every other reader of this module's installed model runs INSIDE the
+    mount that installed it; `firstEditTransport` does not — it returns a
+    function the canvas holds and calls later. While the model was read off the
+    module-global, a second mount or a second transport built in between
+    re-pointed it, and the first editor's Save was then shaped and read by
+    SOMEONE ELSE'S model. Two transports, two models, both called AFTER both were
+    built: each must answer with its own."""
+    result = _run_node("""
+const column = await import(VIEWS + "swb-session.js");
+const model = await import(VIEWS + "staging-workbench-model.js");
+// Two models that differ only where it shows: the verdict each reports.
+const make = (tag) => ({
+  ...model,
+  firstEditBody: (...args) => ({ ...model.firstEditBody(...args), tag }),
+  firstEditVerdict: (response) => ({ tag, ok: response && response.ok === true }),
+});
+const sent = [];
+const fetcher = async (route, opts) => {
+  sent.push(JSON.parse(opts.body).tag);
+  return { ok: true, status: 200, json: async () => ({ ok: true }) };
+};
+const caps = { actor: "brett", console_token: "t" };
+const req = { key: { repository: "openxFactory", tile_kind: "staged",
+                     tile_id: "t-1" },
+              document: "d.md", content: "x" };
+// BOTH built first, then BOTH called — which is the interleaving the module
+// global could not survive.
+const first = column.firstEditTransport({ fetcher, caps, model: make("first") });
+const second = column.firstEditTransport({ fetcher, caps, model: make("second") });
+const a = await first(req);
+const b = await second(req);
+console.log(JSON.stringify({ a, b, sent }));
+""", bundle)
+    assert result["a"]["tag"] == "first", result["a"]
+    assert result["b"]["tag"] == "second", result["b"]
+    # and the BODIES were shaped by the right model too, not only the verdicts
+    assert result["sent"] == ["first", "second"]
