@@ -1893,17 +1893,31 @@ async function click(node) {
 # The BEHAVIOURAL harness for T088's replay: mount, act, let the ending re-render,
 # and look for the engine's report in the freshly built slot. Nothing here reads
 # the module's SOURCE — that is the entire point (finding B13).
+# § 3.4 SLICE S5 MOVED TWO THINGS THIS HARNESS PASSES (Copilot review of
+# openXdox-code#18, round 2). RULED Q3 (`openxFactory#656` comment `5648044785`)
+# makes the mount signature `mount(host, snapshot, ctx)` — the session context
+# travels under `ctx.session`, not as the second positional argument — and RULED
+# counterpart Q6 (`5649094228`) makes openDox's model reach a contributed module
+# through `ctx.model` rather than through an import of its own. A harness still
+# calling `mountSessionAffordances(host, ctx, opts)` hands `opts` in as the
+# SNAPSHOT and the mount then sees no `session` and no `model`, so it takes the
+# refusal path and never renders a session button: the replay would fail before
+# it exercised the ending behaviour it exists to measure.
 _ENDING_REPLAY_HARNESS = _DOM_SHIM + """
 import { mountSessionAffordances, sessionEndingReport } from './swb-session.js';
+import * as workbenchModel from './staging-workbench-model.js';
 
 const BRANCH = 'draft/demo-topic';
-const ctx = {
+const session = {
   scope: { kind: 'staged', id: 'demo-topic' },
   posture: { live: true, branch: BRANCH, ownTile: true, draft: true,
              repository: 'openxFactory', activeRef: BRANCH },
   documents: ['ideation/staging/demo-topic/note.md'],
 };
 const caps = { actions: { gate: true, session: true } };
+// RULED Q3's ctx: the session context under `session`, the model under `model`,
+// and the seams beside them — the shell's own shape (openDox-code
+// `views/staging-workbench.js`).
 const RESULT = {
   ok: true, ref: BRANCH, reason: 'the spike answered its question',
   torn_down: ['worktree', 'registry-entry', 'notebook'], branch_retained: true,
@@ -1915,7 +1929,8 @@ let host = new Node('div');
 let rerenders = 0;
 let resetFinished = false;
 let rerenderSawReset = false;
-const opts = {
+const ctx = {
+  session, model: workbenchModel,
   caps, actor: 'brett', fetcher,
   onSessionEnded: async () => {
     await Promise.resolve();
@@ -1923,9 +1938,9 @@ const opts = {
   },
   onRerender: () => { rerenders += 1; host = new Node('div');
                       rerenderSawReset = resetFinished;
-                      mountSessionAffordances(host, ctx, opts); },
+                      mountSessionAffordances(host, null, ctx); },
 };
-mountSessionAffordances(host, ctx, opts);
+mountSessionAffordances(host, null, ctx);
 
 // the human ends the session: open the abandon form, fill the reason, submit
 const abandon = byClass(host, 'swb-sessionbtn')

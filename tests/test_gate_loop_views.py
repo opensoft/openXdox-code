@@ -428,16 +428,39 @@ def test_the_bindings_that_degrade_to_a_descriptor_require_nothing() -> None:
     without the capability does not require the capability to mount, and
     declaring it would delete the read-only gate surface on every hosted plane."""
     for binding_id in ("gate.bar", "gate.workbench.create",
-                       "gate.workbench.session"):
+                       "gate.workbench.session", "gate.dispose"):
         spec = next(s for s in SPECS if s["id"] == binding_id)
         assert spec["requires"] == (), (
             f"{binding_id} degrades to a descriptor without its capability, so "
             "requiring it would remove a surface that works")
-    for binding_id in ("gate.lens", "gate.projects", "gate.dispose"):
+    for binding_id in ("gate.lens", "gate.projects"):
         spec = next(s for s in SPECS if s["id"] == binding_id)
         assert spec["requires"] == ("actions.gate",), (
             f"{binding_id} mounts a live gate control or nothing, so the "
             "capability is a genuine mount requirement")
+
+
+def test_the_dispose_binding_resolves_on_the_hosted_intent_plane() -> None:
+    """THE FOURTH BINDING THAT MUST NOT REQUIRE THE GATE, and the reason is
+    different from the other three's (Copilot review of this PR, round 2).
+
+    `gate.bar`, `gate.workbench.create` and `gate.workbench.session` degrade to a
+    read-only descriptor. `gate.dispose` does something else: it serves TWO
+    mutually exclusive transports, the LOCAL executing gate (`actions.gate`,
+    loopback) and the HOSTED intent plane (`actions.intent`, which openDox's
+    `serve.py` computes as `intent = not loopback`). openDox's `views/wheel.js`
+    mounts this namespace's tray when `gateCapable(caps) || intentCapable(caps)`
+    and hands it the hosted emitter in the second case, so a
+    `requires: ["actions.gate"]` would make `resolveView` answer `null` on
+    exactly the plane the intent work exists for — taking the tray, its chips
+    and `panelEntry`'s refusal surface with it."""
+    spec = next(s for s in SPECS if s["id"] == "gate.dispose")
+    assert spec["requires"] == ()
+    # and the module really does carry both transports, so the claim above is
+    # about this file rather than about a comment in it
+    text = _module_text("dispose.js")
+    assert "o.intent" in text, "the hosted transport's own branch"
+    assert "gateCapable" in text, "the local transport's own capability read"
 
 
 # ---------------------------------------------------------------------------

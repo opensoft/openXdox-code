@@ -292,7 +292,26 @@ VIEW_BINDING_SPECS: tuple[dict[str, Any], ...] = (
         "exports": ("mountRefusalPanel", "appliedOutcome", "commissionedVerb",
                     "commissionedWorkflow", "gateCapable", "mountDisposeTray",
                     "mountProposeButton", "mountWheelVerb", "panelEntry"),
-        "requires": ("actions.gate",),
+        # `requires` IS EMPTY, AND THAT IS THE INTENT PLANE (Copilot review of
+        # this PR, round 2). This module is the ONE binding of the six that
+        # serves TWO mutually exclusive transports: the LOCAL executing gate
+        # (`actions.gate`, loopback) and the HOSTED intent plane
+        # (`actions.intent`, which openDox's `serve.py` computes as
+        # `intent = not loopback` — so exactly one of the pair is ever true).
+        # openDox's `views/wheel.js` mounts this namespace's tray when
+        # `gateCapable(caps) || intentCapable(caps)`, and hands it the hosted
+        # emitter and chip renderer in the second case. Declaring
+        # `actions.gate` would make `resolveView` answer `null` on every hosted
+        # plane, which would take the tray, its chips and `panelEntry`'s
+        # refusal surface away from the plane the intent work exists for — a
+        # capability declaration deleting the surface it was meant to describe,
+        # which is the exact defect the gate bar's own transitional
+        # `requires: ["actions.gate"]` already was.
+        #
+        # The plane choice stays where it has always been: in the CALLER, which
+        # knows which transport it is holding, and in the module, which takes
+        # `opts.intent` or does not.
+        "requires": (),
         "optional": True,
     },
     {

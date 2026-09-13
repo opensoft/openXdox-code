@@ -169,9 +169,20 @@ def install_view_modules(web_dir: str | Path, *,
                 "replace files the bundle already carries, which is either a "
                 "second copy of the gate loop or a name collision, and neither "
                 "is something to do silently. Nothing was copied")
+    # EVERY SOURCE RESOLVED BEFORE ANY COPY, for the same reason as the
+    # collision sweep above and found by the same review one round later
+    # (Copilot, round 2). `module_path()` raises `ViewAssetError` for a declared
+    # module the installed package does not carry — a wheel built without the
+    # package-data line, a partial install — and resolving it INSIDE the copy
+    # loop meant a later missing module refused only after the earlier ones had
+    # already been written: a bundle carrying three of this column's six
+    # modules, which an installer may serve or retry over. Both preconditions
+    # this function can answer without touching the tree are now answered
+    # before the first write. What stays inside the loop is the I/O the
+    # filesystem decides, which no amount of pre-checking can foresee.
+    sources = [(name, module_path(name)) for name in VIEW_MODULE_NAMES]
     placed: list[Path] = []
-    for name in VIEW_MODULE_NAMES:
-        source = module_path(name)
+    for name, source in sources:
         destination = target_dir / name
         # ONE EXCEPTION TYPE FOR ONE FAILURE (Copilot review, round 1). This
         # module's whole contract is that an assembly failure is a
