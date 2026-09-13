@@ -40,7 +40,9 @@ from openxdox.generator import generate_snapshot
 
 from session_fixtures import build_scratch_repo  # noqa: F401  (harness)
 
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
+WEB = OPENDOX_WEB
 
 # Two staged topics beyond the default, so the served corpus is the multi-topic
 # shape the rest of this wave's regressions use — a single-topic world hides

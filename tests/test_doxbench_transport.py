@@ -71,7 +71,9 @@ from conftest import BASE_REPO, PINNED_REVISION, FakeGit
 from opendox import serve as serve_mod
 from openxdox.generator import generate_snapshot
 
-WEB = Path(__file__).resolve().parent.parent / "src" / "openxdox" / "web"
+import opendox_bundle  # noqa: E402  (skips where the pin carries no bundle)
+
+WEB = opendox_bundle.composed()
 APP_JS = WEB / "app.js"
 STAGING_WORKBENCH_JS = WEB / "views" / "staging-workbench.js"
 NODE = shutil.which("node")

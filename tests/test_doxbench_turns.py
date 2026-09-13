@@ -100,6 +100,8 @@ from opendox.doxbench_turns import (
 )
 from opendox import doxbench_packet, doxbench_turns
 
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
 MODULE_PATH = REPO_ROOT / "scripts" / "ideation_dashboard" / "doxbench_turns.py"
 
 REPOSITORY = "openxFactory"
@@ -629,7 +631,7 @@ def test_the_reserved_keys_are_the_same_two_the_browser_refuses():
         doxbench_turns.OUTLINE_BUFFER_KEY,
         doxbench_turns.UNBACKED_DOCUMENT_BUFFER_KEY,
     }
-    state_js = (REPO_ROOT / "src" / "openxdox" / "web" / "views"
+    state_js = (OPENDOX_WEB / "views"
                 / "doxbench-state.js").read_text(encoding="utf-8")
     assert 'LOAD_REFUSED_RESERVED_KEY = "path_is_a_reserved_key"' in state_js
     for key in doxbench_turns.RESERVED_BUFFER_KEYS:
@@ -3134,9 +3136,9 @@ def test_the_declared_document_order_is_deterministic_and_matches_the_browser():
         "ideation/staging/demo-topic/zulu.md",
     )
     assert doxbench_turns.ordered_buffer_keys(_THREE)[0] == "outline"
-    state_js = (REPO_ROOT / "src" / "openxdox" / "web" / "views"
+    state_js = (OPENDOX_WEB / "views"
                 / "doxbench-state.js").read_text(encoding="utf-8")
-    save_js = (REPO_ROOT / "src" / "openxdox" / "web" / "views"
+    save_js = (OPENDOX_WEB / "views"
                / "doxbench-save.js").read_text(encoding="utf-8")
     assert doxbench_turns.DOCUMENT_KEY_ORDER_RULE in state_js
     assert doxbench_turns.DOCUMENT_KEY_ORDER_RULE in save_js
@@ -3144,7 +3146,7 @@ def test_the_declared_document_order_is_deterministic_and_matches_the_browser():
     # order buffer keys -- the request builder, the selector listing, and the
     # proposal card order -- and a rule re-spelled in prose is a rule that drifts.
     # Every home carries the SAME string, and this is where that is enforced.
-    views = REPO_ROOT / "src" / "openxdox" / "web" / "views"
+    views = OPENDOX_WEB / "views"
     for home in ("doxbench-chat.js", "doxbench-chat-model.js"):
         text = (views / home).read_text(encoding="utf-8")
         assert doxbench_turns.DOCUMENT_KEY_ORDER_RULE in text, home

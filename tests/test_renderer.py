@@ -36,7 +36,9 @@ from opendox import serve as serve_mod
 from opendox.cli import build_parser, cmd_generate_and_open
 from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+import opendox_bundle  # noqa: E402  (skips where the pin carries no bundle)
+
+WEB = opendox_bundle.composed()
 MODEL_JS = WEB / "views" / "model.js"
 VIEWER_JS = WEB / "views" / "viewer.js"
 VENDOR_MARKDOWN_JS = WEB / "vendor" / "markdown-it.min.js"
@@ -1073,8 +1075,8 @@ def test_doxbench_markdown_flows_only_through_the_sanitized_viewer_seam():
 # ---------------------------------------------------------------------------
 
 def test_every_constructed_doxbench_class_has_a_styles_rule():
-    views = REPO_ROOT / "src" / "openxdox" / "web" / "views"
-    styles = (REPO_ROOT / "src" / "openxdox" / "web" /
+    views = opendox_bundle.composed() / "views"
+    styles = (opendox_bundle.composed() /
               "styles.css").read_text(encoding="utf-8")
     import re
     constructed = set()

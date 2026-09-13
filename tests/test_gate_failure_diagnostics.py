@@ -51,7 +51,9 @@ from opendox import workbench as wb
 from opendox.boundary import HumanGate
 from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
+WEB = OPENDOX_WEB
 REPO = "openxFactory"
 RECORDS = "ideation/dashboard/gate-records/"
 

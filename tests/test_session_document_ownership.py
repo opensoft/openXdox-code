@@ -51,6 +51,8 @@ from opendox import session_git as sg
 from openxdox import snapshot_registry as reg
 from openxdox.generator import generate_snapshot
 
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
 REPO = "openxFactory"
 TOPIC = "demo-topic"                 # the tile the session opens on
 OTHER = "other-topic"                # a SECOND staged topic, with its own material
@@ -59,7 +61,7 @@ OTHER_DOC = f"ideation/staging/{OTHER}/README.md"
 BRAINSTORM_DOC = "ideation/brainstorm/a-neighbourhood-capture.md"
 PROBE = "# Foreign scope probe\n\nthis must never land\n"
 NODE = shutil.which("node")
-WEB_VIEWS = REPO_ROOT / "src" / "openxdox" / "web" / "views"
+WEB_VIEWS = OPENDOX_WEB / "views"
 
 CREATE_BODY = {
     "title": "First Draft",

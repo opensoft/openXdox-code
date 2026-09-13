@@ -40,7 +40,9 @@ from opendox import serve as serve_mod
 from opendox import workbench as wb
 from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
+WEB = OPENDOX_WEB
 NOTEBOOK_JS = WEB / "views" / "notebook.js"
 NODE = shutil.which("node")
 

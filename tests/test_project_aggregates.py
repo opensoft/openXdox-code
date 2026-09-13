@@ -25,7 +25,9 @@ from test_snapshot_registry import _published_tree, _write_snapshot
 
 from openxdox import snapshot_registry as reg
 
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
+WEB = OPENDOX_WEB
 NODE = shutil.which("node")
 
 REGISTER = """\

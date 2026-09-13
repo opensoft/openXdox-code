@@ -56,8 +56,10 @@ from opendox import doxbench_packet as pk  # noqa: E402
 from opendox import serve as serve_mod  # noqa: E402
 from openxdox.doxbench_scope import ScopeKey  # noqa: E402
 
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
 NODE = shutil.which("node")
-CHAT_MODEL_JS = (REPO_ROOT / "src" / "openxdox" / "web" / "views"
+CHAT_MODEL_JS = (OPENDOX_WEB / "views"
                  / "doxbench-chat-model.js")
 
 # ---------------------------------------------------------------------------
