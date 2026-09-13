@@ -109,6 +109,63 @@ jobs:
       # installed `opendox` carries no bundle (this leg's pinned state until the
       # pin bump) every probe SKIPS with that reason named, and where `node` is
       # absent they skip for that one.
+      # § 3.4 SLICE S8 UN-NARROWS THIS LIST AS FAR AS THE MEASUREMENT ALLOWS,
+      # which is the half of RULED Q-L8 (b′) this slice was scoped to lift.
+      # The note's § 5 S8 row says the narrowings "lift FOR THE WEB SUITES", and
+      # § 1.2(d) is why: 23 carved suites at THIS leg name a `views/<name>.js`
+      # path and resolve it under `REPO_ROOT / "src" / "openxdox" / "web"` — a
+      # directory this leg does not have — so "nothing runs them" here. S8
+      # re-points 46 sites across 31 files at the PINNED openDox bundle
+      # (`tests/opendox_bundle.py`, slice S5's own `_opendox_bundle()` shape) and
+      # repairs three PRE-CARVE `scripts/ideation_dashboard/<module>.py` reads.
+      # NINE SUITES JOIN THE SIX: 154 passed / 16 skipped becomes 301 passed /
+      # 23 skipped, measured file-by-file under this exact invocation before
+      # each was named (openXdox-code `build/s8-shed-web-tests`, 2026-09-13,
+      # python 3.12.3 / pytest 8.4.2):
+      #
+      #   tests/test_doxbench_abstract_store.py        1 failed  -> 35 passed
+      #   tests/test_doxbench_telemetry.py             1 failed  -> 18 passed
+      #       both a pre-carve `MODULE_PATH`; the module under test is
+      #       openDox's and is read through the PIN, as the bundle now is.
+      #   tests/test_doxbench_mutation_boundary.py   1 error     ->  1 skipped
+      #       A WEB SUITE, and the one of the 23 that can be named today: it
+      #       reads only bundle files, so with the path repaired it COLLECTS
+      #       and skips on the stated reason (this leg's `opendox` pin predates
+      #       openDox's `web/**` package-data declaration) instead of erroring
+      #       on a directory that does not exist. That it collects at all is
+      #       § 1.2(d)'s defect closed; the pin bump is what makes it run.
+      #   tests/test_evidence_provenance_surface.py         19 passed
+      #   tests/test_evidence_provenance_surface_seam.py     8 passed 2 skipped
+      #   tests/test_model_scenario_workbench.py            23 passed
+      #   tests/test_model_scenario_workbench_seam.py       10 passed 2 skipped
+      #   tests/test_role_authority_projection.py           28 passed
+      #   tests/test_role_authority_projection_seam.py       6 passed 2 skipped
+      #       carved suites that were already green under this invocation and
+      #       had no reason left to sit outside the required check.
+      #
+      # WHAT THIS LIST STILL IS NOT: `python -m pytest -q` over the tree, and
+      # the blocker is measured rather than asserted. THIRTY-SEVEN of this
+      # leg's 88 test files fail COLLECTION on one of two openxFactory-only
+      # packages present at neither leg — 21 on `ideation_dashboard`, 16 on
+      # `doc_health`, the latter reached from `src/openxdox/generator.py:66`'s
+      # `from doc_health import corpus` — and past collection the same two
+      # reappear inside the PINNED openDox (`opendox/doxbench_packet.py:177`,
+      # `import ideation_dashboard.doxbench_status_exemption`). That is the
+      # BUILD arc's (split-opendox § 3.5/3.6), which RULED Q-L8 (b′)'s own
+      # sentence at the head of this block names as what the rest of the
+      # narrowing waits on. `tests/test_doxbench_turns.py` is the file that
+      # shows it cleanly: S8's repairs take it from 37 failed / 146 passed to
+      # 202 passed / 32 failed / 3 skipped, and every one of the 32 is that
+      # single import. It is NOT named below, because naming it would put the
+      # required check red for the BUILD arc's defect.
+      #
+      # `tests/test_aggregation_register_instance.py` is green and also not
+      # named: it is all-skip today, on the same footing openDox-code#23 left
+      # its two all-skip suites off ITS list.
+      #
+      # `--noconftest` STAYS, and it is why this list is a list: `tests/
+      # conftest.py` imports the carved session fixtures, which reach both
+      # absent packages. Every file named here stands on its own under it.
       - name: pytest
         run: >-
           python -m pytest -q
@@ -118,4 +175,13 @@ jobs:
           tests/test_no_hardcoded_status_words.py
           tests/test_gate_loop_views.py
           tests/test_gate_loop_probes.py
+          tests/test_doxbench_abstract_store.py
+          tests/test_doxbench_mutation_boundary.py
+          tests/test_doxbench_telemetry.py
+          tests/test_evidence_provenance_surface.py
+          tests/test_evidence_provenance_surface_seam.py
+          tests/test_model_scenario_workbench.py
+          tests/test_model_scenario_workbench_seam.py
+          tests/test_role_authority_projection.py
+          tests/test_role_authority_projection_seam.py
           --noconftest

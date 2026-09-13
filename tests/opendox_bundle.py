@@ -79,9 +79,14 @@ def find() -> Path | None:
 _STAGED: Path | None = None
 
 
-def require() -> Path:
+def require(*, module_level: bool = True) -> Path:
     """The pinned bundle, STAGED once per process as an ESM-marked tree — or
-    SKIP the importing module where the pin carries no bundle.
+    SKIP where the pin carries no bundle.
+
+    `module_level=True` skips the IMPORTING MODULE, which is what the thirty
+    suites whose whole subject is the bundle want. `web()` below passes False,
+    which skips only the calling TEST — see its own docstring for when that is
+    the honest reading and when it is not.
 
     WHY A STAGED COPY AND NOT THE INSTALLED DIRECTORY ITSELF (Copilot review of
     openXdox-code#19, the `test_round_trip.py` finding — accurate). Several of
@@ -108,7 +113,7 @@ def require() -> Path:
     if _STAGED is None:
         web = find()
         if web is None:
-            pytest.skip(_REASON, allow_module_level=True)
+            pytest.skip(_REASON, allow_module_level=module_level)
         staging = Path(tempfile.mkdtemp(prefix="opendox-bundle-"))
         atexit.register(shutil.rmtree, staging, True)
         target = staging / "web"
@@ -119,9 +124,41 @@ def require() -> Path:
     return _STAGED
 
 
-#: The module-level constant the carved suites bind. Importing this name is what
-#: makes a suite skip rather than explode where the pin is behind.
-OPENDOX_WEB = require()
+def web() -> Path:
+    """The pinned bundle, skipping ONLY THE CALLING TEST where the pin carries
+    none.
+
+    FOR THE SUITE WHOSE SUBJECT IS NOT THE BUNDLE (Copilot review of
+    `openXdox-code#19` is the class of finding this anticipates, and the
+    measurement is `tests/test_doxbench_turns.py`: 183 tests, of which THREE
+    read a bundle file and 180 exercise this leg's own scope resolution and
+    openDox's turn assembler). Binding `OPENDOX_WEB` at module level there
+    would trade 37 failing tests for 183 skipped ones — the repair would
+    SILENCE more than it fixed, and a required check would go green over a
+    suite it no longer runs.
+
+    So the rule is the subject, not the convenience: a module whose every test
+    reads the bundle imports `OPENDOX_WEB` and skips whole; a module where the
+    bundle is an aside calls this and skips the three tests that need it.
+    """
+    return require(module_level=False)
+
+
+def __getattr__(name: str) -> Path:
+    """`OPENDOX_WEB`, RESOLVED ON THE IMPORT AND NOT ON THIS MODULE'S OWN.
+
+    PEP 562, and it is load-bearing rather than a style. `OPENDOX_WEB =
+    require()` at this module's top level runs at the FIRST import of this
+    file, so it skipped every module that imported ANY name from here —
+    `web()` included — and a per-test skip could not exist beside it. Resolved
+    here, the module-level skip is raised while the importing module executes
+    `from opendox_bundle import OPENDOX_WEB`, which is exactly where it was
+    raised before and what makes that suite skip whole; a module that imports
+    only `web` never asks for this name and never skips on the import.
+    """
+    if name == "OPENDOX_WEB":
+        return require()
+    raise AttributeError(name)
 
 
 # ---------------------------------------------------------------------------
