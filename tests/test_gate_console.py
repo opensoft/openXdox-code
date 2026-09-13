@@ -1624,7 +1624,14 @@ def test_gate_js_descriptors_cover_all_four_actions_with_cli_commands(tmp_path):
     r = _run_node(tmp_path)
     assert [d["action"] for d in r["descriptors"]] == r["actions"] == ["demote", "edit", "ratify", "kickoff"]
     for d in r["descriptors"]:
-        assert d["command"].startswith("python3 scripts/ideation_dashboard/cli.py gate")
+        # THE CARVE'S OWN `path constants` REWRITE, followed to the destination
+        # (Copilot review of openXdox-code#18, round 3). `views/gate.js`'s `CLI`
+        # constant was repointed from `scripts/ideation_dashboard/cli.py` to
+        # `src/opendox/cli.py` by the carve's declared path-constants edit at
+        # openDox-code; slice S5 brings the module into the same repository as
+        # this suite, and an expectation still quoting the pre-carve path is
+        # asserting against a line the manifest itself moved.
+        assert d["command"].startswith("python3 src/opendox/cli.py gate")
         assert "add-x" in d["command"]
     # demote's descriptor is the exact CLI command a human runs (read-only web
     # never executes server-side — it produces the ACTION DESCRIPTOR).
@@ -1782,8 +1789,8 @@ def test_a_hostile_gate_descriptor_stays_one_command(tmp_path, action):
     command = _hostile_gate_commands(tmp_path)[action]
     argv, _output, run_dir = _paste_gate_command(tmp_path, command)
 
-    assert argv[:1] == ["scripts/ideation_dashboard/cli.py"], argv
-    assert argv.count("scripts/ideation_dashboard/cli.py") == 1, argv
+    assert argv[:1] == ["src/opendox/cli.py"], argv
+    assert argv.count("src/opendox/cli.py") == 1, argv
     assert sorted(p.name for p in run_dir.iterdir()) == [], list(run_dir.iterdir())
 
 

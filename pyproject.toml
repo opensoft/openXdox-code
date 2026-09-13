@@ -127,6 +127,29 @@ package-dir = { "" = "src" }
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# THE CONTRIBUTED VIEW COLUMN'S MODULE BYTES, SHIPPED AS PACKAGE DATA — RULED Q5
+# (`opensoft/openxFactory#656` comment `5648044785`, Brett Heap, 2026-09-12:
+# "where a contributed view module's BYTES come from: the COMPOSED DEPLOYMENT
+# assembles the bundle. openXdox ships its view modules as package data; the
+# composed install copies them into openDox's one `--web-dir` at assembly; a
+# contributed GET route is the declared hosted fallback. § 4.4's bundle-relative
+# rule stands.").
+#
+# WHY THIS LINE IS THE WHOLE MECHANISM. openDox's view registry admits only a
+# BUNDLE-RELATIVE `./…js` specifier (`opendox/view_extension.py`'s `_MODULE`)
+# and resolves it against the bundle root the browser is served from
+# (`views/view_extension.js`'s `resolveView`), and `serve.build_server()` serves
+# ONE directory. So a module this leg contributes has no route into the
+# directory the browser imports from unless the bytes GET THERE — and a wheel
+# that omitted them would ship a `ViewBinding` naming a module that does not
+# exist, which is precisely the "a binding that cannot be mounted must not look
+# registered" defect the seam refuses. Declaring them here is what makes
+# `openxdox.web_assets.install_view_modules()` (the assembly hook) and
+# `openxdox.serve_views` (the declared hosted fallback) both able to find them
+# in an INSTALLED package rather than only in a source checkout.
+[tool.setuptools.package-data]
+openxdox = ["web/views/*.js"]
+
 [tool.pytest.ini_options]
 # The ROOTDIR ANCHOR. With no pytest ini table anywhere, pytest infers a
 # rootdir from the arguments it is handed, so `pytest -q` and `pytest tests/`

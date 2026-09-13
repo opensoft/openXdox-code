@@ -406,9 +406,20 @@ def test_the_renderer_repairs_a_stale_token_by_re_reading_it_never_by_reloading(
         assert "location.reload" not in code, label
 
 
+# § 3.4 SLICE S5 GIVES `firstEditTransport` A `model` (Copilot review of
+# openXdox-code#18, round 2). RULED counterpart Q6 (`openxFactory#656` comment
+# `5649094228`) closes a contributed module's reach into openDox's bundle to
+# `./views/helpers.js`, so `swb-session.js` no longer imports
+# `staging-workbench-model.js` and takes it through `ctx` instead — for this
+# export, RULED Q10 reaches it through the REGISTRY rather than through a mount,
+# so `model` is a field of the ONE options object its caller already builds. A
+# caller that omits it gets a refusal closure, by design, before the fetcher can
+# run; this harness IS the caller, so it supplies what the shell supplies. The
+# namespace is already imported below for the assertions.
 _REPAIR_HARNESS = r"""
 import { createConsoleRepair } from './app.mjs';
 import { firstEditTransport } from './views/swb-session.js';
+import * as workbenchModel from './views/staging-workbench-model.js';
 import {
   CONSOLE_REFUSAL_CODES, CONSOLE_STRANDED_MESSAGE, consoleRefusal,
   withConsoleRepair,
@@ -453,7 +464,8 @@ const request = {
   document: 'ideation/staging/demo-topic/draft.md',
   content: TYPED,
 };
-const verdict = await firstEditTransport({ fetcher, caps, repair })(request);
+const verdict = await firstEditTransport(
+  { fetcher, caps, repair, model: workbenchModel })(request);
 
 // a plane that answers with NO console token cannot be retried against
 const noConsole = await createConsoleRepair(
