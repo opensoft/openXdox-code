@@ -43,27 +43,19 @@ import pytest
 
 from conftest import REPO_ROOT
 
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
 EDITOR_JS = (
-    REPO_ROOT
-    / "scripts"
-    / "ideation_dashboard"
-    / "web"
-    / "views"
-    / "doxbench-editor.js"
+    OPENDOX_WEB / "views" / "doxbench-editor.js"
 )
 STATE_JS = (
-    REPO_ROOT
-    / "scripts"
-    / "ideation_dashboard"
-    / "web"
-    / "views"
-    / "doxbench-state.js"
+    OPENDOX_WEB / "views" / "doxbench-state.js"
 )
 VIEWER_JS = (
-    REPO_ROOT / "src" / "openxdox" / "web" / "views" / "viewer.js"
+    OPENDOX_WEB / "views" / "viewer.js"
 )
 VENDOR_MARKDOWN_JS = (
-    REPO_ROOT / "src" / "openxdox" / "web" / "vendor" / "markdown-it.min.js"
+    OPENDOX_WEB / "vendor" / "markdown-it.min.js"
 )
 NODE = shutil.which("node")
 
@@ -493,7 +485,7 @@ from opendox.boundary import HumanGate  # noqa: E402
 from openxdox.generator import generate_snapshot  # noqa: E402
 
 SAVE_JS = (
-    REPO_ROOT / "src" / "openxdox" / "web" / "views" / "doxbench-save.js"
+    OPENDOX_WEB / "views" / "doxbench-save.js"
 )
 
 TOPIC = "demo-topic"

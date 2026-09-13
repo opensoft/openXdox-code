@@ -55,8 +55,10 @@ from openxdox import gate_console
 from opendox import serve as serve_mod
 from openxdox.generator import generate_snapshot
 
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
 NODE = shutil.which("node")
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+WEB = OPENDOX_WEB
 VIEWS = WEB / "views"
 CHAT_MODEL_JS = VIEWS / "doxbench-chat-model.js"
 CHAT_VIEW_JS = VIEWS / "doxbench-chat.js"

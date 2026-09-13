@@ -36,7 +36,17 @@ from opendox import serve as serve_mod
 from opendox.cli import build_parser, cmd_generate_and_open
 from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
+# openDox's bundle ALONE, never the composed root (Copilot review of #19 —
+# accurate): `_bundle_files()` below rglobs this root and the fetch-site
+# arithmetic at `test_the_session_transport_is_the_only_new_fetch_site` pins an
+# EXACT `by_file` set, so sweeping in this column's six contributed modules
+# would add `gate-projects.js`'s two fallback `fetch(` calls and fail a pin that
+# is about openDox's class-A surface. The one module of THIS column the suite
+# reads is named explicitly, below, out of this leg's own package data.
+WEB = OPENDOX_WEB
+OWN_VIEWS = REPO_ROOT / "src" / "openxdox" / "web" / "views"
 MODEL_JS = WEB / "views" / "model.js"
 VIEWER_JS = WEB / "views" / "viewer.js"
 VENDOR_MARKDOWN_JS = WEB / "vendor" / "markdown-it.min.js"
@@ -607,7 +617,7 @@ def test_the_session_transport_stays_out_of_the_fetch_bearing_set():
     five per-file counts, each needle assembled at runtime so it cannot match its
     own source (finding 24) — so a future pass that "widens" the pin to admit a
     transport module fails here even if it edits the pin itself."""
-    session_js = WEB / "views" / "swb-session.js"
+    session_js = OWN_VIEWS / "swb-session.js"
     assert session_js.is_file(), "the session transport module is missing"
     body = session_js.read_text(encoding="utf-8")
     assert "const doFetch = fetcher || fetch;" in body
@@ -1073,9 +1083,8 @@ def test_doxbench_markdown_flows_only_through_the_sanitized_viewer_seam():
 # ---------------------------------------------------------------------------
 
 def test_every_constructed_doxbench_class_has_a_styles_rule():
-    views = REPO_ROOT / "src" / "openxdox" / "web" / "views"
-    styles = (REPO_ROOT / "src" / "openxdox" / "web" /
-              "styles.css").read_text(encoding="utf-8")
+    views = WEB / "views"
+    styles = (WEB / "styles.css").read_text(encoding="utf-8")
     import re
     constructed = set()
     for name in ("doxbench-chat.js", "doxbench-editor.js",

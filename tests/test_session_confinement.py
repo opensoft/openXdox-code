@@ -65,11 +65,13 @@ from opendox import session_pr as spr
 from openxdox import snapshot_registry as reg
 from openxdox.generator import generate_snapshot
 
+import opendox_bundle  # noqa: E402  (skips where the pin carries no bundle)
+
 REPO = "openxFactory"
 TOPIC = "demo-topic"
 DRAFT = "draft/demo-topic"
 RECORDS = gc.DEFAULT_RECORDS_DIR
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+WEB = opendox_bundle.composed()
 
 CREATE_BODY = {
     "title": "First Draft",
@@ -279,7 +281,7 @@ def test_the_renderer_presents_the_console_token_from_the_capability_probe():
     """The page's side of the same contract: ONE header-name definition in the
     pure model, consulted by both write transports, sourced from the capability
     probe app.js already performs. No new fetch, no second definition."""
-    views = REPO_ROOT / "src" / "openxdox" / "web" / "views"
+    views = opendox_bundle.composed() / "views"
     model = (views / "staging-workbench-model.js").read_text(encoding="utf-8")
     assert f'export const CONSOLE_TOKEN_HEADER = "{serve_mod.CONSOLE_TOKEN_HEADER}"' in model
     assert f'export const CONSOLE_TOKEN_FIELD = "{serve_mod.CONSOLE_TOKEN_FIELD}"' in model
@@ -360,7 +362,7 @@ def test_the_renderer_repairs_a_stale_token_by_re_reading_it_never_by_reloading(
     reach for `location.reload()`. A reload would fix the header by throwing
     away the textarea, the selection and the drafted seed — the work the
     refusal interrupted."""
-    views = REPO_ROOT / "src" / "openxdox" / "web" / "views"
+    views = opendox_bundle.composed() / "views"
     model = (views / "staging-workbench-model.js").read_text(encoding="utf-8")
 
     # the retriable set is exactly the codes serve.py emits from its
@@ -631,7 +633,7 @@ def test_the_session_rekey_asks_the_serve_which_repository_a_session_lives_in(
         "a name that is not the owning repository must not resolve a session "
         "snapshot — which is why the browser may not infer one")
 
-    app = (REPO_ROOT / "src" / "openxdox" / "web" / "app.js"
+    app = (opendox_bundle.composed() / "app.js"
            ).read_text(encoding="utf-8")
     rekey = app.split("const rekeyToSession = async (ref) => {", 1)[1].split(
         "\n    };", 1)[0]
@@ -1714,7 +1716,7 @@ def test_the_hosted_plane_renders_no_session_surface_at_all():
     The discriminator is the capability's own statement. `sessionSurfaceHidden`
     is asked FIRST in both the mount and the view's `drawSession`, and the whole
     bar goes with it — posture chip included."""
-    views = REPO_ROOT / "src" / "openxdox" / "web" / "views"
+    views = opendox_bundle.composed() / "views"
     model = (views / "staging-workbench-model.js").read_text(encoding="utf-8")
     session = (views / "swb-session.js").read_text(encoding="utf-8")
     view = (views / "staging-workbench.js").read_text(encoding="utf-8")
@@ -1804,7 +1806,7 @@ def test_the_outline_pane_reads_through_the_active_keys_source_base():
     and the whole suite stayed green — exactly the finding-16 regression this test
     exists to catch. The pattern below must therefore run through the call's own
     closing arguments, which the declaration cannot supply."""
-    web = REPO_ROOT / "src" / "openxdox" / "web"
+    web = opendox_bundle.composed()
     view = (web / "views" / "staging-workbench.js").read_text(encoding="utf-8")
     app = (web / "app.js").read_text(encoding="utf-8")
 

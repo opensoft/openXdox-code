@@ -75,7 +75,9 @@ from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit  # noqa: F40
 from opendox.fixtures import project_possibles
 from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
+WEB = OPENDOX_WEB
 WHEEL_MODEL_JS = WEB / "views" / "wheel-model.js"
 WHEEL_JS = WEB / "views" / "wheel.js"
 NODE = shutil.which("node")

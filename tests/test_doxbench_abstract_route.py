@@ -70,7 +70,9 @@ from opendox.doxbench_model import (
 from openxdox.doxbench_scope import ScopeKey
 from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
+WEB = OPENDOX_WEB
 FAKE_CHILD = Path(__file__).resolve().parent / "fixtures" / "fake_omp_child.py"
 
 # The route under test. Referenced at module scope deliberately: it does not
