@@ -43,7 +43,9 @@ from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit  # noqa: F40
 from opendox import serve as serve_mod
 from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
+WEB = OPENDOX_WEB
 EXPLORER_JS = WEB / "views" / "explorer.js"
 VIEWER_JS = WEB / "views" / "viewer.js"
 VENDOR_JS = WEB / "vendor" / "markdown-it.min.js"

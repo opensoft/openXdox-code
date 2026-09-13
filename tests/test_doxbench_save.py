@@ -522,9 +522,10 @@ def test_a_stale_second_save_leaves_the_first_saves_commit_standing(
 import shutil  # noqa: E402
 import subprocess  # noqa: E402
 
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
 NODE = shutil.which("node")
-SAVE_JS = (Path(__file__).resolve().parent.parent.parent / "scripts"
-           / "ideation_dashboard" / "web" / "views" / "doxbench-save.js")
+SAVE_JS = OPENDOX_WEB / "views" / "doxbench-save.js"
 STATE_JS = SAVE_JS.parent / "doxbench-state.js"
 
 # The harness builds a doxBench state with both buffers dirty, hands `runSave`
@@ -1072,9 +1073,7 @@ def test_an_absent_outline_buffer_no_longer_blocks_the_document_save(absent_outl
 # pins the two sides against each other across the language boundary.
 # ---------------------------------------------------------------------------
 
-MODEL_JS = (Path(__file__).resolve().parent.parent.parent / "scripts"
-            / "ideation_dashboard" / "web" / "views"
-            / "staging-workbench-model.js")
+MODEL_JS = OPENDOX_WEB / "views" / "staging-workbench-model.js"
 
 _SCOPE_KIND_HARNESS = """
 import { firstEditBody } from "./staging-workbench-model.mjs";

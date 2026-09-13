@@ -75,11 +75,13 @@ from openxdox import snapshot_registry as reg
 from opendox.boundary import BoundaryViolation, OutputBoundary
 from openxdox.generator import generate_snapshot
 
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
 REPO = "openxFactory"
 TOPIC = "demo-topic"
 DRAFT = "draft/demo-topic"
 CHANGE = "add-demo-topic"
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+WEB = OPENDOX_WEB
 RECORDS = gc.DEFAULT_RECORDS_DIR
 ABANDON_ROUTE = "/actions/gate/abandon-session"
 CLEANUP_ROUTE = "/actions/gate/cleanup-abandoned-branch"

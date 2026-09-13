@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import pathlib
 import threading
 
 import pytest
@@ -43,8 +44,14 @@ from opendox import doxbench_abstract_store as store_mod
 from openxdox import doxbench_scope
 from opendox import doxbench_turns
 
-MODULE_PATH = (REPO_ROOT / "scripts" / "ideation_dashboard"
-               / "doxbench_abstract_store.py")
+# THE INSTALLED openDox's OWN MODULE, not the PRE-CARVE
+# `scripts/ideation_dashboard/` path the carve left behind (§ 3.4 slice S8).
+# The module under test is openDox's — this file imports it as `store_mod`
+# three lines up — and this leg reads openDox through the PIN, which is the
+# same resolution `tests/opendox_bundle.py` makes for the bundle. Reading
+# `__file__` needs no skip: a module this file already imported is installed
+# by definition.
+MODULE_PATH = pathlib.Path(store_mod.__file__)
 
 DIGEST_A = "a" * 64
 DIGEST_B = "b" * 64

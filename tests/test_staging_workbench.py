@@ -46,7 +46,9 @@ from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit  # noqa: F40
 from openxdox import gate_routes as gate_routes_mod
 from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+import opendox_bundle  # noqa: E402  (skips where the pin carries no bundle)
+
+WEB = opendox_bundle.composed()
 MODEL_JS = WEB / "views" / "staging-workbench-model.js"
 NODE = shutil.which("node")
 
@@ -878,7 +880,7 @@ def test_workbench_posture_and_affordances_are_capability_derived():
     transport — the viewer owns the fetch, exactly as it did before."""
     view = (WEB / "views" / "staging-workbench.js").read_text(encoding="utf-8")
     create = CREATE_JS.read_text(encoding="utf-8")
-    app = (REPO_ROOT / "src" / "openxdox" / "web" / "app.js").read_text(
+    app = (opendox_bundle.composed() / "app.js").read_text(
         encoding="utf-8")
     # the mount takes caps + fetcher, and app.js hands the probe's verdict over
     assert "{ onOpenDoc, caps, fetcher, active, index," in view
@@ -1001,7 +1003,7 @@ def test_scopes_derive_from_the_real_fixture_snapshot(tmp_path):
 # ==========================================================================
 
 SESSION_JS = WEB / "views" / "swb-session.js"
-APP_JS = REPO_ROOT / "src" / "openxdox" / "web" / "app.js"
+APP_JS = opendox_bundle.composed() / "app.js"
 
 _SESSION_HARNESS = """
 import {
@@ -2571,7 +2573,7 @@ def test_a_selection_that_does_not_land_reconciles_the_docs_wheel():
     different documents — and `doc-wheel.js`'s `selectPath`, written for exactly
     this, had zero callers."""
     source = SWB_JS.read_text(encoding="utf-8")
-    wheel = (REPO_ROOT / "src" / "openxdox" / "web" / "views"
+    wheel = (opendox_bundle.composed() / "views"
              / "doc-wheel.js").read_text(encoding="utf-8")
     assert "selectPath(path)" in wheel
     assert "wheel.selectPath(path)" in source          # the caller it lacked

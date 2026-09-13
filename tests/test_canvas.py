@@ -42,7 +42,9 @@ from opendox import canvas_drafts as cd
 from opendox.boundary import BoundaryViolation, OutputBoundary
 from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
+WEB = OPENDOX_WEB
 CANVAS_MODEL_JS = WEB / "views" / "canvas-model.js"
 CANVAS_JS = WEB / "views" / "canvas.js"
 NODE = shutil.which("node")
