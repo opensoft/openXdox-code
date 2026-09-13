@@ -120,6 +120,24 @@ def require(*, module_level: bool = True) -> Path:
         shutil.copytree(web, target)
         target.joinpath("package.json").write_text('{"type": "module"}\n',
                                                    encoding="utf-8")
+        # AND `vendor/` BACK TO CommonJS (Copilot review of openXdox-code#19,
+        # accurate). The root marker above sets the package scope for the WHOLE
+        # staged tree, `vendor/` included, and the one file there is a vendored
+        # UMD build — `markdown-it.min.js` — that `tests/test_explorer_viewer.py`
+        # hands to node with `require()`. Under an inherited `"type": "module"`
+        # that is `ERR_REQUIRE_ESM`: the ESM marker this function exists to write
+        # would have broken the one suite that reads the vendored file the old
+        # way. Three suites at this leg already write exactly this marker into
+        # their own copies (`test_doxbench_transport.py`,
+        # `test_doxbench_mutation_boundary.py`, `test_session_confinement.py`),
+        # so the staged root states the same thing once, in the same place it
+        # states the ESM one. Written only where the directory exists, because a
+        # bundle carrying no vendor tree must not gain a package.json for a
+        # directory it does not have.
+        vendor = target / "vendor"
+        if vendor.is_dir():
+            vendor.joinpath("package.json").write_text(
+                '{"type": "commonjs"}\n', encoding="utf-8")
         _STAGED = target
     return _STAGED
 
