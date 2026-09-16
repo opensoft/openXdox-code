@@ -240,10 +240,15 @@ MUST_CONSUME_OPENDOX = (
     # as `serve_gate.py` contributes its routes to the `route_extension` one, so
     # it belongs on this list for the same reason: a contribution surface that
     # stops consuming openDox has forked it. Its reach is DEFERRED (inside
-    # `GateLoopViews.views()`) and deliberately so — this leg pins an `opendox`
-    # older than the view registry itself, and an import-time reach would make
-    # the module unimportable under its own declared dependency. The census
-    # below counts a deferred reach, which is what makes that lawful here.
+    # `GateLoopViews.views()`) and deliberately so. This comment used to give
+    # the reason as "this leg pins an `opendox` older than the view registry
+    # itself" — true of `a99eba03`, no longer true since the 2026-09-16 bump to
+    # `0b4e8bbf` (openDox-code#23), where `opendox.view_extension` is
+    # importable. The deferral stays on the reason that outlives any one pin: an
+    # ASSEMBLY chooses the openDox this module runs under, and an import-time
+    # reach would make the module unimportable under a consumer pinned behind
+    # the view contract. The census below counts a deferred reach, which is what
+    # makes that lawful here.
     "src/openxdox/view_extensions.py",
 )
 
@@ -317,10 +322,19 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 #: The openDox -> openXdox back-imports, MEASURED at the commit this leg pins.
 #:
 #: LOWERED TO ZERO AT IMPORT TIME BY BUILD SLICE 2b — `opensoft/openDox-code`
-#: #10, which this file's pin now names (`pyproject.toml`). **0 import-time /
-#: 19 deferred over five modules**, from 9 / 19 at the head of that slice and
-#: from the 13 / 19 over six modules that the census RULED 5626260214 called
-#: "the 13-line openDox->openXdox inversion" stood at.
+#: #10. **0 import-time / 19 deferred over five modules**, from 9 / 19 at the
+#: head of that slice and from the 13 / 19 over six modules that the census
+#: RULED 5626260214 called "the 13-line openDox->openXdox inversion" stood at.
+#:
+#: THE PIN HAS MOVED TWICE SINCE, AND THE TABLE HAS NOT — measured, not assumed.
+#: This note used to say slice 2b's merge was the commit "this file's pin now
+#: names"; that stopped being true at openXdox-code#15 (`0f1f2e59` ->
+#: `a99eba03`) and the sentence was not followed, which is the stale-claim class
+#: this repository has since had to sweep for. The pin names `0b4e8bbf`
+#: (openDox-code#23, § 3.4 slice S8 leg B) as of 2026-09-16, and
+#: `_back_import_census()` recomputed against THAT tree returns exactly the five
+#: rows below — so the ratchet neither fell nor rose across two openDox slices,
+#: and the numbers here are the measurement, not a carried-forward memory.
 #:
 #: THE WHOLE OF THE INVERSION IS GONE, which is worth stating plainly because
 #: this table has never been able to say it before: no module of the pinned

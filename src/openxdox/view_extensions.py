@@ -19,12 +19,23 @@ a `runtime_checkable` `Protocol` precisely so that a binding authored in the
 repository that PINS openDox conforms without inheriting from it.
 
 WHY THE BINDINGS ARE DECLARED AS DATA AND MATERIALIZED LATE. This leg pins
-`opendox` by commit (`pyproject.toml`), and the pinned commit is older than the
-view registry itself — `opendox.view_extension` does not exist there, and the
-`exports` field RULED Q2 adds is newer still, landing in openDox-code's own S5
-leg. Importing either at module-import time would make this module unimportable
-under its own declared dependency and would put this leg's `validate` red for a
-reason that has nothing to do with this column. So `VIEW_BINDING_SPECS` below is
+`opendox` by commit (`pyproject.toml`). Until 2026-09-16 that pin named
+`a99eba03` and this paragraph said the pinned commit "is older than the view
+registry itself — `opendox.view_extension` does not exist there, and the
+`exports` field RULED Q2 adds is newer still". THAT IS NO LONGER TRUE, and the
+old wording is quoted here as provenance rather than deleted: the pin now names
+openDox-code#23 (`0b4e8bbf`, § 3.4 slice S8 leg B), where `view_extension` is
+importable and `ViewBinding` takes `exports` — measured, and the three
+materialization assertions in `tests/test_gate_loop_views.py` run and pass
+against it instead of skipping.
+
+THE LATENESS STAYS, for the reason that outlives any one pin: an ASSEMBLY
+chooses the `opendox` this module runs under, not this file, and a consumer
+that pins an openDox behind the view contract must still be able to IMPORT this
+module — an import-time reach would make it unimportable under THAT consumer's
+pin and would put its `validate` red for a reason that has nothing to do with
+this column. `ViewContractUnsupported` below is what names that
+condition when it arises. So `VIEW_BINDING_SPECS` below is
 plain data — the same JSON shape the manifest crosses the process boundary as —
 and `GateLoopViews.views()` materializes it through whatever `opendox` the
 ASSEMBLY installed, at the one moment an assembly exists to have installed one.

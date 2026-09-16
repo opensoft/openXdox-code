@@ -21,13 +21,20 @@ composed install — and the assembly hook is exercised by every probe rather th
 asserted once.
 
 THE ASSEMBLY IS THE PRECONDITION, AND IT IS THE PIN. This leg pins `opendox` by
-commit (`pyproject.toml`), and the pinned commit predates BOTH the view registry
-and the packaging fix that puts `opendox/web/` into a wheel at all
-(openDox-code#20's own first commit). Where the installed `opendox` carries no
-bundle there is nothing to assemble INTO, and every probe SKIPS with that reason
-named — never fails, and never silently passes against a stand-in. They run in
-full the moment the pin bump lands, which is the same bump the three
-materialization assertions in `test_gate_loop_views.py` wait for.
+commit (`pyproject.toml`). When these probes landed with slice S5 that pin was
+`a99eba03`, which predated BOTH the view registry and the packaging fix that
+puts `opendox/web/` into a wheel at all (openDox-code#20's own first commit), so
+this paragraph said the probes "run in full the moment the pin bump lands".
+THE BUMP LANDED — 2026-09-16, `a99eba03` -> `0b4e8bbf` (openDox-code#23, § 3.4
+slice S8 leg B) — and all thirteen of them now RUN: 13 skipped became 13 passed
+under `validate.yml`'s own invocation, in the same act that moved the pin, and
+the three materialization assertions in `test_gate_loop_views.py` that waited on
+the same bump went 3 skipped -> 3 passed beside them.
+
+The skip below is kept for the case it was always really about: where the
+installed `opendox` carries no bundle there is nothing to assemble INTO, and a
+probe SKIPS with that reason named — never fails, and never silently passes
+against a stand-in.
 
 A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
 (RULED OQ-C), admitted by path in the S5 annotation.
@@ -132,19 +139,21 @@ def bundle(tmp_path) -> Path:
     """A COMPOSED bundle: openDox's own `web/`, with this column's six modules
     placed into it by the assembly hook RULED Q5 names.
 
-    Skipped — never failed — where the assembled `opendox` carries no bundle:
-    that is this leg's pinned state until the pin bump, and a probe that quietly
-    ran against a stand-in `helpers.js` would measure the stand-in rather than
-    the shipped file.
+    Skipped — never failed — where the assembled `opendox` carries no bundle.
+    That was this leg's pinned state until the 2026-09-16 pin bump and is not
+    any more; the skip remains for an assembly that installs an older openDox
+    than this leg declares, because a probe that quietly ran against a stand-in
+    `helpers.js` would measure the stand-in rather than the shipped file.
     """
     source = _opendox_bundle()
     if source is None:
         pytest.skip(
-            "the installed `opendox` carries no `web/` bundle: this leg pins a "
-            "commit older than openDox's own packaging fix, so there is nothing "
-            "to assemble into. The pin bump owed at landing makes these probes "
-            "run (the same bump `test_gate_loop_views.py`'s three "
-            "materialization assertions wait for)")
+            "the installed `opendox` carries no `web/` bundle, so there is "
+            "nothing to assemble into. This leg's declared pin is NOT the "
+            "explanation any more — it names openDox-code#23 (`0b4e8bbf`), "
+            "which carries the bundle, and under it these probes run. Reaching "
+            "this reason means the installed `opendox` came from somewhere "
+            "older than the declared pin")
     target = tmp_path / "web"
     shutil.copytree(source, target)
     web_assets.install_view_modules(target)

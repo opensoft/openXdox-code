@@ -35,11 +35,20 @@ reason and with the same skip:
     web = Path(opendox.__file__).resolve().parent / "web"
 
 and S5 leg B (`openDox-code#20`) landed the packaging declaration that puts
-`opendox/web/**` into a wheel at all. Until this leg's pin advances past that
-commit, an installed `opendox` carries no bundle — so a module that imports this
-one SKIPS, exactly as S5's probes do, rather than failing on a stand-in. A
-skipped suite says "the pin is behind"; a failing one would say "the code is
-wrong", and only one of those is true.
+`opendox/web/**` into a wheel at all. THIS LEG'S PIN HAS NOW ADVANCED PAST IT —
+2026-09-16, `a99eba03` -> `0b4e8bbf` (openDox-code#23, § 3.4 slice S8 leg B) —
+and the bundle is there: `find()` returns a real directory under the installed
+`opendox`, and the suites that import `OPENDOX_WEB` run instead of skipping.
+This paragraph used to end "Until this leg's pin advances past that commit, an
+installed `opendox` carries no bundle", which was true of `a99eba03` and is
+quoted here as provenance, not as a claim.
+
+THE SKIP STAYS, and it is not dead weight. An `opendox` installed from a source
+older than the packaging declaration — a consumer assembling at its own pin, a
+developer with a stale editable checkout — still carries no bundle, and the
+honest outcome there is a SKIP, not a failure against a stand-in: a skipped
+suite says "the pin is behind"; a failing one would say "the code is wrong", and
+only one of those is true.
 """
 
 from __future__ import annotations
@@ -57,12 +66,14 @@ import pytest
 _MARKER = ("views", "helpers.js")
 
 _REASON = (
-    "the installed `opendox` carries no `web/` bundle: this leg pins a commit "
-    "older than openDox's own packaging declaration (`[tool.setuptools."
-    "package-data] opendox = [\"web/**\"]`, openDox-code#20, § 3.4 slice S5), "
-    "so there is nothing here to read. The pin bump makes this suite run — the "
-    "same bump `tests/test_gate_loop_probes.py` and `tests/test_gate_loop_"
-    "views.py` already wait on. SKIPPED, never failed: the code under test is "
+    "the installed `opendox` carries no `web/` bundle, so there is nothing here "
+    "to read. This leg's own pin is NOT the explanation any more: it names "
+    "openDox-code#23 (`0b4e8bbf`), which is past openDox's packaging "
+    "declaration (`[tool.setuptools.package-data] opendox = [\"web/**\"]`, "
+    "openDox-code#20, § 3.4 slice S5), and under that pin this suite RUNS. "
+    "Reaching this reason means the `opendox` actually installed came from "
+    "somewhere older than the declared pin — an assembly at its own pin, or a "
+    "stale editable checkout. SKIPPED, never failed: the code under test is "
     "not what is missing.")
 
 

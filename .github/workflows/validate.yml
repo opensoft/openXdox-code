@@ -92,9 +92,12 @@ jobs:
       #
       # `--noconftest` safe and needs no consumer: it imports this package's own
       # modules and reads this package's own files as text. Its three
-      # materialization assertions SKIP — never fail — where the pinned
-      # `opendox` predates the view contract, which is this leg's state until
-      # the pin bump that lands with the openDox half.
+      # materialization assertions used to SKIP — never fail — because the
+      # pinned `opendox` predated the view contract, "which is this leg's state
+      # until the pin bump that lands with the openDox half". THAT BUMP HAS
+      # LANDED: `pyproject.toml` names `0b4e8bbf` (openDox-code#23, § 3.4 slice
+      # S8 leg B) since 2026-09-16, and this file goes 32 passed / 3 skipped ->
+      # 35 passed / 0 skipped under the invocation below.
       #
       # `tests/test_gate_loop_probes.py` joins it on the same footing and for
       # the reason the slice exists: slice S4 proved its two new modules by
@@ -105,10 +108,13 @@ jobs:
       # assertion silently breaks a verb. Each probe assembles a COMPOSED bundle
       # — openDox's own `web/` with this column's six modules placed into it by
       # `web_assets.install_view_modules()`, RULED Q5's own hook — so what is
-      # measured is the shipped byte in the shipped position. Where the
-      # installed `opendox` carries no bundle (this leg's pinned state until the
-      # pin bump) every probe SKIPS with that reason named, and where `node` is
-      # absent they skip for that one.
+      # measured is the shipped byte in the shipped position. This block used to
+      # end "where the installed `opendox` carries no bundle (this leg's pinned
+      # state until the pin bump) every probe SKIPS". THE SAME BUMP CLEARED IT:
+      # at `0b4e8bbf` the bundle is in the wheel and this file goes 0 passed /
+      # 13 skipped -> 13 passed / 0 skipped. The skip survives for an assembly
+      # that installs an older openDox than this leg declares, and the `node`
+      # one for a runner without node.
       # § 3.4 SLICE S8 UN-NARROWS THIS LIST AS FAR AS THE MEASUREMENT ALLOWS,
       # which is the half of RULED Q-L8 (b′) this slice was scoped to lift.
       # The note's § 5 S8 row says the narrowings "lift FOR THE WEB SUITES", and
@@ -128,12 +134,15 @@ jobs:
       #       both a pre-carve `MODULE_PATH`; the module under test is
       #       openDox's and is read through the PIN, as the bundle now is.
       #   tests/test_doxbench_mutation_boundary.py   1 error     ->  1 skipped
-      #       A WEB SUITE, and the one of the 23 that can be named today: it
-      #       reads only bundle files, so with the path repaired it COLLECTS
-      #       and skips on the stated reason (this leg's `opendox` pin predates
-      #       openDox's `web/**` package-data declaration) instead of erroring
-      #       on a directory that does not exist. That it collects at all is
-      #       § 1.2(d)'s defect closed; the pin bump is what makes it run.
+      #       A WEB SUITE, and the one of the 23 S8 could name: it reads bundle
+      #       files, so with the path repaired it COLLECTED and skipped on the
+      #       stated reason (this leg's `opendox` pin predated openDox's
+      #       `web/**` package-data declaration) instead of erroring on a
+      #       directory that does not exist. That it collects at all is
+      #       § 1.2(d)'s defect closed. S8 then predicted "the pin bump is what
+      #       makes it run". THE PIN BUMP MEASURED IT AND THE PREDICTION WAS
+      #       WRONG — the block below says what actually happens, and the file
+      #       LEAVES this list in the same act that moved the pin.
       #   tests/test_evidence_provenance_surface.py         19 passed
       #   tests/test_evidence_provenance_surface_seam.py     8 passed 2 skipped
       #   tests/test_model_scenario_workbench.py            23 passed
@@ -163,6 +172,36 @@ jobs:
       # named: it is all-skip today, on the same footing openDox-code#23 left
       # its two all-skip suites off ITS list.
       #
+      # ONE FILE LEAVES THIS LIST WITH THE 2026-09-16 PIN BUMP
+      # (`a99eba03` -> `0b4e8bbf`), and the reason is the BUILD arc's, not the
+      # bump's. `tests/test_doxbench_mutation_boundary.py` was named by S8 on
+      # the measurement quoted above: it COLLECTS, then skips whole at
+      # `tests/opendox_bundle.py`'s module-level skip, which is what happened
+      # while the pinned `opendox` carried no `web/` bundle. At `0b4e8bbf` the
+      # bundle IS in the wheel, so the module-level skip on its line 46 no
+      # longer fires and the module runs on to its line 481 `from openxdox
+      # import gate_console` -> `src/openxdox/gate_console.py:63  from
+      # doc_health import corpus`, the openxFactory-only package named two
+      # paragraphs up. Measured under this exact invocation, in a fresh venv at
+      # the new pin: `ERROR tests/test_doxbench_mutation_boundary.py …
+      # ModuleNotFoundError: No module named 'doc_health'`, a COLLECTION error
+      # that interrupts the whole run.
+      #
+      # It is DROPPED rather than repaired, for the reason
+      # `tests/test_doxbench_turns.py` is not named at all: naming it would put
+      # the required check red for the BUILD arc's defect (split-opendox
+      # § 3.5/3.6, RULED Q-L8 (b′)), and the file is an ARRIVED carve row whose
+      # edits are declared at openxFactory — deferring its `gate_console` import
+      # would be an undeclared edit to a declared surface. It comes back to this
+      # list with the BUILD arc, in the act that makes `doc_health` reachable,
+      # alongside `test_doxbench_turns.py`.
+      #
+      # WITH IT GONE AND THE PIN MOVED, this invocation goes 301 passed /
+      # 23 skipped -> 317 passed / 6 skipped. The 17 skips that cleared are the
+      # 3 materialization assertions, the 13 node probes and this file's own
+      # module-level skip; the 6 that remain are the three seam suites'
+      # `doc_health` pairs, which no pin bump touches.
+      #
       # `--noconftest` STAYS, and it is why this list is a list: `tests/
       # conftest.py` imports the carved session fixtures, which reach both
       # absent packages. Every file named here stands on its own under it.
@@ -176,7 +215,6 @@ jobs:
           tests/test_gate_loop_views.py
           tests/test_gate_loop_probes.py
           tests/test_doxbench_abstract_store.py
-          tests/test_doxbench_mutation_boundary.py
           tests/test_doxbench_telemetry.py
           tests/test_evidence_provenance_surface.py
           tests/test_evidence_provenance_surface_seam.py

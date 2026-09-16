@@ -615,17 +615,34 @@ def test_the_style_residue_is_recorded_rather_than_skipped() -> None:
 # ---------------------------------------------------------------------------
 
 def _view_extension_or_skip():
+    """The assembled openDox's view registry, or SKIP where it has none.
+
+    BOTH GUARDS ARE SATISFIED BY THIS LEG'S OWN PIN, since 2026-09-16.
+    They were not when slice S5 wrote them: the pin was `a99eba03`, the first
+    reason read "this leg pins an `opendox` older than the § 3.4 slice S3 view
+    registry" and the second said the bump "is owed at landing". The bump landed
+    (`a99eba03` -> `0b4e8bbf`, openDox-code#23, § 3.4 slice S8 leg B) and the
+    three assertions below went 3 skipped -> 3 passed under `validate.yml`'s own
+    invocation. The old wording is quoted here as provenance, not asserted.
+
+    THE GUARDS STAY, because what they test is the ASSEMBLED openDox, not this
+    leg's declared pin — the section header above says so — and an assembly is
+    free to install an openDox behind the view contract. That is the same
+    condition `view_extensions.ViewContractUnsupported` names at runtime, and
+    these two skips are its test-time counterpart.
+    """
     view_extension = pytest.importorskip(
         "opendox.view_extension",
-        reason="this leg pins an `opendox` older than the § 3.4 slice S3 view "
-               "registry; the specs above are asserted as data, and the "
-               "materialization is asserted wherever a contract-bearing "
-               "opendox is installed")
+        reason="the assembled `opendox` has no `view_extension` module (§ 3.4 "
+               "slice S3's view registry); the specs above are asserted as "
+               "data, and the materialization is asserted wherever a "
+               "contract-bearing opendox is installed")
     if "exports" not in getattr(view_extension.ViewBinding, "__annotations__", {}):
         pytest.skip(
-            "the pinned `opendox.view_extension.ViewBinding` predates RULED Q2's "
-            "`exports` field (openxFactory#656 comment 5648049748); the pin bump "
-            "to the openDox carrying § 3.4 slice S5 is owed at landing")
+            "the assembled `opendox.view_extension.ViewBinding` does not take "
+            "RULED Q2's `exports` field (openxFactory#656 comment 5648049748); "
+            "this leg's own pin does — reaching this skip means the installed "
+            "`opendox` is older than the declared one")
     return view_extension
 
 
