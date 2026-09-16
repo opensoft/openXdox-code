@@ -692,7 +692,8 @@ def test_a_different_installed_commit_SKIPS_and_names_both(monkeypatch) -> None:
     with pytest.raises(pytest.skip.Exception) as raised:
         call()
     message = str(raised.value)
-    assert _PIN_A[:8] in message and _PIN_B[:8] in message
+    assert _PIN_A[:8] in message
+    assert _PIN_B[:8] in message
     assert "NOT the declared pin's doing" in message
 
 
@@ -725,7 +726,8 @@ def test_under_ci_reads_the_environment_the_runner_sets(monkeypatch) -> None:
 def test_the_declared_pin_is_read_from_this_legs_own_pyproject() -> None:
     """Not a constant: the guard re-reads the file the bump edits."""
     declared = _ob.declared_pin()
-    assert declared is not None and len(declared) == 40
+    assert declared is not None
+    assert len(declared) == 40
     toml = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(
         encoding="utf-8")
     assert f"openDox-code@{declared}" in toml
@@ -805,5 +807,6 @@ def test_a_parser_regression_would_now_be_caught_before_it_reaches_the_decision(
     """
     import inspect
     source = inspect.getsource(_ob.installed_commit)
-    assert "direct_url.json" in source and "vcs_info" in source
+    assert "direct_url.json" in source
+    assert "vcs_info" in source
     assert "len(commit) == 40" in source
