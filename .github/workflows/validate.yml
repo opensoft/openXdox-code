@@ -255,7 +255,7 @@ jobs:
       # alongside `test_doxbench_turns.py`.
       #
       # WITH IT GONE AND THE PIN MOVED, this invocation goes 301 passed /
-      # 23 skipped -> 351 passed / 6 skipped, and BOTH HALVES OF THAT DELTA HAVE
+      # 23 skipped -> 353 passed / 6 skipped, and BOTH HALVES OF THAT DELTA HAVE
       # TO BE SAID SEPARATELY, because Copilot's round-3 review of #21 caught this
       # block conflating them:
       #
@@ -269,7 +269,7 @@ jobs:
       #     file leaves this list, so that skip is no longer RUN rather than
       #     cleared. Counting it as cleared would describe a transition that never
       #     happened.
-      #   * The remaining rise to 351 is NOT the bump: it is the 34 direct tests
+      #   * The remaining rise to 353 is NOT the bump: it is the 36 direct tests
       #     of the provenance guard that Copilot's review rounds asked for, which
       #     live in `tests/test_gate_loop_probes.py` and
       #     `tests/test_gate_loop_views.py` and are therefore both on this list.
@@ -277,9 +277,9 @@ jobs:
       #     rather than carried:
       #       git diff main -- tests/test_gate_loop_probes.py \
       #                        tests/test_gate_loop_views.py | grep -c '^+def test_'
-      #     gives 34, and the passing figure has run 317 -> 323 -> 330 -> 332 ->
-      #     333 -> 334 -> 336 -> 343 -> 346 -> 348 -> 349 -> 351, once per round that
-      #     added tests — the
+      #     gives 36, and the passing figure has run 317 -> 323 -> 330 -> 332 ->
+      #     333 -> 334 -> 336 -> 343 -> 346 -> 348 -> 349 -> 351 -> 353, once per
+      #     round that added tests — the
       #     same discipline the block above applies to the skip counts. The review
       #     of `8b23f6f` asked for the CALL SITES: the tests before it proved what
       #     the guard decides and what it reads, and none of them proved that the
@@ -307,7 +307,16 @@ jobs:
       #     dependency line rewritten to a branch ref or a version range would have
       #     returned None with nothing proving the fail-closed policy still catches
       #     it. Two tests: the function returns None, and `_absent()` FAILS under CI
-      #     naming the declared side while still printing the installed commit.)
+      #     naming the declared side while still printing the installed commit. The
+      #     review of `8b9ece1` then found the PARSER bug with the widest blast
+      #     radius on this PR: `_PIN_RE` had no delimiter after `{40}`, so a ref that
+      #     merely BEGAN with forty hex characters (`…@<40-hex>dead`) yielded that
+      #     prefix as the declared commit — and the guard would compare a commit this
+      #     leg does NOT declare against what is installed, failing on the wrong
+      #     culprit or skipping over a real regression. A trailing `(?![0-9a-zA-Z])`
+      #     makes a continuing ref read as NO pin, which is the fail-closed path, and
+      #     two tests hold both sides of it: three continuing refs refused, four
+      #     legitimate line endings still read.)
       #
       # The 6 skips that remain are the three seam suites' `doc_health` pairs,
       # which no pin bump touches.

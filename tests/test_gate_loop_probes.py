@@ -879,6 +879,43 @@ def test_declared_pin_is_none_when_pyproject_declares_no_opendox_pin(
     assert _ob.declared_pin() is None
 
 
+def test_declared_pin_refuses_a_40_hex_PREFIX_of_a_longer_ref(monkeypatch) -> None:
+    """`…@<40-hex>dead` is NOT a pin, and the regex used to read one out of it.
+
+    Copilot's finding at `8b9ece1` (thread on `tests/opendox_bundle.py:197`), and it
+    is the parser bug with the widest blast radius found on this PR: `_PIN_RE` had no
+    delimiter after `{40}`, so any ref that merely BEGAN with forty hex characters
+    yielded that prefix as "the commit this leg declares". The guard would then
+    compare a commit this leg does NOT declare against what is installed — equal by
+    accident FAILS naming the wrong culprit, unequal SKIPS over a real regression.
+    A continuing ref must read as NO pin, which takes the fail-closed path under CI.
+    """
+    for tail in ("dead", "x", "0"):
+        _with_pyproject_text(monkeypatch, (
+            "dependencies = [\n"
+            f"    \"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}{tail}\",\n"
+            "]\n"))
+        assert _ob.declared_pin() is None, tail
+
+
+def test_declared_pin_still_reads_the_real_pin_beside_that_guard(
+        monkeypatch) -> None:
+    """...and the delimiter guard does not cost the pin it is there to protect.
+
+    The live `pyproject.toml` is read by
+    `test_the_declared_pin_is_read_from_this_legs_own_pyproject`; this drives the
+    same line's ENDINGS — the closing quote, a comma, a newline, a `#` comment —
+    because a lookahead that is too strict fails closed on a correct file, which is
+    the opposite defect and just as silent.
+    """
+    for line in (f'    "opendox @ git+https://x/openDox-code@{_PIN_A}",',
+                 f'    "opendox @ git+https://x/openDox-code@{_PIN_A}"',
+                 f'opendox @ git+https://x/openDox-code@{_PIN_A}  # the pin',
+                 f'opendox @ git+https://x/openDox-code@{_PIN_A}'):
+        _with_pyproject_text(monkeypatch, f"dependencies = [\n{line}\n]\n")
+        assert _ob.declared_pin() == _PIN_A, line
+
+
 def test_an_undeclared_pin_FAILS_under_ci_like_any_other_unreadable_side(
         monkeypatch) -> None:
     """...and the outcome is the fail-closed one, driven end to end.
@@ -1125,9 +1162,9 @@ def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) ->
 # number is not carried here. What is true at any head is the command:
 #   git diff main -- tests/test_gate_loop_probes.py | grep -c '^+def test_'
 #   git diff main -- tests/test_gate_loop_views.py  | grep -c '^+def test_'
-# (28 in this file and 6 in the views file at THIS head — 13 decision/read cases,
+# (30 in this file and 6 in the views file at THIS head — 15 decision/read cases,
 # 11 `installed_commit` parser tests and 4 call-site tests here; `validate.yml`'s
-# record block carries the total, 34. The review of `fd3af6a` caught this pair
+# record block carries the total, 36. The review of `fd3af6a` caught this pair
 # reading 25 and 6, and the review of `de7d966` moved it again by asking for the
 # two undeclared-pin tests: a count written in prose is stale one round later,
 # which is why the commands are printed above it every time.)

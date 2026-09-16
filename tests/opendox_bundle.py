@@ -194,7 +194,18 @@ def find() -> Path | None:
 #: unreadable provenance and FAIL under CI for a formatting difference.
 _SHA_RE = re.compile(r"[0-9a-fA-F]{40}")
 
-_PIN_RE = re.compile(r"opendox\s*@\s*git\+[^@\s\"']+@([0-9a-fA-F]{40})")
+#: THE TRAILING GUARD IS LOAD-BEARING, and it is Copilot's finding at `8b9ece1`.
+#: Without `(?![0-9a-zA-Z])` this pattern matched a 40-hex PREFIX of a longer ref:
+#: `…@<40-hex>dead` is not pinned to that commit at all, yet `declared_pin()`
+#: returned the prefix, and the guard would then compare a commit this leg does
+#: NOT declare against what is installed — equal by accident is a FAIL that names
+#: the wrong culprit, and unequal is a SKIP that hides a real regression. A ref
+#: that merely CONTINUES is not a 40-hex pin, so it reads as no pin at all and
+#: takes the fail-closed path under CI. The class is `0-9a-zA-Z` rather than hex:
+#: a branch name like `0b4e8bbf68fabfcd65d4f0d80e619c20a013e888x` is no more a pin
+#: than one ending in `dead`, and both must miss.
+_PIN_RE = re.compile(
+    r"opendox\s*@\s*git\+[^@\s\"']+@([0-9a-fA-F]{40})(?![0-9a-zA-Z])")
 
 
 def declared_pin() -> str | None:

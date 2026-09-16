@@ -628,7 +628,10 @@ def _view_extension_or_skip():
     summary is the line a reader trusts and a half-table is how it went wrong
     twice.
 
-    BOTH GUARDS ARE SATISFIED BY THIS LEG'S OWN PIN, since 2026-09-16.
+    ALL THREE REFUSAL BRANCHES ARE SATISFIED BY THIS LEG'S OWN PIN, since
+    2026-09-16 (the module, the `ViewBinding` class, and RULED Q2's `exports`
+    field — the enumeration is below; this line said "BOTH GUARDS" until the
+    review of `8b9ece1`, having been written when there were two).
     They were not when slice S5 wrote them: the pin was `a99eba03`, the first
     reason read "this leg pins an `opendox` older than the § 3.4 slice S3 view
     registry" and the second said the bump "is owed at landing". The bump landed
