@@ -56,14 +56,31 @@ where the installed distribution records a commit that is NOT the one this leg
 declares — note the claim is "different", never "older": nothing here proves an
 ordering, only a disagreement — and where the installation records no provenance
 at all AND the run is off CI. Everywhere else `_absent()` fails closed, the
-declared pin included, and under CI unrecorded provenance included. A skipped
-THE TWO SKIPS DO NOT SAY THE SAME THING, and this paragraph ran them together
-until the review of `27a89fd` on #21. The different-commit skip says "this is not
-the openDox we declare", and names both commits to prove it. The unreadable-side
-skip says only "the comparison could not be made", claims nothing about what is
-installed, and exists because off CI an unreadable side is lawful. A FAILURE says
-"the openDox we declare is wrong". The guard's whole job is to keep those three
-apart instead of answering "skip" to all of them.
+declared pin included, and under CI unrecorded provenance included.
+
+FOUR OUTCOMES, NOT THREE. Two review rounds on #21 caught this paragraph running
+them together: at `27a89fd` it had one sentence for both SKIPS, and at `f6f1b991`
+the sentence below still said every FAILURE means "the openDox we declare is
+wrong", which is true of one of the two failures and a misdiagnosis of the other.
+`_absent()`'s docstring holds the canonical table; these are the four things it
+says, and they are four different claims:
+
+  * DIFFERENT commits -> SKIP, saying "this is not the openDox we declare" and
+    naming both commits to prove it;
+  * an unreadable side, OFF CI -> SKIP, saying only "the comparison could not be
+    made". It claims nothing about what is installed, and it exists because off
+    the required path an unreadable side is lawful;
+  * EQUAL commits -> FAIL, saying "the openDox we declare is wrong". This is the
+    only outcome that is an assertion about the package;
+  * an unreadable side, UNDER CI -> FAIL, saying "this run cannot say which
+    openDox is installed". That is a PROVENANCE ANOMALY, not proof of a bad
+    package: `validate.yml` installs `-e ".[test]"` against a PEP 508 direct VCS
+    reference and pip records `direct_url.json` for that every time, so a
+    required run that cannot read one has lost the ability to check, which is
+    itself worth stopping for.
+
+The guard's whole job is to keep those four apart instead of answering "skip" to
+all of them.
 """
 
 from __future__ import annotations
@@ -157,11 +174,16 @@ def declared_pin() -> str | None:
     toml = Path(__file__).resolve().parents[1] / "pyproject.toml"
     try:
         match = _PIN_RE.search(toml.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError):    # pragma: no cover - no checkout
+    except (OSError, UnicodeDecodeError):
         # UnicodeDecodeError is a ValueError, NOT an OSError, so a non-UTF-8
         # `pyproject.toml` would have escaped this function and bypassed
         # `_absent()`'s explicit unknown-provenance policy altogether. Caught at
-        # the review of `27a89fd` on openXdox-code#21.
+        # the review of `27a89fd` on openXdox-code#21. The `# pragma: no cover`
+        # that sat on this line is GONE rather than kept: the review of
+        # `f6f1b991` asked for a test that makes the read fail, and BOTH raising
+        # types are now driven by
+        # `tests/test_gate_loop_probes.py::test_declared_pin_is_none_when_*`, so
+        # the pragma had become a false claim about the branch it labelled.
         return None
     return match.group(1).lower() if match else None
 
@@ -185,14 +207,17 @@ def installed_commit() -> str | None:
     try:
         from importlib.metadata import distribution
         raw = distribution("opendox").read_text("direct_url.json")
-    except Exception:                        # pragma: no cover - not installed
+    except Exception:
+        # Driven by `test_installed_commit_is_none_when_the_package_is_not_installed`
+        # (the LOOKUP raises) and `…_when_reading_the_record_raises` (the read does).
         return None
     if not raw:
         return None
     try:
         vcs_info = json.loads(raw).get("vcs_info") or {}
         vcs, commit = vcs_info.get("vcs"), vcs_info.get("commit_id")
-    except (ValueError, AttributeError):     # pragma: no cover - malformed
+    except (ValueError, AttributeError):
+        # Driven by `test_installed_commit_is_none_on_malformed_json`.
         return None
     # BOTH CHECKS ARE LOAD-BEARING, and the second is Copilot's finding at the
     # head before this one: `len(commit) == 40` admitted any forty CHARACTERS, so

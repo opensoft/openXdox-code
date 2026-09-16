@@ -41,11 +41,18 @@ READING which openDox is installed:
   * NO recorded provenance, off CI -> SKIP, naming the declared one and saying
     plainly that the installed one is unrecorded (it cannot name what it could
     not read, which is why this is a different sentence from the one above);
-  * the DECLARED commit, or no recorded provenance UNDER CI -> FAIL, because that
-    is a regression here and a skip would take these thirteen probes quietly
-    green in a required check.
+  * the DECLARED commit -> FAIL, because THAT is a regression here, and a skip
+    would take these thirteen probes quietly green in a required check;
+  * no recorded provenance UNDER CI -> FAIL TOO, and the review of `f6f1b991` on
+    #21 was right that this line used to file it under the word "regression". It
+    is not one. It is a PROVENANCE ANOMALY: the required run cannot establish
+    which openDox it is testing at all. `validate.yml` installs `-e ".[test]"`
+    against a PEP 508 direct VCS reference and pip records `direct_url.json` for
+    that every time, so failing to read one on the required path is a metadata or
+    install failure — worth stopping for, but never evidence that the bundle
+    regressed.
 
-Neither outcome ever passes silently against a stand-in.
+No outcome ever passes silently against a stand-in.
 
 A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
 (RULED OQ-C), admitted by path in the S5 annotation.
@@ -771,6 +778,49 @@ def test_the_declared_pin_is_read_from_this_legs_own_pyproject() -> None:
     assert f"openDox-code@{declared}" in toml
 
 
+def _with_unreadable_pyproject(monkeypatch, exc) -> None:
+    """Make `Path.read_text` raise for `pyproject.toml`, and for nothing else.
+
+    Narrow on purpose: `declared_pin()` is the only reader under test, and a
+    blanket patch would hide which file the branch actually reacted to.
+    """
+    real_read_text = Path.read_text
+
+    def _read_text(self, *args, **kwargs):
+        if self.name == "pyproject.toml":
+            raise exc
+        return real_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(_ob.Path, "read_text", _read_text)
+
+
+def test_declared_pin_is_none_when_the_read_raises(monkeypatch) -> None:
+    """The unreadable DECLARED side, produced rather than assumed.
+
+    Copilot's review of `f6f1b991` on #21: the CI fail-closed policy depends on
+    `declared_pin()` returning None when the read raises, and every test of the
+    decision monkeypatches `declared_pin()` itself — so `declared=None` had only
+    ever been supplied as an input, never once produced by the function.
+    """
+    _with_unreadable_pyproject(monkeypatch, OSError("pyproject.toml unreadable"))
+    assert _ob.declared_pin() is None
+
+
+def test_declared_pin_is_none_when_pyproject_is_not_utf_8(monkeypatch) -> None:
+    """The half of that branch that was a REAL BUG until the review of `27a89fd`.
+
+    `UnicodeDecodeError` is a `ValueError`, NOT an `OSError`, so a non-UTF-8
+    `pyproject.toml` raised straight out of `declared_pin()` and past
+    `_absent()`'s unknown-provenance policy — the required check's fail-closed
+    rule bypassed entirely. This case exists so the `except` clause cannot
+    silently narrow back to `OSError` alone.
+    """
+    _with_unreadable_pyproject(
+        monkeypatch,
+        UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte"))
+    assert _ob.declared_pin() is None
+
+
 # --- THE PEP 610 PARSER ITSELF, not a monkeypatched stand-in -----------------
 # Copilot round 3 on #21: "all six direct guard tests monkeypatch
 # `installed_commit()` and therefore bypass this code … a parser regression can
@@ -892,15 +942,25 @@ def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) ->
 
 # WHY THE CASES ABOVE ARE THE CASES: `_absent()` branches on `installed_commit()`'s
 # RETURN VALUE, so every test of the DECISION that monkeypatches that function
-# proves nothing about the READING. Nine cases cover the reading — a real VCS
-# record, an absent `direct_url.json`, malformed JSON, a non-VCS (`archive_info`)
-# install, a commit id that is not 40 characters, forty characters that are not
-# hex, a 40-hex id under a non-git VCS, the distribution LOOKUP raising, and the
-# read raising.
+# proves nothing about the READING. TEN cases cover the reading of the INSTALLED
+# side — a real VCS record, an absent `direct_url.json`, malformed JSON, a non-VCS
+# (`archive_info`) install, a commit id that is not 40 characters, forty
+# characters that are not hex, an UPPER-CASE 40-hex id (normalized rather than
+# discarded), a 40-hex id under a non-git VCS, the distribution LOOKUP raising,
+# and the read raising. The DECLARED side's own reading is covered separately,
+# above, by the two `test_declared_pin_is_none_when_…` cases.
 #
-# A tenth test stood here until `7c0a3b6` and is gone rather than repaired: it
-# asserted strings against `inspect.getsource(installed_commit)`, and once the
-# implementation stopped containing `len(commit) == 40` it passed only because an
-# explanatory COMMENT still held that text. A test coupled to source text fails on
-# a harmless rename and catches no behaviour — the nine above already assert the
-# results it was gesturing at.
+# THE COUNT IS MEASURED, NOT CARRIED, and this line read "nine" until the review
+# of `f6f1b991` on #21 caught that the upper-case case added at `b177eef` had
+# never reached the inventory:
+#
+#     grep -c '^def test_installed_commit' tests/test_gate_loop_probes.py   -> 10
+#
+# A DELETED case is not one of the ten, and this paragraph used to number it as
+# though it were ("a tenth test"). One further test stood here until `7c0a3b6`
+# and is gone rather than repaired: it asserted strings against
+# `inspect.getsource(installed_commit)`, and once the implementation stopped
+# containing `len(commit) == 40` it passed only because an explanatory COMMENT
+# still held that text. A test coupled to source text fails on a harmless rename
+# and catches no behaviour — the ten above already assert the results it was
+# gesturing at.
