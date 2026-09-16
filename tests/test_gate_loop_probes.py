@@ -895,7 +895,9 @@ class _FakeDist:
 #: it, because neither did until the review of `a0eed16`: they answered to ANY name,
 #: so a regression to `distribution("openxdox")` — or to any other installed package
 #: — would have read a STRANGER's `direct_url.json`, compared that commit against
-#: this leg's declared pin, and left all ten parser tests green while doing it.
+#: this leg's declared pin, and left every parser test then standing green while
+#: doing it — all TEN of them; the eleventh is the one below, which exists because
+#: of this finding. (`grep -c '^def test_installed_commit' <this file>` -> 11.)
 _ASKED = "opendox"
 
 
@@ -1041,15 +1043,18 @@ def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) ->
 # of `f6f1b991` on #21 caught that the upper-case case added at `b177eef` had
 # never reached the inventory:
 #
-#     grep -c '^def test_installed_commit' tests/test_gate_loop_probes.py   -> 10
+#     grep -c '^def test_installed_commit' tests/test_gate_loop_probes.py   -> 11
 #
-# A DELETED case is not one of the ten, and this paragraph used to number it as
+# It read 10 until the review of `fd3af6a` caught the lookup-name test the review
+# of `a0eed16` had just asked for — the same staleness, one round later, which is
+# why the command is printed beside the number every time.
+# A DELETED case is not one of the eleven, and this paragraph used to number it as
 # though it were ("a tenth test"). One further test stood here until `7c0a3b6`
 # and is gone rather than repaired: it asserted strings against
 # `inspect.getsource(installed_commit)`, and once the implementation stopped
 # containing `len(commit) == 40` it passed only because an explanatory COMMENT
 # still held that text. A test coupled to source text fails on a harmless rename
-# and catches no behaviour — the ten above already assert the results it was
+# and catches no behaviour — the eleven above already assert the results it was
 # gesturing at.
 
 
@@ -1065,7 +1070,10 @@ def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) ->
 # number is not carried here. What is true at any head is the command:
 #   git diff main -- tests/test_gate_loop_probes.py | grep -c '^+def test_'
 #   git diff main -- tests/test_gate_loop_views.py  | grep -c '^+def test_'
-# (25 and 6 as this was written; `validate.yml`'s record block carries the total).
+# (26 in this file and 6 in the views file at THIS head — 11 decision/read cases,
+# 11 `installed_commit` parser tests and 4 call-site tests here; `validate.yml`'s
+# record block carries the total, 32. The review of `fd3af6a` caught the pair
+# reading 25 and 6: a count written one round before the round that added to it.)
 # It is exactly the silent green this whole guard exists to break, reached one
 # level further out each round — and the review of `b22a6fd` caught the quoted
 # count going stale three rounds after the quotation.
