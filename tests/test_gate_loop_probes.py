@@ -31,10 +31,15 @@ under `validate.yml`'s own invocation, in the same act that moved the pin, and
 the three materialization assertions in `test_gate_loop_views.py` that waited on
 the same bump went 3 skipped -> 3 passed beside them.
 
-The skip below is kept for the case it was always really about: where the
-installed `opendox` carries no bundle there is nothing to assemble INTO, and a
-probe SKIPS with that reason named — never fails, and never silently passes
-against a stand-in.
+WHAT A MISSING BUNDLE MEANS NOW, stated precisely — Copilot's round-2 review of
+#21 caught this paragraph still saying "SKIPS … never fails", which the guard had
+already stopped doing. Where the installed `opendox` carries no bundle there is
+nothing to assemble INTO, and `tests/opendox_bundle.py::_absent` decides between
+two different outcomes by READING which openDox is installed: a DIFFERENT (older)
+one, or no recorded provenance off the CI path, SKIPS with both commits named; the
+DECLARED one — or unreadable provenance under CI — FAILS, because that is a
+regression here and a skip would take these thirteen probes quietly green in a
+required check. Neither outcome ever passes silently against a stand-in.
 
 A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
 (RULED OQ-C), admitted by path in the S5 annotation.
@@ -643,3 +648,84 @@ console.log(JSON.stringify({ a, b, sent }));
     assert result["b"]["tag"] == "second", result["b"]
     # and the BODIES were shaped by the right model too, not only the verdicts
     assert result["sent"] == ["first", "second"]
+
+
+# ---------------------------------------------------------------------------
+# THE GUARD ITSELF, TESTED DIRECTLY — Copilot round-2 thread on #21
+# (`PRRT_kwDOUPv7_s6i_iiz`, "the new provenance decision is only exercised
+# indirectly on the normal bundle-present path; there are no tests"). Accurate:
+# the four branches had been proven by hand, by renaming the installed bundle and
+# re-running. That proof is now permanent and runs in `validate`.
+#
+# These live HERE rather than in a new file on purpose: a created file at this leg
+# needs an admission row in openxFactory's `docs/opendox-carve-admissions.yaml`
+# (RULED OQ-C), and adding one is not a pin bump's act. This module is already
+# admitted, already on `validate.yml`'s list, and already owns the fixture whose
+# thirteen probes the decision gates.
+# ---------------------------------------------------------------------------
+
+import opendox_bundle as _ob  # noqa: E402  (a helper import, never OPENDOX_WEB)
+
+_PIN_A = "a" * 40
+_PIN_B = "b" * 40
+
+
+def _decide(monkeypatch, declared, installed, *, ci):
+    monkeypatch.setattr(_ob, "declared_pin", lambda: declared)
+    monkeypatch.setattr(_ob, "installed_commit", lambda: installed)
+    monkeypatch.setenv("CI", "true" if ci else "")
+    return lambda: _ob._absent("the subject under test", module_level=False)
+
+
+def test_the_declared_pin_missing_its_bundle_FAILS(monkeypatch) -> None:
+    """The regression case: what is installed IS what this leg declares."""
+    call = _decide(monkeypatch, _PIN_A, _PIN_A, ci=False)
+    with pytest.raises(pytest.fail.Exception) as raised:
+        call()
+    assert "REGRESSION at the declared pin" in str(raised.value)
+    assert _PIN_A[:8] in str(raised.value)
+
+
+def test_a_different_installed_commit_SKIPS_and_names_both(monkeypatch) -> None:
+    """The lawful case: a consumer assembling at its own, older pin."""
+    call = _decide(monkeypatch, _PIN_A, _PIN_B, ci=True)
+    with pytest.raises(pytest.skip.Exception) as raised:
+        call()
+    message = str(raised.value)
+    assert _PIN_A[:8] in message and _PIN_B[:8] in message
+    assert "NOT the declared pin's doing" in message
+
+
+def test_unknown_provenance_FAILS_under_ci(monkeypatch) -> None:
+    """The round-2 finding: on the REQUIRED path, unknown is not neutral."""
+    call = _decide(monkeypatch, _PIN_A, None, ci=True)
+    with pytest.raises(pytest.fail.Exception) as raised:
+        call()
+    assert "cannot say which `opendox` is installed" in str(raised.value)
+
+
+def test_unknown_provenance_SKIPS_off_ci(monkeypatch) -> None:
+    """...and off it, an editable checkout has no provenance to record."""
+    call = _decide(monkeypatch, _PIN_A, None, ci=False)
+    with pytest.raises(pytest.skip.Exception) as raised:
+        call()
+    assert "no PEP 610 provenance" in str(raised.value)
+
+
+def test_under_ci_reads_the_environment_the_runner_sets(monkeypatch) -> None:
+    """`CI=true` is what GitHub Actions sets; nothing else is treated as CI."""
+    for value, expected in (("true", True), ("TRUE", True), ("1", True),
+                            ("yes", True), ("false", False), ("", False)):
+        monkeypatch.setenv("CI", value)
+        assert _ob.under_ci() is expected, value
+    monkeypatch.delenv("CI", raising=False)
+    assert _ob.under_ci() is False
+
+
+def test_the_declared_pin_is_read_from_this_legs_own_pyproject() -> None:
+    """Not a constant: the guard re-reads the file the bump edits."""
+    declared = _ob.declared_pin()
+    assert declared is not None and len(declared) == 40
+    toml = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(
+        encoding="utf-8")
+    assert f"openDox-code@{declared}" in toml

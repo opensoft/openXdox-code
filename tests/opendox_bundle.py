@@ -55,10 +55,12 @@ from __future__ import annotations
 
 import atexit
 import json
+import os
 import re
 import shutil
 import tempfile
 from pathlib import Path
+from typing import NoReturn
 
 import pytest
 
@@ -147,8 +149,31 @@ def installed_commit() -> str | None:
     return commit if isinstance(commit, str) and len(commit) == 40 else None
 
 
-def _absent(subject: str, *, module_level: bool):
-    """Raise the RIGHT outcome for a missing `subject` — fail at the declared pin."""
+def under_ci() -> bool:
+    """True on the REQUIRED path — GitHub Actions sets `CI=true` on every runner."""
+    return os.environ.get("CI", "").strip().lower() in {"1", "true", "yes"}
+
+
+def _absent(subject: str, *, module_level: bool) -> NoReturn:
+    """Raise the RIGHT outcome for a missing `subject`.
+
+    | installed vs declared | outcome |
+    | --- | --- |
+    | equal | FAIL — a regression at the pin this leg declares |
+    | different | SKIP — a consumer assembling at its own, older pin |
+    | UNKNOWN, under CI | FAIL — see below |
+    | UNKNOWN, off CI | SKIP — a developer box may install however it likes |
+
+    THE "UNKNOWN, UNDER CI" ROW IS COPILOT ROUND 2's FINDING, and it was right:
+    skipping on unknown provenance left the required `validate` job able to go
+    green with the bundle missing, which is the exact silence this guard exists to
+    break. On the required path unknown provenance is not a neutral state — 
+    `validate.yml` installs with `pip install -e ".[test]"` against a PEP 508
+    direct VCS reference, and pip records `direct_url.json` for that every time —
+    so failing to read one there is itself the anomaly. Off CI the permissive
+    branch stays, because an editable checkout or a hand-placed wheel is a lawful
+    way to work and has no provenance to record.
+    """
     declared, installed = declared_pin(), installed_commit()
     if declared is not None and installed is not None and declared == installed:
         pytest.fail(
@@ -159,16 +184,31 @@ def _absent(subject: str, *, module_level: bool):
             f"it fails here instead of skipping: a skip would take thirteen node "
             f"probes, three materialization assertions and every bundle suite "
             f"quietly green in a required check.")
-    where = (f"the installed distribution was built from {installed[:8]}, while "
-             f"`pyproject.toml` declares {declared[:8]}"
-             if declared and installed else
-             "this installation records no PEP 610 provenance, so the two cannot "
-             "be compared and nothing is claimed about which commit is installed")
+    if declared is None or installed is None:
+        if under_ci():
+            pytest.fail(
+                f"{subject} is missing AND this run cannot say which `opendox` is "
+                f"installed (declared={declared or 'unreadable'}, "
+                f"installed={installed or 'unrecorded'}). On CI that is itself the "
+                f"anomaly: `validate.yml` installs `-e \".[test]\"` against a PEP 508 "
+                f"direct VCS reference, and pip records `direct_url.json` for that "
+                f"every time. Failing rather than skipping, because a skip here is "
+                f"exactly the silent green this guard exists to prevent.")
+        pytest.skip(
+            f"{subject} is missing, and this installation records no PEP 610 "
+            f"provenance (declared={declared or 'unreadable'}, "
+            f"installed={installed or 'unrecorded'}), so nothing is claimed about "
+            f"which commit is installed. Off the CI path that is lawful — an "
+            f"editable checkout or a hand-placed wheel has none. Under CI this same "
+            f"condition FAILS.",
+            allow_module_level=module_level)
     pytest.skip(
-        f"{subject} is missing, and this is NOT the declared pin's doing: {where}. "
-        f"Under the declared pin these suites RUN — reaching this reason means the "
-        f"`opendox` actually installed came from somewhere else (an assembly at "
-        f"its own pin, or a stale editable checkout).",
+        f"{subject} is missing, and this is NOT the declared pin's doing: the "
+        f"installed distribution was built from {installed[:8]}, while "
+        f"`pyproject.toml` declares {declared[:8]}. Under the declared pin these "
+        f"suites RUN — reaching this reason means the `opendox` actually installed "
+        f"came from somewhere else (an assembly at its own pin, or a stale editable "
+        f"checkout).",
         allow_module_level=module_level)
 
 
