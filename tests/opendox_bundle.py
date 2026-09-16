@@ -194,18 +194,26 @@ def find() -> Path | None:
 #: unreadable provenance and FAIL under CI for a formatting difference.
 _SHA_RE = re.compile(r"[0-9a-fA-F]{40}")
 
-#: THE TRAILING GUARD IS LOAD-BEARING, and it is Copilot's finding at `8b9ece1`.
-#: Without `(?![0-9a-zA-Z])` this pattern matched a 40-hex PREFIX of a longer ref:
+#: THE TRAILING GUARD IS LOAD-BEARING, and it is Copilot's finding at `8b9ece1`,
+#: sharpened by its finding at `2dfd669`.
+#: Without a terminator this pattern matched a 40-hex PREFIX of a longer ref:
 #: `…@<40-hex>dead` is not pinned to that commit at all, yet `declared_pin()`
 #: returned the prefix, and the guard would then compare a commit this leg does
 #: NOT declare against what is installed — equal by accident is a FAIL that names
 #: the wrong culprit, and unequal is a SKIP that hides a real regression. A ref
 #: that merely CONTINUES is not a 40-hex pin, so it reads as no pin at all and
-#: takes the fail-closed path under CI. The class is `0-9a-zA-Z` rather than hex:
-#: a branch name like `0b4e8bbf68fabfcd65d4f0d80e619c20a013e888x` is no more a pin
-#: than one ending in `dead`, and both must miss.
+#: takes the fail-closed path under CI.
+#: IT IS A POSITIVE TERMINATOR, not a list of refused characters — the first try
+#: was `(?![0-9a-zA-Z])`, and the review of `2dfd669` was right that it lets
+#: `…@<sha>-feature`, `…@<sha>/branch`, `…@<sha>_suffix` and `…@<sha>.1` through,
+#: all of them legal git refs. Refusing ref characters one class at a time is a
+#: losing game (git allows nearly everything a URL does); requiring the pin to END
+#: where a TOML string or line ends is not. The terminator set is exactly the
+#: characters that can legitimately follow the sha in `pyproject.toml`: a closing
+#: quote, whitespace (the newline included), a comma, a closing bracket, or a `#`
+#: comment — or the end of the file.
 _PIN_RE = re.compile(
-    r"opendox\s*@\s*git\+[^@\s\"']+@([0-9a-fA-F]{40})(?![0-9a-zA-Z])")
+    r"opendox\s*@\s*git\+[^@\s\"']+@([0-9a-fA-F]{40})(?=[\"'\s,\]#]|$)")
 
 
 def declared_pin() -> str | None:
@@ -373,8 +381,11 @@ def require(*, module_level: bool = True) -> Path:
     `_absent()`.
 
     `module_level` SCOPES THE SKIP OUTCOME AND NOTHING ELSE. With True a skip
-    takes the IMPORTING MODULE, which is what the thirty suites whose whole
-    subject is the bundle want; `web()` below passes False, so a skip takes only
+    takes the IMPORTING MODULE, which is what the TWENTY-NINE suites whose whole
+    subject is the bundle want (26 importing `OPENDOX_WEB`, 3 calling `composed()`
+    at module scope; `test_doxbench_turns.py` is NOT among them — it calls `web()`
+    per test, which is that docstring's own subject. The count read "thirty" until
+    the review of `2dfd669`); `web()` below passes False, so a skip takes only
     the calling TEST (see its docstring for when that is the honest reading). The
     FAIL outcomes — the declared pin, and an unreadable side under CI — are not
     scoped by it at all: `pytest.fail` fails the test that reached the guard,
@@ -408,11 +419,15 @@ def require(*, module_level: bool = True) -> Path:
         if web is None:
             # THE 29 IMPORTER ANNOTATIONS THAT REACH THIS LINE ARE STALE, AND
             # THEY ARE NOT REPAIRED HERE. Copilot's review of `399e2a9` on
-            # openXdox-code#21 is right about the fact: 29 files carry
-            # `from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips
-            # where the pin carries no bundle)`, and after the bump this path
-            # also FAILS — at the declared pin, and for an unreadable side under
-            # CI. Measured, not estimated:
+            # openXdox-code#21 is right about the fact: 29 files carry the
+            # annotation `# noqa: E402  (skips where the pin carries no bundle)`,
+            # and after the bump this path also FAILS — at the declared pin, and
+            # for an unreadable side under CI. The annotation sits on TWO import
+            # forms, which the review of `2dfd669` caught this sentence collapsing
+            # into one: 26 files import `OPENDOX_WEB` from here, and 3 —
+            # `test_doxbench_transport.py`, `test_session_confinement.py`,
+            # `test_staging_workbench.py` — `import opendox_bundle` and call
+            # `composed()` at module scope. Measured, not estimated:
             #   grep -rn 'skips where the pin carries no bundle' tests/ \
             #        --include='test_*.py'                              -> 29
             #     sites in 29 files. The --include is load-bearing: this comment

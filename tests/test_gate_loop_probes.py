@@ -889,8 +889,15 @@ def test_declared_pin_refuses_a_40_hex_PREFIX_of_a_longer_ref(monkeypatch) -> No
     compare a commit this leg does NOT declare against what is installed — equal by
     accident FAILS naming the wrong culprit, unequal SKIPS over a real regression.
     A continuing ref must read as NO pin, which takes the fail-closed path under CI.
+
+    THE FIRST FIX WAS TOO NARROW AND THE THREAD ON `2dfd669` SAID SO: a negative
+    lookahead over `[0-9a-zA-Z]` still admitted `-feature`, `/branch`, `_suffix` and
+    `.1`, all legal git refs. Refusing ref characters one class at a time is a losing
+    game; the pattern requires a POSITIVE terminator now — the characters that can
+    legitimately follow the sha in `pyproject.toml` — and every separator named in
+    that thread is in the loop below.
     """
-    for tail in ("dead", "x", "0"):
+    for tail in ("dead", "x", "0", "-feature", "/branch", "_suffix", ".1"):
         _with_pyproject_text(monkeypatch, (
             "dependencies = [\n"
             f"    \"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}{tail}\",\n"
