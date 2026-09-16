@@ -76,7 +76,11 @@ class ContributedViewModuleRoutes:
     """
 
     def _serve_contributed_view_module(self, head_only: bool) -> None:
-        """Answer one exact `/views/<module>.js` this column declares.
+        """Answer one exact `/views/<asset>` this column declares — `.js` OR
+        `.css` (Copilot review, round 3: this contract still promised only a
+        module, so the CSS path RULED Q7 added read as unsupported and a later
+        change could reintroduce a JS-only assumption without contradicting
+        anything written here).
 
         The binding is EXACT, so openDox's dispatcher calls this with
         `head_only` alone and the path is read off the request. The name is
@@ -88,6 +92,8 @@ class ContributedViewModuleRoutes:
         path = self.path.split("?", 1)[0].split("#", 1)[0]
         prefix = f"/{web_assets.BUNDLE_SUBDIR}/"
         name = path[len(prefix):] if path.startswith(prefix) else ""
+        # DECLARED ASSETS, modules and sheets alike: `VIEW_ASSET_NAMES`, not
+        # `VIEW_MODULE_NAMES`, since RULED Q7 sends a binding's sheet with it.
         if name not in web_assets.VIEW_ASSET_NAMES:
             # Not this column's to answer. 404 rather than falling through:
             # the dispatcher already decided this route is ours, and serving
@@ -95,6 +101,9 @@ class ContributedViewModuleRoutes:
             self.send_error(404, "not found")
             return
         suffix = name[name.rfind("."):]
+        # ONE MEDIA TYPE PER SUFFIX, from the declared table: a browser in
+        # standards mode DROPS a stylesheet served as `text/javascript`, with no
+        # error event and an unstyled panel as the only symptom.
         self._serve_bytes(web_assets.module_source(name), CTYPES[suffix],
                           head_only)
 

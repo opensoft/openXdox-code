@@ -238,6 +238,13 @@ def test_the_hosted_fallback_claims_exactly_this_columns_declared_paths() -> Non
     assert serve_views.CTYPES == {".js": serve_views.JS_CTYPE,
                                   ".css": serve_views.CSS_CTYPE}
     assert "text/css" in serve_views.CSS_CTYPE
+    # AND THE HANDLER'S OWN CONTRACT SAYS SO (Copilot review, round 3): a
+    # docstring promising only `/views/<module>.js` documents the CSS path as
+    # unsupported, and a later change could reintroduce a JS-only assumption
+    # without contradicting anything written down.
+    doc = serve_views.ContributedViewModuleRoutes \
+        ._serve_contributed_view_module.__doc__
+    assert ".css" in doc and ".js" in doc, doc
 
 
 def test_the_hosted_fallback_serves_only_declared_names() -> None:
