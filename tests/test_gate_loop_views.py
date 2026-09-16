@@ -615,13 +615,18 @@ def test_the_style_residue_is_recorded_rather_than_skipped() -> None:
 # ---------------------------------------------------------------------------
 
 def _view_extension_or_skip():
-    """The assembled openDox's view registry, or — where it has none — a FAIL if
-    that openDox is the one this leg DECLARES (or its provenance is unreadable
-    under CI) and a SKIP only for a demonstrably different consumer.
+    """The assembled openDox's view registry, or — where it has none — whichever
+    of FAIL and SKIP `tests/opendox_bundle.py::_absent` measures: FAIL for the
+    commit this leg DECLARES and for unrecorded provenance UNDER CI; SKIP for a
+    DIFFERENT commit and for unrecorded provenance OFF CI.
 
-    The summary line used to read "or SKIP where it has none", which contradicted
-    the table four paragraphs down; Copilot's review of `42741fd` on #21 caught
-    it. The summary is the line a reader trusts, so it carries the outcome now.
+    This summary took two goes. It read "or SKIP where it has none", which
+    contradicted the table four paragraphs down; the review of `42741fd` on #21
+    caught that, and the review of `7c0a3b6` caught the replacement too — it said
+    a skip was "only for a demonstrably different consumer" and dropped the
+    off-CI unrecorded branch. All four rows are on the line now, because the
+    summary is the line a reader trusts and a half-table is how it went wrong
+    twice.
 
     BOTH GUARDS ARE SATISFIED BY THIS LEG'S OWN PIN, since 2026-09-16.
     They were not when slice S5 wrote them: the pin was `a99eba03`, the first

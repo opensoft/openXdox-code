@@ -43,12 +43,16 @@ This paragraph used to end "Until this leg's pin advances past that commit, an
 installed `opendox` carries no bundle", which was true of `a99eba03` and is
 quoted here as provenance, not as a claim.
 
-THE SKIP STAYS, and it is not dead weight. An `opendox` installed from a source
-older than the packaging declaration — a consumer assembling at its own pin, a
-developer with a stale editable checkout — still carries no bundle, and the
-honest outcome there is a SKIP, not a failure against a stand-in: a skipped
-suite says "the pin is behind"; a failing one would say "the code is wrong", and
-only one of those is true.
+A SKIP STAYS FOR TWO CASES AND TWO ONLY, and this paragraph overstated it until
+the review of `7c0a3b6` on openXdox-code#21. A missing bundle is honest to skip
+where the installed distribution records a commit that is NOT the one this leg
+declares — note the claim is "different", never "older": nothing here proves an
+ordering, only a disagreement — and where the installation records no provenance
+at all AND the run is off CI. Everywhere else `_absent()` fails closed, the
+declared pin included, and under CI unrecorded provenance included. A skipped
+suite says "this is not the openDox we declare"; a failing one says "the openDox
+we declare is wrong", and the guard's whole job is to tell those apart instead of
+answering "skip" to both.
 """
 
 from __future__ import annotations
@@ -207,9 +211,8 @@ def _absent(subject: str, *, module_level: bool) -> NoReturn:
             f"(`pyproject.toml` pins {declared[:8]}, and the installed "
             f"distribution records that same commit in its `direct_url.json`). "
             f"That is a REGRESSION at the declared pin, not a stale consumer, so "
-            f"it fails here instead of skipping: a skip would take thirteen node "
-            f"probes, three materialization assertions and every bundle suite "
-            f"quietly green in a required check.")
+            f"it fails here instead of skipping: a skip would take every suite "
+            f"that depends on {subject} quietly green in a required check.")
     if declared is None or installed is None:
         if under_ci():
             pytest.fail(

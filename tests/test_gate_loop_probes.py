@@ -31,15 +31,21 @@ under `validate.yml`'s own invocation, in the same act that moved the pin, and
 the three materialization assertions in `test_gate_loop_views.py` that waited on
 the same bump went 3 skipped -> 3 passed beside them.
 
-WHAT A MISSING BUNDLE MEANS NOW, stated precisely — Copilot's round-2 review of
-#21 caught this paragraph still saying "SKIPS … never fails", which the guard had
-already stopped doing. Where the installed `opendox` carries no bundle there is
-nothing to assemble INTO, and `tests/opendox_bundle.py::_absent` decides between
-two different outcomes by READING which openDox is installed: a DIFFERENT (older)
-one, or no recorded provenance off the CI path, SKIPS with both commits named; the
-DECLARED one — or unreadable provenance under CI — FAILS, because that is a
-regression here and a skip would take these thirteen probes quietly green in a
-required check. Neither outcome ever passes silently against a stand-in.
+WHAT A MISSING BUNDLE MEANS NOW, stated precisely — the review rounds on #21
+rewrote this paragraph twice, and both times because it promised an outcome the
+guard does not give. Where the installed `opendox` carries no bundle there is
+nothing to assemble INTO, and `tests/opendox_bundle.py::_absent` chooses by
+READING which openDox is installed:
+
+  * a DIFFERENT commit from the one this leg declares -> SKIP, naming BOTH;
+  * NO recorded provenance, off CI -> SKIP, naming the declared one and saying
+    plainly that the installed one is unrecorded (it cannot name what it could
+    not read, which is why this is a different sentence from the one above);
+  * the DECLARED commit, or no recorded provenance UNDER CI -> FAIL, because that
+    is a regression here and a skip would take these thirteen probes quietly
+    green in a required check.
+
+Neither outcome ever passes silently against a stand-in.
 
 A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
 (RULED OQ-C), admitted by path in the S5 annotation.
@@ -155,14 +161,15 @@ def bundle(tmp_path) -> Path:
     """
     source = _opendox_bundle()
     if source is None:
-        # FAIL at the declared pin, SKIP only for a different one — the shared
-        # rule in `tests/opendox_bundle.py::_absent`, which READS the installed
-        # distribution's PEP 610 provenance instead of asserting it. Copilot's
-        # round-1 review of #21 found this file claiming "came from somewhere
-        # older than the declared pin" on a check that only tested for a marker;
-        # if `0b4e8bbf` itself ever stopped shipping `web/**`, all thirteen
-        # probes below would have skipped and this required check would have
-        # stayed green over the regression.
+        # The shared rule in `tests/opendox_bundle.py::_absent`, which READS the
+        # installed distribution's PEP 610 provenance instead of asserting it:
+        # FAIL for the DECLARED commit and for unrecorded provenance UNDER CI;
+        # SKIP for a DIFFERENT commit, and for unrecorded provenance OFF CI.
+        # Round 1 of the review on #21 found this file claiming "came from
+        # somewhere older than the declared pin" on a check that only tested for
+        # a marker; if `0b4e8bbf` itself ever stopped shipping `web/**`, all
+        # thirteen probes below would have skipped and this required check would
+        # have stayed green over the regression.
         import opendox_bundle
         opendox_bundle._absent("openDox's `web/` bundle", module_level=False)
     target = tmp_path / "web"
@@ -756,8 +763,24 @@ class _FakeDist:
 
 
 def _with_dist(monkeypatch, payload):
+    """Install a fake distribution whose `read_text` returns (or raises) `payload`."""
     import importlib.metadata as md
     monkeypatch.setattr(md, "distribution", lambda name: _FakeDist(payload))
+
+
+def _with_no_dist(monkeypatch, exc):
+    """Make the LOOKUP itself raise — the path `_with_dist` cannot reach.
+
+    Caught at `7c0a3b6`: `_with_dist(PackageNotFoundError(...))` made `read_text`
+    raise, so the test named for an uninstalled package never exercised
+    `distribution("opendox")` failing, which is the call `installed_commit()`
+    actually guards.
+    """
+    import importlib.metadata as md
+
+    def _raise(name):
+        raise exc
+    monkeypatch.setattr(md, "distribution", _raise)
 
 
 def test_installed_commit_reads_a_real_vcs_record(monkeypatch) -> None:
@@ -813,21 +836,28 @@ def test_installed_commit_refuses_a_record_that_is_not_git(monkeypatch) -> None:
 
 
 def test_installed_commit_is_none_when_the_package_is_not_installed(monkeypatch) -> None:
+    """The LOOKUP fails, not the read — see `_with_no_dist`."""
     from importlib.metadata import PackageNotFoundError
-    _with_dist(monkeypatch, PackageNotFoundError("opendox"))
+    _with_no_dist(monkeypatch, PackageNotFoundError("opendox"))
     assert _ob.installed_commit() is None
 
 
-def test_a_parser_regression_would_now_be_caught_before_it_reaches_the_decision() -> None:
-    """The point of the six above, stated as an assertion rather than a comment.
+def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) -> None:
+    """...and the read failing is its own case, which is what `_with_dist` drives."""
+    _with_dist(monkeypatch, OSError("metadata unreadable"))
+    assert _ob.installed_commit() is None
 
-    `_absent()` branches on `installed_commit()`'s RETURN VALUE, so every test of
-    the decision that monkeypatches that function proves nothing about the
-    reading. These six cover the reading: a real VCS record, an absent file,
-    malformed JSON, a non-VCS install, a too-short id, and no distribution at all.
-    """
-    import inspect
-    source = inspect.getsource(_ob.installed_commit)
-    assert "direct_url.json" in source
-    assert "vcs_info" in source
-    assert "len(commit) == 40" in source
+# WHY THE CASES ABOVE ARE THE CASES: `_absent()` branches on `installed_commit()`'s
+# RETURN VALUE, so every test of the DECISION that monkeypatches that function
+# proves nothing about the READING. Nine cases cover the reading — a real VCS
+# record, an absent `direct_url.json`, malformed JSON, a non-VCS (`archive_info`)
+# install, a commit id that is not 40 characters, forty characters that are not
+# hex, a 40-hex id under a non-git VCS, the distribution LOOKUP raising, and the
+# read raising.
+#
+# A tenth test stood here until `7c0a3b6` and is gone rather than repaired: it
+# asserted strings against `inspect.getsource(installed_commit)`, and once the
+# implementation stopped containing `len(commit) == 40` it passed only because an
+# explanatory COMMENT still held that text. A test coupled to source text fails on
+# a harmless rename and catches no behaviour — the nine above already assert the
+# results it was gesturing at.
