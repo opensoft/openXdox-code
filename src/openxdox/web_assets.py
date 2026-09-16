@@ -123,13 +123,17 @@ def module_path(name: str) -> Path:
     path = VIEW_MODULE_DIR / name
     if not path.is_file():
         raise ViewAssetError(
-            f"declared view module {name!r} is missing from this package at "
+            f"declared view asset {name!r} is missing from this package at "
             f"{path}: the wheel was built without "
             "`[tool.setuptools.package-data] openxdox = [\"web/views/*.js\", "
             "\"web/views/*.css\"]`, "
             "so every binding this column declares names a file that cannot "
             "load — and a binding that cannot be mounted must not look "
-            "registered (openDox `views/view_extension.js`'s own rule)")
+            "registered (openDox `views/view_extension.js`'s own rule). A "
+            "MISSING SHEET is the same defect in the quieter direction: the "
+            "binding mounts and paints unstyled, which RULED Q7 treats as a "
+            "degrade and not a refusal, so the wheel is where it has to be "
+            "caught")
     return path
 
 
@@ -197,10 +201,11 @@ def install_view_modules(web_dir: str | Path, *,
         if collisions:
             raise ViewAssetError(
                 f"{', '.join(str(path) for path in collisions)} already "
-                "exist(s) and overwrite=False: this column's module(s) would "
+                "exist(s) and overwrite=False: this column's asset(s) would "
                 "replace files the bundle already carries, which is either a "
-                "second copy of the gate loop or a name collision, and neither "
-                "is something to do silently. Nothing was copied")
+                "second placement of this column or a name collision with "
+                "openDox's own bundle, and neither is something to do "
+                "silently. Nothing was copied")
     # EVERY SOURCE RESOLVED BEFORE ANY COPY, for the same reason as the
     # collision sweep above and found by the same review one round later
     # (Copilot, round 2). `module_path()` raises `ViewAssetError` for a declared

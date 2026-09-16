@@ -170,15 +170,19 @@ def test_the_assembly_hook_can_refuse_to_overwrite(tmp_path) -> None:
     web = tmp_path / "web"
     views = web / web_assets.BUNDLE_SUBDIR
     views.mkdir(parents=True)
-    (views / web_assets.VIEW_MODULE_NAMES[0]).write_text("// someone else's\n")
+    (views / web_assets.VIEW_SHEET_NAMES[0]).write_text("/* someone else's */\n")
     with pytest.raises(web_assets.ViewAssetError) as clash:
         web_assets.install_view_modules(web, overwrite=False)
     assert "already" in str(clash.value) and "overwrite=False" in str(clash.value)
+    # ASSET, not MODULE (Copilot review, round 2): the collision sweep covers
+    # `VIEW_ASSET_NAMES` since RULED Q7, so a colliding `gate.css` must not be
+    # described as a second copy of the gate loop's modules.
+    assert "asset(s)" in str(clash.value)
     # NOTHING WAS COPIED (Copilot review, round 1): the collision check runs over
     # every module BEFORE the first write, so a refusal never leaves a
     # half-assembled bundle behind.
     assert sorted(p.name for p in views.iterdir()) == [
-        web_assets.VIEW_MODULE_NAMES[0]]
+        web_assets.VIEW_SHEET_NAMES[0]]
 
 
 def test_an_undeclared_module_name_is_refused() -> None:
@@ -186,6 +190,15 @@ def test_an_undeclared_module_name_is_refused() -> None:
         web_assets.module_path("../../etc/passwd")
     with pytest.raises(web_assets.ViewAssetError):
         web_assets.module_path("helpers.js")
+    # A SHEET NAME NOTHING DECLARES IS REFUSED THE SAME WAY, and the refusal
+    # says ASSET rather than MODULE (Copilot review, round 2): since RULED Q7
+    # this function answers for both kinds, and a diagnostic that calls a
+    # missing stylesheet a "view module" points an operator at the wrong
+    # package-data line.
+    with pytest.raises(web_assets.ViewAssetError) as undeclared:
+        web_assets.module_path("gate-lens.css")
+    assert "view asset" in str(undeclared.value)
+    assert "module" not in str(undeclared.value).split("view asset")[0]
 
 
 # ---------------------------------------------------------------------------
