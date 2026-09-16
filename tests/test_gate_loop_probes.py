@@ -972,3 +972,78 @@ def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) ->
 # still held that text. A test coupled to source text fails on a harmless rename
 # and catches no behaviour — the ten above already assert the results it was
 # gesturing at.
+
+
+# --- THE CALL SITES, not the decision and not the parser ---------------------
+# Copilot's review of `8b23f6f` on #21, and it is the round-3 finding one level
+# out: the tests above prove what `_absent()` DECIDES and what
+# `installed_commit()` READS, and every one of them either calls `_absent()`
+# directly or monkeypatches the function under it. None of them proves that the
+# three CALLERS still route a missing subject INTO `_absent()`. "Replacing this
+# call with `pytest.skip` would leave the 19 guard tests green while the
+# `OPENDOX_WEB` importers silently skip under CI" — exactly the silent green
+# this whole guard exists to break, reached one level further out each round.
+# Two call sites are covered here; the third
+# (`test_gate_loop_views.py::_view_extension_or_skip`) is covered in that file,
+# beside the assertions it gates.
+
+
+def _pin(monkeypatch, declared, installed, *, ci=True):
+    """Fix what the guard will READ, so a call site's OUTCOME is the assertion."""
+    monkeypatch.setattr(_ob, "declared_pin", lambda: declared)
+    monkeypatch.setattr(_ob, "installed_commit", lambda: installed)
+    monkeypatch.setenv("CI", "true" if ci else "")
+
+
+def test_require_FAILS_at_the_declared_pin_when_the_bundle_is_missing(
+        monkeypatch) -> None:
+    """`opendox_bundle.require()`'s own call site, driven with no bundle.
+
+    `_STAGED` is reset because `require()` stages once per process and every
+    other suite in this run has already filled it — without the reset this test
+    would never reach `find()` at all, and would prove nothing.
+    """
+    _pin(monkeypatch, _PIN_A, _PIN_A)
+    monkeypatch.setattr(_ob, "_STAGED", None)
+    monkeypatch.setattr(_ob, "find", lambda: None)
+    with pytest.raises(pytest.fail.Exception) as raised:
+        _ob.require(module_level=False)
+    assert "REGRESSION at the declared pin" in str(raised.value)
+
+
+def test_require_SKIPS_for_a_different_installed_commit(monkeypatch) -> None:
+    """...and the lawful consumer still gets a skip through the same call."""
+    _pin(monkeypatch, _PIN_A, _PIN_B)
+    monkeypatch.setattr(_ob, "_STAGED", None)
+    monkeypatch.setattr(_ob, "find", lambda: None)
+    with pytest.raises(pytest.skip.Exception) as raised:
+        _ob.require(module_level=False)
+    assert "NOT the declared pin's doing" in str(raised.value)
+
+
+def test_the_bundle_fixture_FAILS_at_the_declared_pin(request, monkeypatch) -> None:
+    """The `bundle` fixture's call site, driven through the real fixture.
+
+    `request.getfixturevalue` runs the fixture that the thirteen probes below
+    receive, so what is proven is the branch they actually take — not a copy of
+    it written into the test.
+    """
+    import sys
+    _pin(monkeypatch, _PIN_A, _PIN_A)
+    monkeypatch.setattr(sys.modules[__name__], "_opendox_bundle", lambda: None)
+    with pytest.raises(pytest.fail.Exception) as raised:
+        request.getfixturevalue("bundle")
+    assert "REGRESSION at the declared pin" in str(raised.value)
+
+
+def test_the_bundle_fixture_SKIPS_for_a_different_installed_commit(
+        request, monkeypatch) -> None:
+    """...and skips, naming both commits, for an assembly at another pin."""
+    import sys
+    _pin(monkeypatch, _PIN_A, _PIN_B)
+    monkeypatch.setattr(sys.modules[__name__], "_opendox_bundle", lambda: None)
+    with pytest.raises(pytest.skip.Exception) as raised:
+        request.getfixturevalue("bundle")
+    message = str(raised.value)
+    assert _PIN_A[:8] in message
+    assert _PIN_B[:8] in message

@@ -760,3 +760,80 @@ def test_the_draft_views_one_action_is_the_create_forms_own_submit() -> None:
     assert create.count('method: "POST"') == 1, "still exactly one write"
     # the TILE path is untouched: there a new document really is being started
     assert 'o.submitLabel || "create document"' in create
+
+
+# ---------------------------------------------------------------------------
+# `_view_extension_or_skip`'s OWN CALL SITES — Copilot's review of `8b23f6f` on
+# openXdox-code#21, and it was right: the three materialization assertions above
+# exercise only the SUCCESSFUL import-and-`exports` path. The guard's two
+# refusal branches — the module absent, and `ViewBinding` without RULED Q2's
+# `exports` field — were reached by nothing, so replacing either
+# `_absent()` call with a bare `pytest.skip` would have left every required test
+# green while restoring the silent green this act exists to remove. The direct
+# `_absent()` tests in `tests/test_gate_loop_probes.py` prove what the guard
+# DECIDES; these prove that this caller still asks it.
+# ---------------------------------------------------------------------------
+
+_PIN_DECLARED = "a" * 40
+_PIN_OTHER = "b" * 40
+
+
+def _guard_reads(monkeypatch, declared, installed, *, ci=True):
+    import opendox_bundle
+    monkeypatch.setattr(opendox_bundle, "declared_pin", lambda: declared)
+    monkeypatch.setattr(opendox_bundle, "installed_commit", lambda: installed)
+    monkeypatch.setenv("CI", "true" if ci else "")
+
+
+def _without_view_extension(monkeypatch):
+    """Make `from opendox import view_extension` raise ImportError.
+
+    BOTH steps are needed and neither is enough: the attribute is deleted
+    because the package object already carries it once anything has imported it,
+    and the `sys.modules` entry is set to `None` because otherwise the submodule
+    is simply re-imported from disk. A `None` entry is the documented way to
+    make an import fail without touching the filesystem.
+    """
+    import sys
+    import opendox
+    monkeypatch.delattr(opendox, "view_extension", raising=False)
+    monkeypatch.setitem(sys.modules, "opendox.view_extension", None)
+
+
+def test_a_missing_view_extension_FAILS_at_the_declared_pin(monkeypatch) -> None:
+    """The ImportError branch, at the pin this leg declares, under CI."""
+    _guard_reads(monkeypatch, _PIN_DECLARED, _PIN_DECLARED)
+    _without_view_extension(monkeypatch)
+    with pytest.raises(pytest.fail.Exception) as raised:
+        _view_extension_or_skip()
+    message = str(raised.value)
+    assert "REGRESSION at the declared pin" in message
+    assert "view_extension" in message
+
+
+def test_a_missing_view_extension_SKIPS_for_a_different_installed_commit(
+        monkeypatch) -> None:
+    """...and the older-assembly reading RULED 5700475319 keeps still holds."""
+    _guard_reads(monkeypatch, _PIN_DECLARED, _PIN_OTHER)
+    _without_view_extension(monkeypatch)
+    with pytest.raises(pytest.skip.Exception) as raised:
+        _view_extension_or_skip()
+    message = str(raised.value)
+    assert _PIN_DECLARED[:8] in message
+    assert _PIN_OTHER[:8] in message
+
+
+def test_a_ViewBinding_without_exports_FAILS_at_the_declared_pin(
+        monkeypatch) -> None:
+    """The SECOND branch: the module imports, and RULED Q2's field is gone.
+
+    This is the branch a partial packaging regression would take — the registry
+    present, the contract behind it — and it was the less obvious of the two to
+    leave unproven.
+    """
+    from opendox import view_extension
+    _guard_reads(monkeypatch, _PIN_DECLARED, _PIN_DECLARED)
+    monkeypatch.setattr(view_extension.ViewBinding, "__annotations__", {})
+    with pytest.raises(pytest.fail.Exception) as raised:
+        _view_extension_or_skip()
+    assert "`exports` field" in str(raised.value)

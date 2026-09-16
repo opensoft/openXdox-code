@@ -231,7 +231,7 @@ jobs:
       # alongside `test_doxbench_turns.py`.
       #
       # WITH IT GONE AND THE PIN MOVED, this invocation goes 301 passed /
-      # 23 skipped -> 336 passed / 6 skipped, and BOTH HALVES OF THAT DELTA HAVE
+      # 23 skipped -> 343 passed / 6 skipped, and BOTH HALVES OF THAT DELTA HAVE
       # TO BE SAID SEPARATELY, because Copilot's round-3 review of #21 caught this
       # block conflating them:
       #
@@ -245,18 +245,22 @@ jobs:
       #     file leaves this list, so that skip is no longer RUN rather than
       #     cleared. Counting it as cleared would describe a transition that never
       #     happened.
-      #   * The remaining rise to 336 is NOT the bump: it is the 19 direct tests
+      #   * The remaining rise to 343 is NOT the bump: it is the 26 direct tests
       #     of the provenance guard that Copilot's review rounds asked for, which
-      #     live in `tests/test_gate_loop_probes.py` and are therefore on this
-      #     list. The bump alone measured 317. Both counts are re-derived at every
-      #     head rather than carried:
-      #       git diff main -- tests/test_gate_loop_probes.py | grep -c '^+def test_'
-      #     gives 19, and the passing figure has run 317 -> 323 -> 330 -> 332 ->
-      #     333 -> 334 -> 336, once per round that added tests — the same
+      #     live in `tests/test_gate_loop_probes.py` and
+      #     `tests/test_gate_loop_views.py` and are therefore both on this list.
+      #     The bump alone measured 317. Both counts are re-derived at every head
+      #     rather than carried:
+      #       git diff main -- tests/test_gate_loop_probes.py \
+      #                        tests/test_gate_loop_views.py | grep -c '^+def test_'
+      #     gives 26, and the passing figure has run 317 -> 323 -> 330 -> 332 ->
+      #     333 -> 334 -> 336 -> 343, once per round that added tests — the same
       #     discipline the block above applies to the skip counts. The last step
-      #     is the review of `f6f1b991`, which asked for the two cases that drive
-      #     `declared_pin()`'s own unreadable-file branch instead of supplying its
-      #     None as an input.)
+      #     is the review of `8b23f6f`, which asked for the CALL SITES: the tests
+      #     before it proved what the guard decides and what it reads, and none of
+      #     them proved that the three callers still route a missing subject into
+      #     it, so swapping any one call for a bare `pytest.skip` would have left
+      #     every required test green.)
       #
       # The 6 skips that remain are the three seam suites' `doc_health` pairs,
       # which no pin bump touches.
