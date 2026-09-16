@@ -113,8 +113,10 @@ jobs:
       # state until the pin bump) every probe SKIPS". THE SAME BUMP CLEARED IT:
       # at `0b4e8bbf` the bundle is in the wheel and this file goes 0 passed /
       # 13 skipped -> 13 passed / 0 skipped. The skip survives for an assembly
-      # that installs an older openDox than this leg declares, and the `node`
-      # one for a runner without node.
+      # that installs a DIFFERENT openDox from the one this leg declares — the
+      # guard compares two commit identities and never asks git which came first,
+      # so "different" is all it can say — and the `node` one for a runner
+      # without node.
       # § 3.4 SLICE S8 UN-NARROWS THIS LIST AS FAR AS THE MEASUREMENT ALLOWS,
       # which is the half of RULED Q-L8 (b′) this slice was scoped to lift.
       # The note's § 5 S8 row says the narrowings "lift FOR THE WEB SUITES", and
@@ -204,7 +206,7 @@ jobs:
       # alongside `test_doxbench_turns.py`.
       #
       # WITH IT GONE AND THE PIN MOVED, this invocation goes 301 passed /
-      # 23 skipped -> 333 passed / 6 skipped, and BOTH HALVES OF THAT DELTA HAVE
+      # 23 skipped -> 334 passed / 6 skipped, and BOTH HALVES OF THAT DELTA HAVE
       # TO BE SAID SEPARATELY, because Copilot's round-3 review of #21 caught this
       # block conflating them:
       #
@@ -218,11 +220,12 @@ jobs:
       #     file leaves this list, so that skip is no longer RUN rather than
       #     cleared. Counting it as cleared would describe a transition that never
       #     happened.
-      #   * The remaining rise to 333 is NOT the bump: it is the 16 direct tests
+      #   * The remaining rise to 334 is NOT the bump: it is the 17 direct tests
       #     of the provenance guard that Copilot's review rounds asked for, which
       #     live in `tests/test_gate_loop_probes.py` and are therefore on this
       #     list. The bump alone measured 317. (This figure has been re-derived at
-      #     every head rather than carried: 317 -> 323 -> 330 -> 332 -> 333, once per
+      #     every head rather than carried: 317 -> 323 -> 330 -> 332 -> 333 -> 334,
+      #     once per
       #     round that added tests, which is the same discipline the block above
       #     applies to the skip counts.)
       #

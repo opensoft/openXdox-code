@@ -57,9 +57,13 @@ declares — note the claim is "different", never "older": nothing here proves a
 ordering, only a disagreement — and where the installation records no provenance
 at all AND the run is off CI. Everywhere else `_absent()` fails closed, the
 declared pin included, and under CI unrecorded provenance included. A skipped
-suite says "this is not the openDox we declare"; a failing one says "the openDox
-we declare is wrong", and the guard's whole job is to tell those apart instead of
-answering "skip" to both.
+THE TWO SKIPS DO NOT SAY THE SAME THING, and this paragraph ran them together
+until the review of `27a89fd` on #21. The different-commit skip says "this is not
+the openDox we declare", and names both commits to prove it. The unreadable-side
+skip says only "the comparison could not be made", claims nothing about what is
+installed, and exists because off CI an unreadable side is lawful. A FAILURE says
+"the openDox we declare is wrong". The guard's whole job is to keep those three
+apart instead of answering "skip" to all of them.
 """
 
 from __future__ import annotations
@@ -120,8 +124,11 @@ def find() -> Path | None:
 #     distribution's `direct_url.json` (PEP 610), which a VCS install always
 #     records.
 # Bundle missing AND the two agree  -> FAIL: a regression at the declared pin.
-# Bundle missing AND they differ    -> SKIP: a consumer assembling at its own,
-#                                      older pin, named in the reason.
+# Bundle missing AND they differ    -> SKIP: a consumer assembling at a
+#                                      DIFFERENT commit, both named in the
+#                                      reason. DIFFERENT, never "older": this
+#                                      guard compares two identities and never
+#                                      asks git which came first.
 # Provenance unreadable, UNDER CI   -> FAIL. Round 2 of the same review was right
 #                                      that skipping here left the required job
 #                                      able to go green with the bundle missing;
@@ -150,7 +157,11 @@ def declared_pin() -> str | None:
     toml = Path(__file__).resolve().parents[1] / "pyproject.toml"
     try:
         match = _PIN_RE.search(toml.read_text(encoding="utf-8"))
-    except OSError:                          # pragma: no cover - no checkout
+    except (OSError, UnicodeDecodeError):    # pragma: no cover - no checkout
+        # UnicodeDecodeError is a ValueError, NOT an OSError, so a non-UTF-8
+        # `pyproject.toml` would have escaped this function and bypassed
+        # `_absent()`'s explicit unknown-provenance policy altogether. Caught at
+        # the review of `27a89fd` on openXdox-code#21.
         return None
     return match.group(1).lower() if match else None
 
@@ -158,8 +169,12 @@ def declared_pin() -> str | None:
 def installed_commit() -> str | None:
     """The commit the INSTALLED `opendox` was built from (PEP 610), or None.
 
-    None is not "no provenance exists"; it is "this installation did not record
-    one" — an editable checkout, a wheel copied in by hand.
+    None means NO USABLE PROVENANCE WAS READ — which is broader than "none was
+    recorded", and saying only the narrow thing made this contract inaccurate
+    (caught at the review of `27a89fd` on #21). It covers: no `direct_url.json`,
+    malformed JSON, an `archive_info` (non-VCS) install, a record whose `vcs` is
+    not git, a `commit_id` that is not 40 hex, the distribution lookup raising,
+    and the read raising. Every one of those has its own test below.
 
     WHAT THE CALLER DOES WITH None IS NOT "always skip", and this docstring said
     so until Copilot's round-3 review of #21 caught it: `_absent()` FAILS on None
@@ -202,7 +217,7 @@ def _absent(subject: str, *, module_level: bool) -> NoReturn:
     | installed vs declared | outcome |
     | --- | --- |
     | equal | FAIL — a regression at the pin this leg declares |
-    | different | SKIP — a consumer assembling at its own, older pin |
+    | different | SKIP — a consumer assembling at a DIFFERENT commit (identity, never ancestry) |
     | UNKNOWN, under CI | FAIL — see below |
     | UNKNOWN, off CI | SKIP — a developer box may install however it likes |
 
@@ -235,13 +250,18 @@ def _absent(subject: str, *, module_level: bool) -> NoReturn:
                 f"direct VCS reference, and pip records `direct_url.json` for that "
                 f"every time. Failing rather than skipping, because a skip here is "
                 f"exactly the silent green this guard exists to prevent.")
+        missing = ("this leg's declared pin could not be read from "
+                   "`pyproject.toml`" if declared is None else
+                   "no usable PEP 610 provenance could be read from the installed "
+                   "distribution")
         pytest.skip(
-            f"{subject} is missing, and this installation records no PEP 610 "
-            f"provenance (declared={declared or 'unreadable'}, "
-            f"installed={installed or 'unrecorded'}), so nothing is claimed about "
-            f"which commit is installed. Off the CI path that is lawful — an "
-            f"editable checkout or a hand-placed wheel has none. Under CI this same "
-            f"condition FAILS.",
+            f"{subject} is missing and the comparison could not be made: {missing} "
+            f"(declared={declared or 'unreadable'}, "
+            f"installed={installed or 'unreadable'}). NOTHING is claimed here about "
+            f"which openDox is installed — this is not the different-commit skip, "
+            f"which names both. Off the CI path an unreadable side is lawful (an "
+            f"editable checkout or a hand-placed wheel records none). Under CI this "
+            f"same condition FAILS.",
             allow_module_level=module_level)
     pytest.skip(
         f"{subject} is missing, and this is NOT the declared pin's doing: the "
@@ -258,10 +278,13 @@ _STAGED: Path | None = None
 
 def require(*, module_level: bool = True) -> Path:
     """The pinned bundle, STAGED once per process as an ESM-marked tree — or,
-    where there is none, whatever `_absent()` decides: FAIL for the pin this leg
-    DECLARES (and for unknown provenance under CI), SKIP for a demonstrably
-    different consumer. It is not an unconditional skip, and this docstring said
-    it was until Copilot's review of `42741fd` on #21.
+    where there is none, whatever `_absent()` decides.
+
+    THE OUTCOME IS `_absent()`'s FOUR-ROW TABLE AND THIS DOCSTRING DOES NOT
+    RESTATE IT. Two reviews on #21 caught a paraphrase here losing a row (first
+    "SKIP where the pin carries no bundle", then a summary that dropped the
+    off-CI unreadable case), which is what a second copy of a table is for. Read
+    `_absent()`.
 
     `module_level=True` skips the IMPORTING MODULE, which is what the thirty
     suites whose whole subject is the bundle want. `web()` below passes False,
@@ -324,8 +347,9 @@ def require(*, module_level: bool = True) -> Path:
 
 def web() -> Path:
     """The pinned bundle; where there is none, `_absent()`'s outcome scoped to
-    the CALLING TEST rather than the module — a FAIL for the declared pin (or
-    unknown provenance under CI) and a SKIP for a different consumer.
+    the CALLING TEST rather than the module. Which outcome is `_absent()`'s
+    table's to say, and this docstring does not restate it — for the reason
+    `require()` above gives.
 
     FOR THE SUITE WHOSE SUBJECT IS NOT THE BUNDLE (Copilot review of
     `openXdox-code#19` is the class of finding this anticipates, and the

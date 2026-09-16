@@ -150,9 +150,11 @@ def bundle(tmp_path) -> Path:
     """A COMPOSED bundle: openDox's own `web/`, with this column's six modules
     placed into it by the assembly hook RULED Q5 names.
 
-    Skipped where the assembled `opendox` carries no bundle AND that openDox is
-    demonstrably not the one this leg declares; FAILED where it IS the declared
-    one. That this guard survives the pin bump at all is RULED
+    Where the assembled `opendox` carries no bundle, the outcome is
+    `tests/opendox_bundle.py::_absent`'s FOUR-ROW TABLE and this docstring does
+    not restate it — two reviews on #21 caught a two-row paraphrase here, which is
+    what a second copy of a table is for. That this guard survives the pin bump at
+    all is RULED
     openxFactory#656 comment 5700475319 (Brett Heap, 2026-09-16, by interactive
     multi-choice), answer (a): keep the guards, correct their reasons.
 
@@ -160,19 +162,16 @@ def bundle(tmp_path) -> Path:
     bundle stopped being the expected state and started being a regression —
     see `tests/opendox_bundle.py::_absent`, which reads both commits before it
     decides. A probe that quietly ran against a stand-in `helpers.js` would
-    measure the stand-in rather than the shipped file, so the skip is still the
-    right outcome for a consumer whose installed commit is demonstrably a
-    DIFFERENT one (this guard measures disagreement, never an ordering).
+    measure the stand-in rather than the shipped file, so a skip is still the
+    right outcome wherever `_absent()` gives one.
     """
     source = _opendox_bundle()
     if source is None:
         # The shared rule in `tests/opendox_bundle.py::_absent`, which READS the
-        # installed distribution's PEP 610 provenance instead of asserting it:
-        # FAIL for the DECLARED commit and for unrecorded provenance UNDER CI;
-        # SKIP for a DIFFERENT commit, and for unrecorded provenance OFF CI.
-        # Round 1 of the review on #21 found this file claiming "came from
-        # somewhere older than the declared pin" on a check that only tested for
-        # a marker; if `0b4e8bbf` itself ever stopped shipping `web/**`, all
+        # installed distribution's PEP 610 provenance instead of asserting it.
+        # Its four-row table is there, not restated here. Round 1 of the review on
+        # #21 found this file claiming the install "came from somewhere older than
+        # the declared pin" on a check that only tested for a marker; if `0b4e8bbf` itself ever stopped shipping `web/**`, all
         # thirteen probes below would have skipped and this required check would
         # have stayed green over the regression.
         import opendox_bundle
@@ -699,7 +698,11 @@ def test_the_declared_pin_missing_its_bundle_FAILS(monkeypatch) -> None:
 
 
 def test_a_different_installed_commit_SKIPS_and_names_both(monkeypatch) -> None:
-    """The lawful case: a consumer assembling at its own, older pin."""
+    """The lawful case: a consumer assembling at a DIFFERENT commit.
+
+    Not "older": the values are synthetic and `_absent()` compares identities, so
+    nothing here establishes an ordering. Caught at the review of `27a89fd`.
+    """
     call = _decide(monkeypatch, _PIN_A, _PIN_B, ci=True)
     with pytest.raises(pytest.skip.Exception) as raised:
         call()
@@ -722,11 +725,34 @@ def test_unknown_provenance_SKIPS_off_ci(monkeypatch) -> None:
     call = _decide(monkeypatch, _PIN_A, None, ci=False)
     with pytest.raises(pytest.skip.Exception) as raised:
         call()
-    assert "no PEP 610 provenance" in str(raised.value)
+    message = str(raised.value)
+    assert "no usable PEP 610 provenance could be read" in message
+    assert "NOTHING is claimed here about" in message
+
+
+def test_an_unreadable_declared_pin_says_so_rather_than_blaming_the_install(
+        monkeypatch) -> None:
+    """The INSTALLED side can be perfectly good and the comparison still fail.
+
+    Caught at the review of `27a89fd` on #21: this branch used to report "this
+    installation records no PEP 610 provenance" even when the installation had
+    recorded a valid one and it was `pyproject.toml` that could not be read. The
+    message now names whichever side is actually missing.
+    """
+    call = _decide(monkeypatch, None, _PIN_B, ci=False)
+    with pytest.raises(pytest.skip.Exception) as raised:
+        call()
+    message = str(raised.value)
+    assert "declared pin could not be read" in message
+    assert "no usable PEP 610 provenance" not in message
 
 
 def test_under_ci_reads_the_environment_the_runner_sets(monkeypatch) -> None:
-    """`CI=true` is what GitHub Actions sets; nothing else is treated as CI."""
+    """`CI` is read, not guessed: `1`, `true` and `yes` (any case, trimmed) are
+    CI; every other value, and an unset variable, are not. GitHub Actions sets
+    `CI=true`. The docstring used to say "nothing else is treated as CI" while the
+    body below accepted three spellings — caught at the review of `27a89fd`.
+    """
     for value, expected in (("true", True), ("TRUE", True), ("1", True),
                             ("yes", True), ("false", False), ("", False)):
         monkeypatch.setenv("CI", value)
