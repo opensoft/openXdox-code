@@ -110,7 +110,17 @@ _MARKER = ("views", "helpers.js")
 
 
 def find() -> Path | None:
-    """The installed openDox's `web/` bundle, or None where the pin carries none."""
+    """The installed openDox's `web/` bundle, or None where no bundle was found.
+
+    DISCOVERY ONLY: this function tests for the marker and says nothing about
+    WHY it is absent. `None` used to be documented as "the pin carries none",
+    which was the single expected cause before the bump and is now one of four
+    (a regression at the declared pin, a consumer at a different commit, or
+    either side unreadable). Classifying it is `_absent()`'s job and its table
+    is not restated here — a caller that read the old line could have concluded
+    "stale pin, skip" and walked straight past the identity check. Caught at the
+    review of `399e2a9` on openXdox-code#21.
+    """
     try:
         import opendox
     except ModuleNotFoundError:          # pragma: no cover - no consumer pinned
@@ -341,6 +351,27 @@ def require(*, module_level: bool = True) -> Path:
     if _STAGED is None:
         web = find()
         if web is None:
+            # THE 29 IMPORTER ANNOTATIONS THAT REACH THIS LINE ARE STALE, AND
+            # THEY ARE NOT REPAIRED HERE. Copilot's review of `399e2a9` on
+            # openXdox-code#21 is right about the fact: 29 files carry
+            # `from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips
+            # where the pin carries no bundle)`, and after the bump this path
+            # also FAILS — at the declared pin, and for an unreadable side under
+            # CI. Measured, not estimated:
+            #   grep -rn 'skips where the pin carries no bundle' tests/  -> 29
+            #     sites in 29 files
+            #   git diff --name-only main -- <those 29>                  -> 0
+            #   all 29 appear in openxFactory `docs/opendox-carve-manifest.yaml`
+            # Every one of them is an ARRIVED carve row whose edits are declared
+            # at openxFactory, and none is otherwise touched by this act, so
+            # editing them here would be an undeclared edit to a declared
+            # surface — the same ground on which
+            # `tests/test_doxbench_mutation_boundary.py` is DROPPED from
+            # `validate.yml` rather than repaired. Registered as residue in #21's
+            # description for a later declared act. Nothing is hidden by the
+            # wait: the annotation is a `# noqa` justification, while the
+            # outcome those files actually get is composed below, from what it
+            # measured, and names itself in full.
             _absent("openDox's `web/` bundle", module_level=module_level)
         staging = Path(tempfile.mkdtemp(prefix="opendox-bundle-"))
         atexit.register(shutil.rmtree, staging, True)

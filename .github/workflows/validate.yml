@@ -47,6 +47,31 @@ jobs:
       # The same disclosed narrowing openDox-code carries under RULED Q-L5
       # (b′).
       #
+      # THAT PARAGRAPH IS THE 2026-09-10 STATE AND IS NO LONGER THE WHOLE SCOPE
+      # OF THIS CHECK. Copilot's review of `399e2a9` on openXdox-code#21 was
+      # right that a reader who stopped there would take the required job to be
+      # narrower than the list at the bottom of this file actually is; the
+      # correction was already in the file, twenty lines further down
+      # ("§ 3.4 SLICE S8 UN-NARROWS THIS LIST AS FAR AS THE MEASUREMENT
+      # ALLOWS"), and had never been pointed at from up here. MEASURED against
+      # that list rather than asserted — it names FOURTEEN files:
+      #   * THREE never import anything under test (`test_leg_shape.py`,
+      #     `test_dependency_direction.py`, `test_no_hardcoded_status_words.py`
+      #     parse trees with `ast`). Those are the scaffold shape assertions the
+      #     paragraph above is about, and they are all that "only the scaffold's
+      #     shape assertions" ever described.
+      #   * ELEVEN import a runtime module. `test_domain_profile.py` imports
+      #     `openxdox.domain_profile` alone, on the § 4.4 grounds set out below;
+      #     the other TEN are carved suites that RUN here, and FOUR of those
+      #     read the pinned openDox bundle through `tests/opendox_bundle.py`
+      #     (`test_gate_loop_views.py`, `test_gate_loop_probes.py`,
+      #     `test_doxbench_abstract_store.py`, `test_doxbench_telemetry.py`).
+      # What Q-L8 (b′) still keeps out is the REST of the carved corpus, which
+      # is BUILD-blocked on `doc_health` / `ideation_dashboard` — and
+      # `tests/test_doxbench_mutation_boundary.py` is the one file this act
+      # moves from the running group into that one, for the reason recorded in
+      # the drop block below.
+      #
       # `tests/test_dependency_direction.py` joins it under
       # `split-opendox-two-layer-product` § 4.1 (RULED 5626260214,
       # opensoft/openxFactory#656). It is a SHAPE assertion authored HERE, of

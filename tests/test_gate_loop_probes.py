@@ -143,7 +143,15 @@ def _run_node(body: str, bundle: Path) -> dict:
 
 
 def _opendox_bundle() -> Path | None:
-    """The INSTALLED openDox's web bundle, or None where the pin carries none."""
+    """The INSTALLED openDox's web bundle, or None where no bundle was found.
+
+    DISCOVERY ONLY, same contract as `tests/opendox_bundle.py::find` and stale
+    in the same way until the review of `399e2a9` on #21: "where the pin carries
+    none" was the one expected cause before the bump, and the `bundle` fixture
+    below now routes `None` into `_absent()` precisely BECAUSE it is no longer
+    the only one. What the absence means is `_absent()`'s four-row table; this
+    function only reports that the marker is not there.
+    """
     try:
         import opendox
     except ModuleNotFoundError:              # pragma: no cover - no consumer
