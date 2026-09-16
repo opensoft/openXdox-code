@@ -226,8 +226,36 @@ _SHA_RE = re.compile(r"[0-9a-fA-F]{40}")
 #: happily, and the guard would have failed closed under CI on a correct file.
 #: Greedy `\S+` under `fullmatch` backtracks to the LAST `@` that leaves forty hex
 #: and nothing after them, which is the pin by construction.
+#: THE NAME MATCHES CASE-INSENSITIVELY, because distribution names are
+#: (PEP 503, and `tests/test_dependency_direction.py` normalizes with `.lower()`
+#: for the same reason): `OpenDox @ git+…@<sha>` is the same declaration pip
+#: installs, and reading no pin out of it would fail this guard CLOSED under CI on
+#: a correct file. Copilot's review of `18e8c12`.
 _PIN_RE = re.compile(
-    r"opendox(?:\[[^\]]*\])?\s*@\s*git\+\S+@([0-9a-fA-F]{40})")
+    r"(?i:opendox)(?:\[[^\]]*\])?\s*@\s*git\+\S+@([0-9a-fA-F]{40})")
+
+
+def _marker_holds(text: str) -> bool:
+    """Whether a PEP 508 environment marker is TRUE for this interpreter.
+
+    A conditional requirement is only a declaration where its marker holds: with
+    `; python_version < "3.0"` pip installs nothing, so treating the sha as "the
+    commit this leg declares" would compare an unrelated installed `opendox`
+    against a pin that is not active and take the different-commit SKIP — over a
+    real regression. Copilot's review of `18e8c12`.
+
+    UNEVALUABLE IS FALSE, deliberately: a marker this environment cannot judge is
+    not a declaration this run can rely on, and everything that returns None here
+    lands on `_absent()`'s fail-closed path under CI rather than on a skip.
+    """
+    try:
+        from packaging.markers import Marker
+    except ModuleNotFoundError:          # pragma: no cover - ships with pytest
+        return False
+    try:
+        return bool(Marker(text).evaluate())
+    except Exception:
+        return False
 
 
 def declared_pin() -> str | None:
@@ -265,11 +293,16 @@ def declared_pin() -> str | None:
     for requirement in dependencies:
         if not isinstance(requirement, str):
             continue
-        # PEP 508 allows an environment marker after `;`; the pin is in the part
-        # before it, and `fullmatch` on the rest is what refuses a continuing ref.
-        match = _PIN_RE.fullmatch(requirement.split(";", 1)[0].strip())
-        if match:
-            return match.group(1).lower()
+        # PEP 508 allows an environment marker after `;`. The pin is in the part
+        # before it — `fullmatch` on that is what refuses a continuing ref — and the
+        # marker decides whether this requirement is INSTALLED AT ALL.
+        spec, _, marker = requirement.partition(";")
+        match = _PIN_RE.fullmatch(spec.strip())
+        if not match:
+            continue
+        if marker.strip() and not _marker_holds(marker.strip()):
+            continue
+        return match.group(1).lower()
     return None
 
 

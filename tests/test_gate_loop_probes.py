@@ -949,10 +949,31 @@ def test_declared_pin_reads_the_pin_through_extras_markers_and_position(
             # Copilot's review of `52453af`.
             f"opendox @ git+ssh://git@github.com/opensoft/openDox-code@{_PIN_A}",
             f'opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A} ; python_version >= "3.11"',
+            # Distribution names are case-insensitive (PEP 503), and this one is
+            # spelled `openDox` half the time in this estate. Copilot, `18e8c12`.
+            f"OpenDox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}",
     ):
         _with_pyproject_text(monkeypatch, _pyproject(
             "PyYAML>=6.0", requirement, "jsonschema>=4.18"))
         assert _ob.declared_pin() == _PIN_A, requirement
+
+
+def test_declared_pin_is_none_for_a_pin_whose_marker_is_FALSE(monkeypatch) -> None:
+    """A conditional requirement is a declaration only where its marker holds.
+
+    With `; python_version < "3.0"` pip installs nothing from that line, so reading
+    the sha as "the commit this leg declares" would compare whatever `opendox`
+    happens to be installed against a pin that is NOT ACTIVE — and the mismatch
+    takes the different-commit SKIP, over a real regression. Copilot's review of
+    `18e8c12`; the marker is evaluated now, and an unevaluable one reads as false.
+    """
+    for marker, expected in (('python_version >= "3.0"', _PIN_A),
+                             ('python_version < "3.0"', None),
+                             ('this is not a marker', None)):
+        _with_pyproject_text(monkeypatch, _pyproject(
+            f"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}"
+            f" ; {marker}"))
+        assert _ob.declared_pin() == expected, marker
 
 
 def test_declared_pin_is_none_when_pyproject_does_not_parse(monkeypatch) -> None:
@@ -1214,9 +1235,9 @@ def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) ->
 # number is not carried here. What is true at any head is the command:
 #   git diff main -- tests/test_gate_loop_probes.py | grep -c '^+def test_'
 #   git diff main -- tests/test_gate_loop_views.py  | grep -c '^+def test_'
-# (32 in this file and 6 in the views file at THIS head — 17 decision/read cases,
+# (33 in this file and 6 in the views file at THIS head — 18 decision/read cases,
 # 11 `installed_commit` parser tests and 4 call-site tests here; `validate.yml`'s
-# record block carries the total, 38. The review of `fd3af6a` caught this pair
+# record block carries the total, 39. The review of `fd3af6a` caught this pair
 # reading 25 and 6, and the review of `de7d966` moved it again by asking for the
 # two undeclared-pin tests: a count written in prose is stale one round later,
 # which is why the commands are printed above it every time.)
