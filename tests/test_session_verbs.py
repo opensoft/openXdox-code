@@ -100,10 +100,12 @@ from opendox.boundary import (
 )
 from openxdox.generator import generate_snapshot, live_topic_health
 
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
 REPO = "openxFactory"
 TOPIC = "demo-topic"
 DRAFT = "draft/demo-topic"
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+WEB = OPENDOX_WEB
 EDIT_ROUTE = "/actions/gate/edit-document"
 OPEN_PR_ROUTE = "/actions/gate/open-pr"
 RECORDS = gc.DEFAULT_RECORDS_DIR

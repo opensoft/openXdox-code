@@ -46,7 +46,9 @@ from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit
 from opendox import serve as serve_mod
 from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
+WEB = OPENDOX_WEB
 
 
 def _snapshot():
