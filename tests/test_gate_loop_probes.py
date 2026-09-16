@@ -152,7 +152,8 @@ def bundle(tmp_path) -> Path:
 
     Skipped where the assembled `opendox` carries no bundle AND that openDox is
     demonstrably not the one this leg declares; FAILED where it IS the declared
-    one. That was a plain skip until the 2026-09-16 pin bump, when a missing
+    one. That this guard survives the pin bump at all is RULED openxFactory#656 comment 5700475319 (Brett Heap, 2026-09-16, by interactive multi-choice), answer (a): keep
+    the guards, correct their reasons. That was a plain skip until the 2026-09-16 pin bump, when a missing
     bundle stopped being the expected state and started being a regression —
     see `tests/opendox_bundle.py::_absent`, which reads both commits before it
     decides. A probe that quietly ran against a stand-in `helpers.js` would

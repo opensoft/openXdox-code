@@ -636,9 +636,12 @@ def _view_extension_or_skip():
     three assertions below went 3 skipped -> 3 passed under `validate.yml`'s own
     invocation. The old wording is quoted here as provenance, not asserted.
 
-    THE GUARDS STAY, because what they test is the ASSEMBLED openDox, not this
-    leg's declared pin — the section header above says so — and an assembly is
-    free to install an openDox behind the view contract. That is the same
+    THE GUARDS STAY, and that is RULED rather than preferred:
+    RULED openxFactory#656 comment 5700475319 (Brett Heap, 2026-09-16, by interactive multi-choice) answered the question "keep the guards and correct their reasons, or
+    delete them on pin lockstep #2's precedent" with (a) KEEP — because what they
+    test is the ASSEMBLED openDox, not this leg's declared pin (the section header
+    above says so), and an assembly is free to install an openDox behind the view
+    contract. That is the same
     condition `view_extensions.ViewContractUnsupported` names at runtime, and
     these two guards are its test-time counterpart.
 
