@@ -653,7 +653,7 @@ def _view_extension_or_skip():
     first of those may skip. (That review said "an older assembly"; the guard that
     replaced `importorskip` cannot measure ordering, only identity, so this summary
     stopped borrowing the word — the review of `cb84001` caught it here, the last
-    copy left in the file.) if `0b4e8bbf` lost `view_extension` or the `exports`
+    copy left in the file.) If `0b4e8bbf` lost `view_extension` or the `exports`
     field, all three assertions below would have gone quietly green in a required
     check. `tests/opendox_bundle.py::_absent` decides by READING the declared pin
     out of `pyproject.toml` and the installed commit out of the distribution's
@@ -830,7 +830,7 @@ def test_a_missing_view_extension_FAILS_at_the_declared_pin(monkeypatch) -> None
 
 def test_a_missing_view_extension_SKIPS_for_a_different_installed_commit(
         monkeypatch) -> None:
-    """...and the DIFFERENT-COMMIT reading RULED 5700475319 keeps still holds.
+    """...and the DIFFERENT-COMMIT reading that RULED 5700475319 rests on still holds.
 
     Not "older", and the thread on `24cd5f2` was right to say so twice: `_absent()`
     compares two identities and never asks git which came first, so `b`*40 against
