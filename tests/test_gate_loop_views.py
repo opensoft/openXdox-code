@@ -648,7 +648,9 @@ def _view_extension_or_skip():
     above says so), and an assembly is free to install an openDox behind the view
     contract. That is the same
     condition `view_extensions.ViewContractUnsupported` names at runtime, and
-    these two guards are its test-time counterpart.
+    the three refusal branches below are its test-time counterpart (the paragraph
+    said "these two guards" until the review of `52453af`, having been written when
+    there were two).
 
     BUT THEY NO LONGER SKIP BLINDLY. Copilot's round-1 review of openXdox-code#21
     was right that `pytest.importorskip` cannot tell a DIFFERENT assembly from "a

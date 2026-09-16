@@ -49,7 +49,13 @@ and S5 leg B (`openDox-code#20`) landed the packaging declaration that puts
 `opendox/web/**` into a wheel at all. THIS LEG'S PIN HAS NOW ADVANCED PAST IT —
 2026-09-16, `a99eba03` -> `0b4e8bbf` (openDox-code#23, § 3.4 slice S8 leg B) —
 and the bundle is there: `find()` returns a real directory under the installed
-`opendox`, and the suites that import `OPENDOX_WEB` run instead of skipping.
+`opendox`, so the OLD missing-bundle skip no longer fires for the suites that
+import `OPENDOX_WEB`. It does not follow that all of them now RUN, and the review
+of `52453af` was right to catch the blanket claim: `test_doxbench_mutation_
+boundary.py` imports `OPENDOX_WEB` too, and with that skip gone it runs on to
+`from openxdox import gate_console` -> `doc_health`, a COLLECTION ERROR. That is
+the BUILD arc's defect, not this bump's, and it is precisely why RULED
+openxFactory#656 comment 5700475319 drops that file from `validate.yml`'s list.
 This paragraph used to end "Until this leg's pin advances past that commit, an
 installed `opendox` carries no bundle", which was true of `a99eba03` and is
 quoted here as provenance, not as a claim.
@@ -213,8 +219,15 @@ _SHA_RE = re.compile(r"[0-9a-fA-F]{40}")
 #: comment is not in `project.dependencies` at all. Copilot's finding at `a9264b8`.
 #: The optional-dependency tables are NOT searched: a test extra is not what this
 #: leg is built against, and `validate.yml` installs `.[test]` against this list.
+#: THE URL PART IS `\S+`, NOT `[^@\s]+`, and that is the review of `52453af`:
+#: a PEP 508 SSH declaration carries an `@` in the AUTHORITY —
+#: `opendox @ git+ssh://git@github.com/opensoft/openDox-code@<40-hex>` — so
+#: stopping at the first `@` read no pin out of a declaration pip installs
+#: happily, and the guard would have failed closed under CI on a correct file.
+#: Greedy `\S+` under `fullmatch` backtracks to the LAST `@` that leaves forty hex
+#: and nothing after them, which is the pin by construction.
 _PIN_RE = re.compile(
-    r"opendox(?:\[[^\]]*\])?\s*@\s*git\+[^@\s]+@([0-9a-fA-F]{40})")
+    r"opendox(?:\[[^\]]*\])?\s*@\s*git\+\S+@([0-9a-fA-F]{40})")
 
 
 def declared_pin() -> str | None:

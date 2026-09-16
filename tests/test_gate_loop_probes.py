@@ -911,9 +911,10 @@ def test_declared_pin_refuses_anything_but_a_whole_40_hex_direct_pin(
     """
     for tail in ("dead", "x", "0", "-feature", "/branch", "_suffix", ".1",
                  ",feature", "'feature", " feature", "#feature"):
-        _with_pyproject_text(monkeypatch, _pyproject(
-            f"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}{tail}"))
-        assert _ob.declared_pin() is None, tail
+        for url in (f"git+https://github.com/opensoft/openDox-code@{_PIN_A}",
+                    f"git+ssh://git@github.com/opensoft/openDox-code@{_PIN_A}"):
+            _with_pyproject_text(monkeypatch, _pyproject(f"opendox @ {url}{tail}"))
+            assert _ob.declared_pin() is None, (url, tail)
 
 
 def test_declared_pin_ignores_a_commented_out_dependency(monkeypatch) -> None:
@@ -942,6 +943,11 @@ def test_declared_pin_reads_the_pin_through_extras_markers_and_position(
     for requirement in (
             f"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}",
             f"opendox[test] @ git+https://github.com/opensoft/openDox-code@{_PIN_A}",
+            # An SSH declaration carries an `@` in the AUTHORITY, and a pattern that
+            # stopped at the first one read NO pin out of a requirement pip installs
+            # happily — the guard would then fail closed under CI on a correct file.
+            # Copilot's review of `52453af`.
+            f"opendox @ git+ssh://git@github.com/opensoft/openDox-code@{_PIN_A}",
             f'opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A} ; python_version >= "3.11"',
     ):
         _with_pyproject_text(monkeypatch, _pyproject(
