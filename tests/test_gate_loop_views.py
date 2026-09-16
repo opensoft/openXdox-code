@@ -674,7 +674,11 @@ def test_the_style_residue_records_the_discharge_rather_than_the_block() -> None
     residue = view_extensions.STYLE_RESIDUE
     assert residue["blocked_by"] is None
     assert residue["exclusive_classes"] == 54
-    assert residue["shared_classes"] == 21
+    # 18, not 21: openxFactory #1068's round 5 narrowed the census's gate-side
+    # scan again and `g`, `lens` and `topic` were shared only through a dotted
+    # view id, a sentence's `.g` and a `btn.title` string. What LEAVES is
+    # unchanged — the three assertions below say so.
+    assert residue["shared_classes"] == 18
     assert residue["rule_blocks_moved"] == 59
     assert residue["mixed_blocks_handled"] == 2
     assert residue["rule_blocks_in_sheets"] == 61
@@ -757,9 +761,40 @@ def test_the_package_data_globs_cover_every_declared_asset() -> None:
     # it is checking.
     package_dir = Path(web_assets.__file__).resolve().parent
     subdir = web_assets.VIEW_MODULE_DIR.resolve().relative_to(package_dir)
+    # `fnmatch` IS NOT PATH-AWARE, and setuptools' globbing is (Copilot
+    # review, round 7). `fnmatch.fnmatch("web/views/gate.css", "web/*.css")`
+    # is TRUE because `*` there matches `/` like any other character, while a
+    # package-data pattern of `web/*.css` does NOT cover a file one directory
+    # down — so this guard would have passed a declaration that leaves the
+    # sheets out of the wheel, which is the single failure it exists to catch.
+    # Matching SEGMENT BY SEGMENT is the fix: each pattern segment is matched
+    # against the corresponding path segment, and only a `**` segment spans
+    # separators.
+    def _covers(pattern: str, rel_path: str) -> bool:
+        pattern_parts = pattern.split("/")
+        path_parts = rel_path.split("/")
+        if "**" in pattern_parts:
+            head = pattern_parts[:pattern_parts.index("**")]
+            tail = pattern_parts[pattern_parts.index("**") + 1:]
+            if len(path_parts) < len(head) + len(tail):
+                return False
+            pairs = list(zip(head, path_parts[:len(head)]))
+            pairs += list(zip(tail, path_parts[len(path_parts) - len(tail):]
+                              if tail else []))
+        else:
+            if len(pattern_parts) != len(path_parts):
+                return False
+            pairs = list(zip(pattern_parts, path_parts))
+        return all(fnmatch.fnmatch(part, glob) for glob, part in pairs)
+
+    # the guard's own guard: the defect it was blind to must now be caught
+    assert not _covers("web/*.css", "web/views/gate.css")
+    assert _covers("web/views/*.css", "web/views/gate.css")
+    assert _covers("web/**/*.css", "web/views/gate.css")
+
     for name in web_assets.VIEW_ASSET_NAMES:
         rel = f"{subdir.as_posix()}/{name}"
-        assert any(fnmatch.fnmatch(rel, pattern) for pattern in patterns), (
+        assert any(_covers(pattern, rel) for pattern in patterns), (
             f"{rel!r} is declared in `VIEW_ASSET_NAMES` and matches no "
             f"package-data pattern {patterns}: it would be missing from the "
             "built wheel while every test in this file, which reads the source "

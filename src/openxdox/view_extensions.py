@@ -204,12 +204,23 @@ CTX_MODEL_REACH: dict[str, dict[str, tuple[str, ...]]] = {
 #: `cb343ae8` reproduces EXACTLY under a literal-only scan — and the `51` was
 #: three short: `.dispose-accepted`, `.dispose-rejected` and `.dispose-deferred`
 #: are built by `"disposebtn dispose-" + v.outcome` (`dispose.js`:275), which no
-#: literal search can see. 54 classes are this column's own; 21 are shared with
-#: modules that stay and are openDox's, which is where they remain.
+#: literal search can see. 54 classes are this column's own; **18** are shared
+#: with modules that stay and are openDox's, which is where they remain.
+#:
+#: THE SHARED FIGURE WAS 21 UNTIL openxFactory #1068's ROUND 5 narrowed the
+#: census's gate-side scan again: a `.token` counts only inside a literal
+#: SHAPED like a selector with the dot in selector POSITION, and an assignment
+#: only where the target is class-named. `g` (`"e.g. Field Pilots"`,
+#: `gate-projects.js`), `lens` (`"gate.lens: ..."`, `gate-lens.js`) and `topic`
+#: (`btn.title = "commission proposal authoring for this staging topic "`,
+#: `dispose.js`:402) were shared only through those false reads. WHAT LEAVES IS
+#: UNCHANGED — 54 exclusive classes, 59 blocks at the same extents, the same
+#: four sheets — because a class moving from SHARED to openDox's own is a class
+#: that stays either way.
 STYLE_RESIDUE: dict[str, Any] = {
     "measured_at": "opensoft/openDox-code 0b4e8bbf, opensoft/openXdox-code 0a0265f7",
     "exclusive_classes": 54,
-    "shared_classes": 21,
+    "shared_classes": 18,
     "rule_blocks_moved": 59,
     #: AND THE TWO MIXED RULES, counted separately because they are a different
     #: act (Copilot review, round 3, which found the sheets carrying 61 blocks

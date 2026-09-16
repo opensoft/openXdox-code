@@ -1,4 +1,4 @@
-"""The DECLARED HOSTED FALLBACK for this column's view modules (RULED Q5).
+"""The DECLARED HOSTED FALLBACK for this column's view ASSETS (RULED Q5).
 
 RULED Q5 (`opensoft/openxFactory#656` comment `5648044785`, Brett Heap,
 2026-09-12): *"the COMPOSED DEPLOYMENT assembles the bundle. openXdox ships its
@@ -17,11 +17,19 @@ WHY EXACT BINDINGS AND NOT A `/views/` PREFIX. openDox consults contributed
 routes AFTER every fixed core arm and BEFORE the static fallback
 (`opendox/serve.py`'s `_route`), so a PREFIX binding on `/views/` would
 intercept every one of openDox's own view modules and this column would be
-answering for the shell's files. Six EXACT bindings claim exactly the six paths
-this column contributes and nothing else; anything else under `/views/` falls
+answering for the shell's files. One EXACT binding per declared asset claims exactly the
+paths this column contributes and nothing else; anything else under `/views/` falls
 through to openDox's static fallback exactly as it does today. That is the same
 discipline `route_extension.collect_bindings` enforces between columns, applied
 by this column to itself.
+
+TEN BINDINGS, NOT SIX, SINCE RULED Q7 (Copilot review, round 7): six `.js`
+modules and the four `.css` sheets RULED Q7 sends with the bindings that own
+them (`#656` comment `5648049748`). The count is `web_assets.VIEW_ASSET_NAMES`'
+and is never spelled here, because a number written down twice is a number that
+goes stale — which is exactly what this paragraph did when the sheets arrived.
+The rule is unchanged and is what matters: EXACT bindings for exactly the paths
+this column contributes, never a `/views/` prefix.
 
 THE HANDLER IS A METHOD NAME, never a callable: `serve.build_server()` refuses a
 build whose contributed handler does not resolve on the bound handler class, so

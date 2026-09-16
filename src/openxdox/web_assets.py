@@ -1,4 +1,12 @@
-"""The gate loop's VIEW MODULE BYTES, and the assembly hook that places them.
+"""The gate loop's VIEW ASSET BYTES, and the assembly hook that places them.
+
+MODULES AND, SINCE RULED Q7, THE SHEETS THAT PAINT THEM (`opensoft/openxFactory#656`
+comment `5648049748`). `VIEW_ASSET_NAMES` is `VIEW_MODULE_NAMES + VIEW_SHEET_NAMES`
+and every public name below answers for all of them — `module_path`,
+`module_source`, `served_path`, `install_view_modules`, `ViewAssetError`. The
+`module_*` spellings are kept because they are the seam openDox's registry and
+this column's route extension already import; a rename is its own act, and the
+contract each states is the ASSET contract (Copilot review, round 7).
 
 RULED Q5 (`opensoft/openxFactory#656` comment `5648044785`, Brett Heap,
 2026-09-12, on openXdox-spec `docs/gate-loop-view-contract.md` § 8 Q5 @
@@ -52,7 +60,11 @@ __all__ = [
 
 
 class ViewAssetError(RuntimeError):
-    """An assembly that cannot place this column's view modules.
+    """An assembly that cannot place this column's view ASSETS.
+
+    MODULES AND SHEETS ALIKE since RULED Q7 (Copilot review, round 7): the name
+    already said ASSET and the docstring still said "modules", so the one
+    exception that answers for a missing `.css` read as though it did not.
 
     One exception for every placement defect — a missing package file, a target
     that is not a directory, a copy that failed — because a caller does nothing
@@ -127,32 +139,51 @@ def module_path(name: str) -> Path:
             "shipped into another leg's bundle with no binding naming it")
     path = VIEW_MODULE_DIR / name
     if not path.is_file():
+        # THE DIAGNOSTIC SAYS WHICH DEFECT THIS IS (Copilot review, round 7).
+        # A missing MODULE and a missing SHEET fail differently at the browser,
+        # and one suffix for both told an operator hunting a missing `gate.js`
+        # that the binding would "mount and paint unstyled" — which is the
+        # sheet's symptom and not the module's. The wheel is where either is
+        # caught; the sentence now names the one that happened.
+        detail = (
+            "the binding mounts and paints UNSTYLED, which RULED Q7 treats as "
+            "a degrade and not a refusal — the quieter direction of the same "
+            "defect, which is exactly why it has to be caught here"
+            if name in VIEW_SHEET_NAMES else
+            "every binding this column declares names a MODULE that cannot "
+            "load, and a binding that cannot be mounted must not look "
+            "registered (openDox `views/view_extension.js`'s own rule)")
         raise ViewAssetError(
             f"declared view asset {name!r} is missing from this package at "
             f"{path}: the wheel was built without "
             "`[tool.setuptools.package-data] openxdox = [\"web/views/*.js\", "
-            "\"web/views/*.css\"]`, "
-            "so every binding this column declares names a file that cannot "
-            "load — and a binding that cannot be mounted must not look "
-            "registered (openDox `views/view_extension.js`'s own rule). A "
-            "MISSING SHEET is the same defect in the quieter direction: the "
-            "binding mounts and paints unstyled, which RULED Q7 treats as a "
-            "degrade and not a refusal, so the wheel is where it has to be "
-            "caught")
+            f"\"web/views/*.css\"]`, so {detail}")
     return path
 
 
 def module_source(name: str) -> bytes:
-    """One declared module's bytes — what both mechanisms hand over."""
+    """One declared ASSET's bytes — what both mechanisms hand over.
+
+    A MODULE OR A SHEET (Copilot review, round 7: the public names here still
+    said "module" after RULED Q7 made CSS a shipped asset, so a caller reading
+    this API could not tell that a sheet is served by the same three
+    functions). `module_path`, `module_source`, `served_path`,
+    `install_view_modules` and `ViewAssetError` all answer for
+    `VIEW_ASSET_NAMES` — modules AND sheets. The names are kept because they
+    are the seam openDox's registry and this column's route extension already
+    import; what changes is that they say so.
+    """
     return module_path(name).read_bytes()
 
 
 def served_path(name: str) -> str:
-    """The URL path the browser imports this module from.
+    """The URL path the browser loads this ASSET from — module or sheet.
 
-    `./views/gate.js` resolved against the bundle root, which is what
-    `views/view_extension.js`'s `resolveView` computes and therefore what the
-    hosted fallback (`openxdox.serve_views`) must answer.
+    `./views/gate.js` (and, since RULED Q7, `./views/gate.css`) resolved
+    against the bundle root, which is what `views/view_extension.js`'s
+    `resolveView` computes for a module and its `injectBindingStyles` computes
+    for a sheet — and therefore what the hosted fallback
+    (`openxdox.serve_views`) must answer for both.
     """
     return f"/{BUNDLE_SUBDIR}/{name}"
 
