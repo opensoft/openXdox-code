@@ -34,8 +34,18 @@ chooses the `opendox` this module runs under, not this file, and a consumer
 that pins an openDox behind the view contract must still be able to IMPORT this
 module — an import-time reach would make it unimportable under THAT consumer's
 pin and would put its `validate` red for a reason that has nothing to do with
-this column. `ViewContractUnsupported` below is what names that
-condition when it arises. So `VIEW_BINDING_SPECS` below is
+this column. `ViewContractUnsupported` below is what names that condition where
+`GateLoopViews.views()` CATCHES it, and that is two shapes, not three: the
+`view_extension` module absent (ImportError) and a `ViewBinding` that does not
+take this column's fields (TypeError). A module that carries no `ViewBinding` at
+all still raises `AttributeError` at the constructor below — the class docstring
+names that assembly as unsupported, and the runtime does not yet classify it.
+The TEST-time guard does (`tests/test_gate_loop_views.py::_view_extension_or_skip`,
+which reads the class with `getattr` and hands the shape to
+`tests/opendox_bundle.py::_absent`); the runtime catch is registered in this pull
+request's "What this does NOT do" rather than smuggled into a pin bump. Caught at
+the review of `e6cd0e8` on openXdox-code#21, which was right that these lines
+promised more than the code below does. So `VIEW_BINDING_SPECS` below is
 plain data — the same JSON shape the manifest crosses the process boundary as —
 and `GateLoopViews.views()` materializes it through whatever `opendox` the
 ASSEMBLY installed, at the one moment an assembly exists to have installed one.

@@ -109,8 +109,11 @@ _MARKER = ("views", "helpers.js")
 # reason from what it measured instead of stating it in advance. It read "this leg
 # pins a commit older than openDox's own packaging declaration … The pin bump makes
 # this suite run", which was true of `a99eba03` and became false at `0b4e8bbf`; the
-# replacement's whole point is that it cannot go stale, because it names the two
-# commits it just compared.
+# replacement's whole point is that it cannot go stale, because every reason is
+# composed from what the run just read. In the DIFFERENT-COMMIT outcome that is the
+# two commits, named; where a side is unreadable there is no comparison to name, and
+# the reason says WHICH side could not be read instead. (The review of `e6cd0e8`
+# caught this comment claiming the two commits for all four rows.)
 
 
 def find() -> Path | None:
@@ -347,10 +350,14 @@ def require(*, module_level: bool = True) -> Path:
     off-CI unreadable case), which is what a second copy of a table is for. Read
     `_absent()`.
 
-    `module_level=True` skips the IMPORTING MODULE, which is what the thirty
-    suites whose whole subject is the bundle want. `web()` below passes False,
-    which skips only the calling TEST — see its own docstring for when that is
-    the honest reading and when it is not.
+    `module_level` SCOPES THE SKIP OUTCOME AND NOTHING ELSE. With True a skip
+    takes the IMPORTING MODULE, which is what the thirty suites whose whole
+    subject is the bundle want; `web()` below passes False, so a skip takes only
+    the calling TEST (see its docstring for when that is the honest reading). The
+    FAIL outcomes — the declared pin, and an unreadable side under CI — are not
+    scoped by it at all: `pytest.fail` fails the test that reached the guard,
+    whichever flag was passed. The review of `e6cd0e8` caught this paragraph
+    reading as though the flag governed every outcome.
 
     WHY A STAGED COPY AND NOT THE INSTALLED DIRECTORY ITSELF (Copilot review of
     openXdox-code#19, the `test_round_trip.py` finding — accurate). Several of
@@ -443,8 +450,13 @@ def web() -> Path:
     suite it no longer runs.
 
     So the rule is the subject, not the convenience: a module whose every test
-    reads the bundle imports `OPENDOX_WEB` and skips whole; a module where the
-    bundle is an aside calls this and skips the three tests that need it.
+    reads the bundle imports `OPENDOX_WEB` and takes the outcome module-wide; a
+    module where the bundle is an aside calls this and takes it per test. WHERE
+    THE OUTCOME IS A SKIP, that reads "skips whole" and "skips the three tests
+    that need it"; where `_absent()` FAILS — the declared pin, or an unreadable
+    side under CI — the failure lands on whatever test reached the guard, and no
+    scoping flag softens it. Caught at the review of `e6cd0e8`, which was right
+    that promising a skip here contradicts the table this docstring defers to.
     """
     return require(module_level=False)
 
