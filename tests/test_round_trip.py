@@ -32,8 +32,10 @@ from doc_health import families
 from openxdox import gate_console as gc
 from openxdox import round_trip as rt
 
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
 OUTLINE_MODEL_JS = (
-    REPO_ROOT / "src/openxdox/web/views/outline-model.js")
+    OPENDOX_WEB / "views" / "outline-model.js")
 NODE = shutil.which("node")
 
 

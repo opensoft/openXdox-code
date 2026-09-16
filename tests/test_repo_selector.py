@@ -41,7 +41,9 @@ from opendox import serve as serve_mod
 from openxdox import snapshot_registry as reg
 from openxdox.generator import generate_snapshot
 
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
+WEB = OPENDOX_WEB
 MODEL_JS = WEB / "views" / "repo-selector-model.js"
 SERVE_PY = REPO_ROOT / "scripts" / "ideation_dashboard" / "serve.py"
 NODE = shutil.which("node")

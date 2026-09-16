@@ -26,8 +26,10 @@ from openxdox.doxbench_scope import (
     session_created_paths_for_scope,
 )
 
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
 CASES_PATH = FIXTURES / "doxbench_scope_cases.json"
-WEB_VIEWS = REPO_ROOT / "src" / "openxdox" / "web" / "views"
+WEB_VIEWS = OPENDOX_WEB / "views"
 MODEL_JS = WEB_VIEWS / "staging-workbench-model.js"
 WHEEL_MODEL_JS = WEB_VIEWS / "wheel-model.js"
 NODE = shutil.which("node")

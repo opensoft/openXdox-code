@@ -64,10 +64,12 @@ from opendox import session_git as sg
 from openxdox import snapshot_registry as reg
 from openxdox.generator import generate_snapshot
 
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
 REPO = "openxFactory"
 TOPIC = "demo-topic"
 DRAFT = "draft/demo-topic"
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+WEB = OPENDOX_WEB
 MODEL_JS = WEB / "views" / "repo-selector-model.js"
 NODE = shutil.which("node")
 

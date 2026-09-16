@@ -12,6 +12,8 @@ bounded so a long serve cannot grow one.
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 
 from conftest import REPO_ROOT  # noqa: F401  (sys.path side effect)
@@ -19,8 +21,11 @@ from conftest import REPO_ROOT  # noqa: F401  (sys.path side effect)
 from opendox import doxbench_telemetry as tel  # noqa: E402
 from openxdox.doxbench_scope import ScopeKey  # noqa: E402
 
-MODULE_PATH = (REPO_ROOT / "scripts" / "ideation_dashboard"
-               / "doxbench_telemetry.py")
+# THE INSTALLED openDox's OWN MODULE, not the PRE-CARVE
+# `scripts/ideation_dashboard/` path the carve left behind (§ 3.4 slice S8) —
+# the same resolution through the PIN that `tests/opendox_bundle.py` makes for
+# the bundle, on the module this file already imports as `tel`.
+MODULE_PATH = pathlib.Path(tel.__file__)
 
 
 def _scope(tile: str = "demo-topic") -> ScopeKey:

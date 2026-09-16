@@ -73,11 +73,13 @@ from openxdox import snapshot_registry as reg
 from opendox.boundary import HumanGate
 from openxdox.generator import generate_snapshot
 
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
 REPO = "openxFactory"
 TOPIC = "demo-topic"
 DRAFT = "draft/demo-topic"
 RECORDS = gc.DEFAULT_RECORDS_DIR
-WEB = REPO_ROOT / "src" / "openxdox" / "web"
+WEB = OPENDOX_WEB
 AT = "2026-07-27T09:00:00Z"
 VALIDATOR = find_openxfactory_validator()
 

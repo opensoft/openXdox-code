@@ -49,6 +49,8 @@ from openxdox import snapshot_registry as reg
 from opendox.boundary import HumanGate
 from openxdox.generator import generate_snapshot
 
+from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
+
 RUNBOOK = REPO_ROOT / "docs" / "ideation-dashboard-session-runbook.md"
 
 # `CHECK_MATRIX` and its consistency pins stayed with `docs/check-matrix.md` in
@@ -226,7 +228,7 @@ def test_the_runbook_does_not_call_the_unvalidated_snapshot_routine():
 # finding 18 — §4's posture readings are the ones the page can actually render
 # --------------------------------------------------------------------------
 
-MODEL_JS = (REPO_ROOT / "src" / "openxdox" / "web" / "views"
+MODEL_JS = (OPENDOX_WEB / "views"
             / "staging-workbench-model.js")
 
 
