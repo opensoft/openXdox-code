@@ -648,9 +648,12 @@ def _view_extension_or_skip():
     these two guards are its test-time counterpart.
 
     BUT THEY NO LONGER SKIP BLINDLY. Copilot's round-1 review of openXdox-code#21
-    was right that `pytest.importorskip` cannot tell "an older assembly" from "a
+    was right that `pytest.importorskip` cannot tell a DIFFERENT assembly from "a
     regression in the openDox this leg DECLARES", and after the bump only the
-    first of those may skip: if `0b4e8bbf` lost `view_extension` or the `exports`
+    first of those may skip. (That review said "an older assembly"; the guard that
+    replaced `importorskip` cannot measure ordering, only identity, so this summary
+    stopped borrowing the word — the review of `cb84001` caught it here, the last
+    copy left in the file.) if `0b4e8bbf` lost `view_extension` or the `exports`
     field, all three assertions below would have gone quietly green in a required
     check. `tests/opendox_bundle.py::_absent` decides by READING the declared pin
     out of `pyproject.toml` and the installed commit out of the distribution's
@@ -867,6 +870,25 @@ def test_a_ViewBinding_without_exports_FAILS_at_the_declared_pin(
     assert "`exports` field" in str(raised.value)
 
 
+def test_a_ViewBinding_without_exports_SKIPS_for_a_different_installed_commit(
+        monkeypatch) -> None:
+    """The SKIP half of the `exports` branch, at the CALL SITE.
+
+    The declared-pin FAIL above and the generic `_absent()` tests would both stay
+    green if this call became an unconditional failure, and the consumer RULED
+    5700475319 protects — an assembly pinning an openDox behind the view contract —
+    would break with them green. Caught at the review of `cb84001`.
+    """
+    view_extension = _view_extension_or_skip()
+    _guard_reads(monkeypatch, _PIN_DECLARED, _PIN_OTHER)
+    monkeypatch.setattr(view_extension.ViewBinding, "__annotations__", {})
+    with pytest.raises(pytest.skip.Exception) as raised:
+        _view_extension_or_skip()
+    message = str(raised.value)
+    assert _PIN_DECLARED[:8] in message
+    assert _PIN_OTHER[:8] in message
+
+
 def test_a_view_extension_without_ViewBinding_FAILS_at_the_declared_pin(
         monkeypatch) -> None:
     """THE THIRD unsupported shape: the module imports, the CLASS is not there.
@@ -884,3 +906,23 @@ def test_a_view_extension_without_ViewBinding_FAILS_at_the_declared_pin(
     message = str(raised.value)
     assert "ViewBinding" in message
     assert "REGRESSION at the declared pin" in message
+
+
+def test_a_view_extension_without_ViewBinding_SKIPS_for_a_different_commit(
+        monkeypatch) -> None:
+    """...and the same branch at a DIFFERENT commit takes the ruled skip.
+
+    The third unsupported shape has to be COMPATIBLE for a consumer behind the
+    view contract, exactly as the other two are; with only the FAIL case driven,
+    an unconditional failure here would pass every added test and break that
+    consumer. Caught at the review of `cb84001`.
+    """
+    view_extension = _view_extension_or_skip()
+    _guard_reads(monkeypatch, _PIN_DECLARED, _PIN_OTHER)
+    monkeypatch.delattr(view_extension, "ViewBinding")
+    with pytest.raises(pytest.skip.Exception) as raised:
+        _view_extension_or_skip()
+    message = str(raised.value)
+    assert "ViewBinding" in message
+    assert _PIN_DECLARED[:8] in message
+    assert _PIN_OTHER[:8] in message
