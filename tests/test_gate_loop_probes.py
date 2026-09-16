@@ -842,6 +842,61 @@ def _with_unreadable_pyproject(monkeypatch, exc) -> None:
     monkeypatch.setattr(_ob.Path, "read_text", _read_text)
 
 
+def _with_pyproject_text(monkeypatch, text) -> None:
+    """Make `pyproject.toml` READ CLEANLY as `text`, and nothing else change.
+
+    `_with_unreadable_pyproject` above drives the two RAISING branches; this drives
+    the branch where the file is perfectly readable and simply does not declare the
+    pin — the `if match else None` the review of `de7d966` found untested.
+    """
+    real_read_text = Path.read_text
+
+    def _read_text(self, *args, **kwargs):
+        if self.name == "pyproject.toml":
+            return text
+        return real_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(_ob.Path, "read_text", _read_text)
+
+
+def test_declared_pin_is_none_when_pyproject_declares_no_opendox_pin(
+        monkeypatch) -> None:
+    """A READABLE `pyproject.toml` with no `opendox @ git+…@<40-hex>` in it.
+
+    The two tests above make the READ raise; nothing made the REGEX miss. A
+    dependency line that lost its pin — rewritten to a version range, to a branch
+    ref, to a path install, or simply deleted — returns None from the same function
+    and must reach the SAME fail-closed policy, or the required check could go green
+    over a leg that no longer declares which openDox it is built against. Caught at
+    the review of `de7d966` on #21.
+    """
+    _with_pyproject_text(monkeypatch, (
+        "[project]\nname = \"openxdox-code\"\n"
+        "dependencies = [\n"
+        "    \"opendox @ git+https://github.com/opensoft/openDox-code@main\",\n"
+        "    \"pyyaml>=6\",\n"
+        "]\n"))
+    assert _ob.declared_pin() is None
+
+
+def test_an_undeclared_pin_FAILS_under_ci_like_any_other_unreadable_side(
+        monkeypatch) -> None:
+    """...and the outcome is the fail-closed one, driven end to end.
+
+    The test above proves the function returns None; this proves what `_absent()`
+    then does with it — FAIL under CI, naming the declared side as the one it could
+    not read, with the installed commit still printed because that side was fine.
+    """
+    _with_pyproject_text(monkeypatch, "[project]\nname = \"openxdox-code\"\n")
+    monkeypatch.setattr(_ob, "installed_commit", lambda: _PIN_B)
+    monkeypatch.setenv("CI", "true")
+    with pytest.raises(pytest.fail.Exception) as raised:
+        _ob._absent("the subject under test", module_level=False)
+    message = str(raised.value)
+    assert "declared pin could not be read" in message
+    assert _PIN_B in message
+
+
 def test_declared_pin_is_none_when_the_read_raises(monkeypatch) -> None:
     """The unreadable DECLARED side, produced rather than assumed.
 
@@ -1070,10 +1125,12 @@ def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) ->
 # number is not carried here. What is true at any head is the command:
 #   git diff main -- tests/test_gate_loop_probes.py | grep -c '^+def test_'
 #   git diff main -- tests/test_gate_loop_views.py  | grep -c '^+def test_'
-# (26 in this file and 6 in the views file at THIS head — 11 decision/read cases,
+# (28 in this file and 6 in the views file at THIS head — 13 decision/read cases,
 # 11 `installed_commit` parser tests and 4 call-site tests here; `validate.yml`'s
-# record block carries the total, 32. The review of `fd3af6a` caught the pair
-# reading 25 and 6: a count written one round before the round that added to it.)
+# record block carries the total, 34. The review of `fd3af6a` caught this pair
+# reading 25 and 6, and the review of `de7d966` moved it again by asking for the
+# two undeclared-pin tests: a count written in prose is stale one round later,
+# which is why the commands are printed above it every time.)
 # It is exactly the silent green this whole guard exists to break, reached one
 # level further out each round — and the review of `b22a6fd` caught the quoted
 # count going stale three rounds after the quotation.

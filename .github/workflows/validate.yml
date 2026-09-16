@@ -255,7 +255,7 @@ jobs:
       # alongside `test_doxbench_turns.py`.
       #
       # WITH IT GONE AND THE PIN MOVED, this invocation goes 301 passed /
-      # 23 skipped -> 349 passed / 6 skipped, and BOTH HALVES OF THAT DELTA HAVE
+      # 23 skipped -> 351 passed / 6 skipped, and BOTH HALVES OF THAT DELTA HAVE
       # TO BE SAID SEPARATELY, because Copilot's round-3 review of #21 caught this
       # block conflating them:
       #
@@ -269,7 +269,7 @@ jobs:
       #     file leaves this list, so that skip is no longer RUN rather than
       #     cleared. Counting it as cleared would describe a transition that never
       #     happened.
-      #   * The remaining rise to 349 is NOT the bump: it is the 32 direct tests
+      #   * The remaining rise to 351 is NOT the bump: it is the 34 direct tests
       #     of the provenance guard that Copilot's review rounds asked for, which
       #     live in `tests/test_gate_loop_probes.py` and
       #     `tests/test_gate_loop_views.py` and are therefore both on this list.
@@ -277,9 +277,9 @@ jobs:
       #     rather than carried:
       #       git diff main -- tests/test_gate_loop_probes.py \
       #                        tests/test_gate_loop_views.py | grep -c '^+def test_'
-      #     gives 32, and the passing figure has run 317 -> 323 -> 330 -> 332 ->
-      #     333 -> 334 -> 336 -> 343 -> 346 -> 348 -> 349, once per round that added
-      #     tests — the
+      #     gives 34, and the passing figure has run 317 -> 323 -> 330 -> 332 ->
+      #     333 -> 334 -> 336 -> 343 -> 346 -> 348 -> 349 -> 351, once per round that
+      #     added tests — the
       #     same discipline the block above applies to the skip counts. The review
       #     of `8b23f6f` asked for the CALL SITES: the tests before it proved what
       #     the guard decides and what it reads, and none of them proved that the
@@ -301,7 +301,13 @@ jobs:
       #     to `distribution("openxdox")` would have read a stranger's PEP 610
       #     record and compared ITS commit against this leg's declared pin with all
       #     ten parser tests green. Both fakes assert the name now, and one test
-      #     asserts the lookup itself.)
+      #     asserts the lookup itself. The review of `de7d966` took the branch under
+      #     THAT one: `declared_pin()`'s regex MISS — a readable `pyproject.toml`
+      #     that declares no `opendox @ git+…@<40-hex>` — had no test at all, so a
+      #     dependency line rewritten to a branch ref or a version range would have
+      #     returned None with nothing proving the fail-closed policy still catches
+      #     it. Two tests: the function returns None, and `_absent()` FAILS under CI
+      #     naming the declared side while still printing the installed commit.)
       #
       # The 6 skips that remain are the three seam suites' `doc_health` pairs,
       # which no pin bump touches.

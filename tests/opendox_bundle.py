@@ -10,9 +10,20 @@ WHAT THIS REPAIRS, and why it is a path and not a move.
 openXdox-code [name a `views/<name>.js` path], and every one of them resolves it
 under `REPO_ROOT / "src" / "openxdox" / "web"` — a directory openXdox-code does
 not have … the carve's `import rewrites` edit class rewrote the path constant and
-pointed the tests at the wrong leg."* Eight further suites at this leg name the
-same constant as a SERVE ROOT without naming a view module, so the real count is
-31 files and 47 sites.
+pointed the tests at the wrong leg."* Further suites at this leg name the same
+constant as a SERVE ROOT without naming a view module, and the total is the one
+**openXdox-code#19's LANDING re-derived** (`main 0a0265f`, "RE-DERIVED AT LANDING,
+AND ONLY THE COUNT MOVED"): under a named, re-runnable instrument — a ROOT SPELLING
+is a line spelling `REPO_ROOT / "src" / "openxdox" / "web"` in any Path or slash
+form, counted over the REVISIONS with `git grep` and never a worktree — **46 root
+spellings over 31 files**, as 22 resolving a concrete `views/<name>.js` module plus
+9 using the root as a serve root (the ninth being the tool at
+`tests/tools/playwright-smoke.py`, outside `validate`'s list). `validate.yml`'s S8
+block carries that same 46. The review rounds on #19 said "31 files, 47 sites";
+that figure is left ATTRIBUTED and not restated, for #19's own reason — a root
+spelled once carries several derived sites, so neither total corrects the other —
+and this line asserted it as "the real count" until the review of `de7d966` on #21
+found the two numbers disagreeing across this repository.
 
 The note's § 5 S8 row then infers that those files *"go to the leg the census
 says owns each bundle file"*. **That inference does not hold, and the reason is
@@ -391,8 +402,12 @@ def require(*, module_level: bool = True) -> Path:
             # where the pin carries no bundle)`, and after the bump this path
             # also FAILS — at the declared pin, and for an unreadable side under
             # CI. Measured, not estimated:
-            #   grep -rn 'skips where the pin carries no bundle' tests/  -> 29
-            #     sites in 29 files
+            #   grep -rn 'skips where the pin carries no bundle' tests/ \
+            #        --include='test_*.py'                              -> 29
+            #     sites in 29 files. The --include is load-bearing: this comment
+            #     quotes the annotation, so the unfiltered command answers 30 and
+            #     counts the helper that reports the count. Caught at the review
+            #     of `de7d966` on #21.
             #   git diff --name-only main -- <those 29>                  -> 0
             #   all 29 appear in openxFactory `docs/opendox-carve-manifest.yaml`
             # Every one of them is an ARRIVED carve row whose edits are declared
