@@ -782,13 +782,23 @@ def test_the_draft_views_one_action_is_the_create_forms_own_submit() -> None:
 # ---------------------------------------------------------------------------
 # `_view_extension_or_skip`'s OWN CALL SITES — Copilot's review of `8b23f6f` on
 # openXdox-code#21, and it was right: the three materialization assertions above
-# exercise only the SUCCESSFUL import-and-`exports` path. The guard's two
-# refusal branches — the module absent, and `ViewBinding` without RULED Q2's
-# `exports` field — were reached by nothing, so replacing either
-# `_absent()` call with a bare `pytest.skip` would have left every required test
-# green while restoring the silent green this act exists to remove. The direct
-# `_absent()` tests in `tests/test_gate_loop_probes.py` prove what the guard
-# DECIDES; these prove that this caller still asks it.
+# exercise only the SUCCESSFUL import-and-`exports` path. The guard's refusal
+# branches were reached by nothing, so replacing any one `_absent()` call with a
+# bare `pytest.skip` would have left every required test green while restoring the
+# silent green this act exists to remove. There are THREE of them, and the third
+# arrived with the review of `cb84001` (the review of `b22a6fd` caught this header
+# still saying two):
+#   1. `opendox.view_extension` absent           — the module is not there at all;
+#   2. `view_extension.ViewBinding` absent       — the module without its class,
+#      which was an AttributeError out of this guard until `cb84001`;
+#   3. `ViewBinding` without RULED Q2's `exports` — the partial packaging
+#      regression: the registry present, the contract behind it.
+# Each is driven BOTH ways below — FAIL at the commit this leg declares, SKIP for a
+# different one — because a branch proved only at the declared pin can be replaced
+# by an unconditional failure with every added test still green, and that breaks the
+# consumer RULED 5700475319 protects. The direct `_absent()` tests in
+# `tests/test_gate_loop_probes.py` prove what the guard DECIDES; these prove that
+# this caller still asks it.
 # ---------------------------------------------------------------------------
 
 _PIN_DECLARED = "a" * 40

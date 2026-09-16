@@ -1019,10 +1019,17 @@ def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) ->
 # out: the tests above prove what `_absent()` DECIDES and what
 # `installed_commit()` READS, and every one of them either calls `_absent()`
 # directly or monkeypatches the function under it. None of them proves that the
-# three CALLERS still route a missing subject INTO `_absent()`. "Replacing this
-# call with `pytest.skip` would leave the 19 guard tests green while the
-# `OPENDOX_WEB` importers silently skip under CI" — exactly the silent green
-# this whole guard exists to break, reached one level further out each round.
+# three CALLERS still route a missing subject INTO `_absent()`. That review's own
+# sentence: "replacing this call with `pytest.skip` would leave the <N> guard
+# tests green while the `OPENDOX_WEB` importers silently skip under CI" — it said
+# 19, the count at ITS head, and the point does not live in the number, so the
+# number is not carried here. What is true at any head is the command:
+#   git diff main -- tests/test_gate_loop_probes.py | grep -c '^+def test_'
+#   git diff main -- tests/test_gate_loop_views.py  | grep -c '^+def test_'
+# (25 and 6 as this was written; `validate.yml`'s record block carries the total).
+# It is exactly the silent green this whole guard exists to break, reached one
+# level further out each round — and the review of `b22a6fd` caught the quoted
+# count going stale three rounds after the quotation.
 # Two call sites are covered here; the third
 # (`test_gate_loop_views.py::_view_extension_or_skip`) is covered in that file,
 # beside the assertions it gates.
