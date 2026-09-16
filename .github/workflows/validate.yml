@@ -62,9 +62,22 @@ jobs:
       #     shape assertions" ever described.
       #   * ELEVEN import a runtime module. `test_domain_profile.py` imports
       #     `openxdox.domain_profile` alone, on the § 4.4 grounds set out below;
-      #     the other TEN are carved suites that RUN here, and FOUR of them reach
-      #     the PINNED openDox — in TWO DIFFERENT WAYS, which this line ran
-      #     together until the review of `24cd5f2` on #21 measured them apart:
+      #     the other TEN RUN here — and calling all ten "carved" was wrong, as
+      #     the review of `e92fb06` said: measured against openxFactory's own two
+      #     registers, only TWO are ARRIVED carve rows
+      #     (`test_doxbench_abstract_store.py`, `test_doxbench_telemetry.py`, each
+      #     with a row in `docs/opendox-carve-manifest.yaml`) and EIGHT are CREATED
+      #     files admitted by name in `docs/opendox-carve-admissions.yaml` — the two
+      #     gate-loop suites of § 3.4 slice S5 and the three evidence/workbench/
+      #     authority pairs. The distinction is not cosmetic: an ARRIVED row's edits
+      #     are declared at openxFactory (which is why
+      #     `test_doxbench_mutation_boundary.py` is dropped rather than repaired,
+      #     and why the 29 importer annotations are left alone), while a CREATED
+      #     file is this leg's to edit. Re-derive with
+      #     `grep -c '<path>' <that repo>/docs/opendox-carve-{manifest,admissions}.yaml`.
+      #     FOUR of the ten reach the PINNED openDox — in TWO DIFFERENT WAYS, which
+      #     this line ran together until the review of `24cd5f2` on #21 measured
+      #     them apart:
       #       - ONE reads the pinned WEB BUNDLE: `test_gate_loop_probes.py`, whose
       #         `_opendox_bundle()` finds the marker under the installed `opendox`
       #         and whose `bundle` fixture composes it. `tests/opendox_bundle.py`'s

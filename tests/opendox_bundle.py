@@ -234,6 +234,22 @@ _SHA_RE = re.compile(r"[0-9a-fA-F]{40}")
 #: greedy backtracking under `fullmatch` lands on the LAST such `@`.
 _URL_PIN_RE = re.compile(r"git\+\S+@([0-9a-fA-F]{40})")
 
+#: pip's direct-reference FRAGMENT: `#subdirectory=src`, `#egg=opendox`, joined by
+#: `&`. It is legal after the pin and says nothing about which commit is declared,
+#: so it is stripped before matching — the review of `e92fb06` caught
+#: `…@<sha>#subdirectory=src` reading as NO pin and failing the guard closed on a
+#: declaration pip installs. Only a `key=value` fragment is stripped: a bare
+#: `#feature` is a ref continuation, not a fragment, and must still refuse.
+_FRAGMENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_.-]*=[^&]*(?:&[A-Za-z_][A-Za-z0-9_.-]*=[^&]*)*")
+
+
+def _without_fragment(url: str) -> str:
+    """`url` with a pip direct-reference fragment removed, if it has one."""
+    head, sep, fragment = url.partition("#")
+    if sep and _FRAGMENT_RE.fullmatch(fragment):
+        return head
+    return url
+
 #: The repository this leg is entitled to reason about. `installed_commit()`
 #: compares SHAS ONLY, so a declaration re-pointed at another repository at some
 #: other 40-hex commit would have made a missing bundle look like the lawful
@@ -346,8 +362,9 @@ def declared_pin() -> str | None:
         # the sha on it is not "the commit this leg declares" (review of `18e8c12`).
         if requirement.marker is not None and not _marker_holds(str(requirement.marker)):
             continue
-        match = _URL_PIN_RE.fullmatch(requirement.url)
-        if match and _names_opendox_code(requirement.url):
+        url = _without_fragment(requirement.url)
+        match = _URL_PIN_RE.fullmatch(url)
+        if match and _names_opendox_code(url):
             return match.group(1).lower()
     return None
 

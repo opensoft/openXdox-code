@@ -921,6 +921,9 @@ def test_declared_pin_refuses_anything_but_a_whole_40_hex_direct_pin(
     and `fullmatch` admits it only if the WHOLE requirement is the pin. Every
     continuation those rounds named is driven here, on one `assert`.
     """
+    # `#feature` stays a REFUSAL: a bare `#…` is a ref continuation, not pip's
+    # `key=value` direct-reference fragment, and only the latter is stripped
+    # (review of `e92fb06`).
     for tail in ("dead", "x", "0", "-feature", "/branch", "_suffix", ".1",
                  ",feature", "'feature", " feature", "#feature"):
         for url in (f"git+https://github.com/opensoft/openDox-code@{_PIN_A}",
@@ -993,6 +996,12 @@ def test_declared_pin_reads_the_pin_through_extras_markers_and_position(
             f"opendox @ git+https://github.com/opensoft/openDox-code;branch@{_PIN_A}",
             # ...and a `.git` suffix, which the source check must not refuse.
             f"opendox @ git+ssh://git@github.com/opensoft/openDox-code.git@{_PIN_A}",
+            # pip's direct-reference FRAGMENT is legal after the pin and says
+            # nothing about which commit is declared. `#subdirectory=…` read as NO
+            # pin until the review of `e92fb06`, failing the guard closed on a
+            # declaration pip installs.
+            f"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}#subdirectory=src",
+            f"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}#egg=opendox&subdirectory=src",
     ):
         _with_pyproject_text(monkeypatch, _pyproject(
             "PyYAML>=6.0", requirement, "jsonschema>=4.18"))
