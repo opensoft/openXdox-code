@@ -174,11 +174,14 @@ jobs:
       #
       # ONE FILE LEAVES THIS LIST WITH THE 2026-09-16 PIN BUMP
       # (`a99eba03` -> `0b4e8bbf`), and the reason is the BUILD arc's, not the
-      # bump's. RULED openxFactory#656 comment 5700475319 (Brett Heap, 2026-09-16, by interactive multi-choice):
-      # the question "drop it, keep it and accept a red required check, or edit
-      # the arrived file" was put to Brett Heap and answered (a) DROP IT, "with
-      # the measurement and both grounds in the workflow comment; it returns with
-      # the BUILD arc beside test_doxbench_turns.py" — which is what follows. `tests/test_doxbench_mutation_boundary.py` was named by S8 on
+      # bump's. RULED openxFactory#656 comment 5700475319 (Brett Heap,
+      # 2026-09-16, by interactive multi-choice): the question "drop it, keep it
+      # and accept a red required check, or edit the arrived file" was put to
+      # Brett Heap and answered (a) DROP IT, "with the measurement and both
+      # grounds in the workflow comment; it returns with the BUILD arc beside
+      # test_doxbench_turns.py" — which is what follows.
+      #
+      # `tests/test_doxbench_mutation_boundary.py` was named by S8 on
       # the measurement quoted above: it COLLECTS, then skips whole at
       # `tests/opendox_bundle.py`'s module-level skip, which is what happened
       # while the pinned `opendox` carried no `web/` bundle. At `0b4e8bbf` the

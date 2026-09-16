@@ -44,11 +44,14 @@ installed `opendox` carries no bundle", which was true of `a99eba03` and is
 quoted here as provenance, not as a claim.
 
 A SKIP STAYS FOR TWO CASES AND TWO ONLY — and THAT IT STAYS AT ALL is ruled, not
-chosen here. RULED openxFactory#656 comment 5700475319 (Brett Heap, 2026-09-16, by interactive multi-choice): asked whether to keep these guards with corrected reasons or
-delete them on pin lockstep #2's precedent, Brett Heap answered (a) KEEP THEM and
-correct the reasons, "they test the ASSEMBLED openDox; a consumer may pin behind
-the view contract". This paragraph overstated the skip until the review of
-`7c0a3b6` on openXdox-code#21. A missing bundle is honest to skip
+chosen here. RULED openxFactory#656 comment 5700475319 (Brett Heap, 2026-09-16,
+by interactive multi-choice): asked whether to keep these guards with corrected
+reasons or delete them on pin lockstep #2's precedent, Brett Heap answered
+(a) KEEP THEM and correct the reasons, "they test the ASSEMBLED openDox; a
+consumer may pin behind the view contract".
+
+This paragraph overstated the skip until the review of `7c0a3b6` on
+openXdox-code#21. A missing bundle is honest to skip
 where the installed distribution records a commit that is NOT the one this leg
 declares — note the claim is "different", never "older": nothing here proves an
 ordering, only a disagreement — and where the installation records no provenance
