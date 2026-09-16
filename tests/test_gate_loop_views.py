@@ -638,8 +638,12 @@ def _view_extension_or_skip():
     field, all three assertions below would have gone quietly green in a required
     check. `tests/opendox_bundle.py::_absent` decides by READING the declared pin
     out of `pyproject.toml` and the installed commit out of the distribution's
-    PEP 610 `direct_url.json`: equal -> FAIL, different (or unrecorded) -> SKIP,
-    with both commits named in the reason either way.
+    PEP 610 `direct_url.json`. This docstring said "different (or unrecorded) ->
+    SKIP", and Copilot's round-3 review of #21 was right that the parenthesis is
+    false: UNRECORDED provenance FAILS under CI and skips only off it, because a
+    skip on the required path is the silent green the guard exists to prevent.
+    The table `_absent()` actually carries: equal -> FAIL; different -> SKIP with
+    both commits named; unrecorded -> FAIL under CI, SKIP off it.
     """
     import opendox_bundle
     try:

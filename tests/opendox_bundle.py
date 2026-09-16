@@ -111,8 +111,17 @@ def find() -> Path | None:
 # Bundle missing AND the two agree  -> FAIL: a regression at the declared pin.
 # Bundle missing AND they differ    -> SKIP: a consumer assembling at its own,
 #                                      older pin, named in the reason.
-# Provenance unreadable             -> SKIP, saying so: nothing was measured, so
-#                                      nothing may be claimed either way.
+# Provenance unreadable, UNDER CI   -> FAIL. Round 2 of the same review was right
+#                                      that skipping here left the required job
+#                                      able to go green with the bundle missing;
+#                                      on the required path an unreadable
+#                                      provenance is itself the anomaly, because
+#                                      `validate.yml` installs a PEP 508 direct
+#                                      VCS reference and pip records one every
+#                                      time.
+# Provenance unreadable, OFF CI     -> SKIP, saying so: an editable checkout or a
+#                                      hand-placed wheel lawfully has none, and
+#                                      nothing measured means nothing claimed.
 # ---------------------------------------------------------------------------
 
 _PIN_RE = re.compile(r"opendox\s*@\s*git\+[^@\s\"']+@([0-9a-f]{40})")
@@ -132,8 +141,13 @@ def installed_commit() -> str | None:
     """The commit the INSTALLED `opendox` was built from (PEP 610), or None.
 
     None is not "no provenance exists"; it is "this installation did not record
-    one" — an editable checkout, a wheel copied in by hand. The callers treat it
-    as unknown and skip rather than guess.
+    one" — an editable checkout, a wheel copied in by hand.
+
+    WHAT THE CALLER DOES WITH None IS NOT "always skip", and this docstring said
+    so until Copilot's round-3 review of #21 caught it: `_absent()` FAILS on None
+    under CI and SKIPS off it. The rule is the required path, not the value —
+    see `_absent()`'s own table. A future caller that reads only this line would
+    otherwise bypass the safety rule the required check depends on.
     """
     try:
         from importlib.metadata import distribution

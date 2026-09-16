@@ -729,3 +729,81 @@ def test_the_declared_pin_is_read_from_this_legs_own_pyproject() -> None:
     toml = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(
         encoding="utf-8")
     assert f"openDox-code@{declared}" in toml
+
+
+# --- THE PEP 610 PARSER ITSELF, not a monkeypatched stand-in -----------------
+# Copilot round 3 on #21: "all six direct guard tests monkeypatch
+# `installed_commit()` and therefore bypass this code … a parser regression can
+# change the CI decision while the required tests remain green." Accurate — the
+# tests above pin the DECISION, these pin the READING it decides on. A fake
+# distribution is installed over `importlib.metadata.distribution`, which is the
+# exact name `installed_commit()` resolves at call time.
+
+class _FakeDist:
+    """Just enough of `importlib.metadata.Distribution` for `read_text`."""
+
+    def __init__(self, payload):
+        self._payload = payload
+
+    def read_text(self, name):
+        if name != "direct_url.json":        # pragma: no cover - never asked
+            return None
+        if isinstance(self._payload, Exception):
+            raise self._payload
+        return self._payload
+
+
+def _with_dist(monkeypatch, payload):
+    import importlib.metadata as md
+    monkeypatch.setattr(md, "distribution", lambda name: _FakeDist(payload))
+
+
+def test_installed_commit_reads_a_real_vcs_record(monkeypatch) -> None:
+    _with_dist(monkeypatch, json.dumps(
+        {"url": "https://github.com/opensoft/openDox-code",
+         "vcs_info": {"vcs": "git", "commit_id": _PIN_B}}))
+    assert _ob.installed_commit() == _PIN_B
+
+
+def test_installed_commit_is_none_when_the_file_is_absent(monkeypatch) -> None:
+    _with_dist(monkeypatch, None)
+    assert _ob.installed_commit() is None
+
+
+def test_installed_commit_is_none_on_malformed_json(monkeypatch) -> None:
+    _with_dist(monkeypatch, "{not json at all")
+    assert _ob.installed_commit() is None
+
+
+def test_installed_commit_is_none_for_a_non_vcs_install(monkeypatch) -> None:
+    """A wheel installed from an archive records `archive_info`, not `vcs_info`."""
+    _with_dist(monkeypatch, json.dumps(
+        {"url": "file:///tmp/opendox-0.0.0-py3-none-any.whl",
+         "archive_info": {"hash": "sha256=abc"}}))
+    assert _ob.installed_commit() is None
+
+
+def test_installed_commit_refuses_a_commit_id_that_is_not_40_hex(monkeypatch) -> None:
+    """A short id is not a commit this guard may compare — round 3's parser case."""
+    _with_dist(monkeypatch, json.dumps({"vcs_info": {"commit_id": "0b4e8bbf"}}))
+    assert _ob.installed_commit() is None
+
+
+def test_installed_commit_is_none_when_the_package_is_not_installed(monkeypatch) -> None:
+    from importlib.metadata import PackageNotFoundError
+    _with_dist(monkeypatch, PackageNotFoundError("opendox"))
+    assert _ob.installed_commit() is None
+
+
+def test_a_parser_regression_would_now_be_caught_before_it_reaches_the_decision() -> None:
+    """The point of the six above, stated as an assertion rather than a comment.
+
+    `_absent()` branches on `installed_commit()`'s RETURN VALUE, so every test of
+    the decision that monkeypatches that function proves nothing about the
+    reading. These six cover the reading: a real VCS record, an absent file,
+    malformed JSON, a non-VCS install, a too-short id, and no distribution at all.
+    """
+    import inspect
+    source = inspect.getsource(_ob.installed_commit)
+    assert "direct_url.json" in source and "vcs_info" in source
+    assert "len(commit) == 40" in source

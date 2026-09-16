@@ -197,10 +197,27 @@ jobs:
       # alongside `test_doxbench_turns.py`.
       #
       # WITH IT GONE AND THE PIN MOVED, this invocation goes 301 passed /
-      # 23 skipped -> 317 passed / 6 skipped. The 17 skips that cleared are the
-      # 3 materialization assertions, the 13 node probes and this file's own
-      # module-level skip; the 6 that remain are the three seam suites'
-      # `doc_health` pairs, which no pin bump touches.
+      # 23 skipped -> 330 passed / 6 skipped, and BOTH HALVES OF THAT DELTA HAVE
+      # TO BE SAID SEPARATELY, because Copilot's round-3 review of #21 caught this
+      # block conflating them:
+      #
+      #   * SIXTEEN skips became PASSES — the 3 materialization assertions in
+      #     `tests/test_gate_loop_views.py` and the 13 node probes in
+      #     `tests/test_gate_loop_probes.py`. That is the pin bump's own effect,
+      #     and it is the whole point of the act.
+      #   * The seventeenth skip did NOT clear. It was
+      #     `tests/test_doxbench_mutation_boundary.py`'s module-level skip, and at
+      #     the new pin it becomes a COLLECTION ERROR (see the block above); the
+      #     file leaves this list, so that skip is no longer RUN rather than
+      #     cleared. Counting it as cleared would describe a transition that never
+      #     happened.
+      #   * The remaining rise to 330 is NOT the bump: it is the 13 direct tests
+      #     of the provenance guard that Copilot's rounds 2 and 3 asked for, which
+      #     live in `tests/test_gate_loop_probes.py` and are therefore on this
+      #     list. The bump alone measured 317.
+      #
+      # The 6 skips that remain are the three seam suites' `doc_health` pairs,
+      # which no pin bump touches.
       #
       # `--noconftest` STAYS, and it is why this list is a list: `tests/
       # conftest.py` imports the carved session fixtures, which reach both
