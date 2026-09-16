@@ -10,7 +10,17 @@
    (RULED Q-L1's form, `#656` comment `5628560136`). What selects them is
    measured, never chosen: each selector's every class is named by this
    column's six modules and by no file of openDox's own bundle
-   (`measure-css-census.py`, the BROAD scan).
+   (openxFactory `scripts/measure_opendox_css_census.py`, which reads THIS
+   column's side from class-bearing positions only and openDox's side broadly,
+   because over-including on openDox's side keeps a rule and over-including on
+   ours moves one).
+
+   WITH ONE DECLARED EXCEPTION, and `swb.css` is where it lives:
+   `.swb-draftchrome .swb-cactions` names `.swb-draftchrome`, which is
+   openDox's own draft chrome. The DECLARATION styles this column's action row
+   and belongs with the binding; the ancestor travels with it as HOST CONTEXT,
+   and `view_extensions.STYLE_RESIDUE["open_coupling"]["host_context_classes"]`
+   is where that is recorded rather than left for a reader to notice.
 
    WHAT THIS SHEET READS THAT IS NOT A `--st-*` TOKEN is openDox's own
    non-token custom properties, which RULED Q7 declares are NOT a stable

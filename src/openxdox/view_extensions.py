@@ -205,6 +205,16 @@ STYLE_RESIDUE: dict[str, Any] = {
     "exclusive_classes": 54,
     "shared_classes": 21,
     "rule_blocks_moved": 59,
+    #: AND THE TWO MIXED RULES, counted separately because they are a different
+    #: act (Copilot review, round 3, which found the sheets carrying 61 blocks
+    #: against a record that said 59). `.filterpop[hidden], .projectform
+    #: .projectpanel[hidden]` was SPLIT — openDox keeps its half and this
+    #: column re-states the gate half — and `.swb-draftchrome .swb-cactions`
+    #: MOVED WHOLE, carrying the one openDox class a sheet here names as host
+    #: context. 59 + 2 = 61, which is what the four sheets contain and what
+    #: `test_the_sheets_carry_the_blocks_the_residue_counts` asserts.
+    "mixed_blocks_handled": 2,
+    "rule_blocks_in_sheets": 61,
     "styles_css_lines_declared": 89,
     "sheets": web_assets.VIEW_SHEET_NAMES,
     "previously_measured_at": "opensoft/openDox-code cb343ae8 (51 exclusive / "

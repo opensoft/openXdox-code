@@ -29,6 +29,7 @@ import ast
 import dataclasses
 import fnmatch
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -668,6 +669,10 @@ def test_the_style_residue_records_the_discharge_rather_than_the_block() -> None
     assert residue["exclusive_classes"] == 54
     assert residue["shared_classes"] == 21
     assert residue["rule_blocks_moved"] == 59
+    assert residue["mixed_blocks_handled"] == 2
+    assert residue["rule_blocks_in_sheets"] == 61
+    assert (residue["rule_blocks_moved"] + residue["mixed_blocks_handled"]
+            == residue["rule_blocks_in_sheets"])
     assert residue["styles_css_lines_declared"] == 89
     assert residue["sheets"] == web_assets.VIEW_SHEET_NAMES
     assert "RULED Q7 realized" in residue["discharged_by"]
@@ -818,6 +823,51 @@ def test_the_design_token_guard_sees_an_inline_declaration() -> None:
     assert _declared_st_tokens(".x { color: var(--st-proposed); }") == []
 
 
+def test_the_sheets_carry_the_blocks_the_residue_counts() -> None:
+    """61 RULE BLOCKS, AND THE RECORD SAYS WHY IT IS NOT 59 (Copilot review,
+    round 3, which counted the shipped bytes against the recorded figure).
+
+    59 blocks are the EXCLUSIVE ones — every class in the selector this
+    column's own. The other two are the file's only MIXED rules and were
+    handled rather than exempted: one selector list SPLIT, so openDox keeps
+    `.filterpop[hidden]` and this column re-states the gate half; and
+    `.swb-draftchrome .swb-cactions` MOVED WHOLE, carrying the one openDox
+    class a sheet here names as host context.
+
+    Counted off the shipped sheets, so the audit record cannot silently
+    disagree with the bytes.
+    """
+    blocks = 0
+    for name in web_assets.VIEW_SHEET_NAMES:
+        body = _sheet_body(name)
+        blocks += body.count("{")
+        assert body.count("{") == body.count("}"), name
+    residue = view_extensions.STYLE_RESIDUE
+    assert blocks == residue["rule_blocks_in_sheets"], blocks
+    assert blocks == residue["rule_blocks_moved"] + residue["mixed_blocks_handled"]
+
+    # THE TWO MIXED RULES ARE WHERE THE RECORD SAYS, not merely counted.
+    projects = _sheet_body("gate-projects.css")
+    assert ".projectform.projectpanel[hidden]" in projects
+    swb = _sheet_body("swb.css")
+    for host in residue["open_coupling"]["host_context_classes"]:
+        assert f".{host} " in swb, host
+
+
+def test_every_sheet_header_declares_the_host_context_exception() -> None:
+    """The headers said every selector's classes are this column's own, and
+    `swb.css` carries `.swb-draftchrome .swb-cactions` (Copilot review, round
+    3). A sheet whose own prose contradicts the census is worse than one with
+    no prose."""
+    for name in web_assets.VIEW_SHEET_NAMES:
+        header = _sheet_text(name)
+        assert "WITH ONE DECLARED EXCEPTION" in header, name
+        assert "host_context_classes" in header, name
+        # and the tool is named as it is committed, not as it was drafted
+        assert "scripts/measure_opendox_css_census.py" in header, name
+        assert "measure-css-census.py" not in header, name
+
+
 def test_the_non_token_coupling_is_the_number_the_residue_records() -> None:
     """The one thing RULED Q7 leaves open here, COUNTED instead of hidden.
 
@@ -836,6 +886,82 @@ def test_the_non_token_coupling_is_the_number_the_residue_records() -> None:
     assert len(tokens) == residue["st_tokens_read"], sorted(tokens)
     assert len(non_token) == residue["non_token_custom_properties_read"], \
         sorted(non_token)
+
+
+def test_a_pin_that_carries_styles_materializes_the_declared_sheets(
+        monkeypatch) -> None:
+    """THE NEW-PIN BRANCH, EXECUTED (Copilot review, round 3).
+
+    `GateLoopViews.views()` is where `specs_for()`'s answer becomes real
+    bindings, and nothing drove it with a `ViewBinding` that HAS `styles`: the
+    live materialization test skips on this leg's old pin, and the `specs_for`
+    test drives the filter and not the constructor. So a regression between the
+    two — a spec the filter kept that the constructor drops — would leave the
+    sheets inert with every test green.
+
+    Driven through a STUB `opendox.view_extension`, because the pin bump that
+    brings the real one is a later act and this assertion must not wait for it.
+    """
+    import types
+
+    @dataclasses.dataclass(frozen=True)
+    class StubBinding:
+        id: str = ""
+        region: str = ""
+        module: str = ""
+        entry: str = ""
+        view_class: str = ""
+        routes: tuple = ()
+        exports: tuple = ()
+        requires: tuple = ()
+        optional: bool = False
+        styles: str = ""
+
+    stub = types.ModuleType("opendox.view_extension")
+    stub.ViewBinding = StubBinding
+    package = types.ModuleType("opendox")
+    package.view_extension = stub
+    monkeypatch.setitem(sys.modules, "opendox", package)
+    monkeypatch.setitem(sys.modules, "opendox.view_extension", stub)
+
+    bindings = view_extensions.GateLoopViews().views()
+    assert [b.id for b in bindings] == [spec["id"] for spec in SPECS]
+    assert [b.styles for b in bindings] == [
+        "./views/gate.css", "", "./views/gate-projects.css",
+        "./views/dispose.css", "./views/swb.css", "./views/swb.css"]
+    # every declared sheet is reached by at least one binding, and no binding
+    # names a sheet this column does not ship
+    named = {b.styles[len("./views/"):] for b in bindings if b.styles}
+    assert named == set(web_assets.VIEW_SHEET_NAMES)
+
+
+def test_an_old_pin_materializes_without_the_field(monkeypatch) -> None:
+    """The other side of the same call path: a `ViewBinding` with no `styles`
+    still materializes the whole column, unstyled rather than absent."""
+    import types
+
+    @dataclasses.dataclass(frozen=True)
+    class OldBinding:
+        id: str = ""
+        region: str = ""
+        module: str = ""
+        entry: str = ""
+        view_class: str = ""
+        routes: tuple = ()
+        exports: tuple = ()
+        requires: tuple = ()
+        optional: bool = False
+
+    stub = types.ModuleType("opendox.view_extension")
+    stub.ViewBinding = OldBinding
+    package = types.ModuleType("opendox")
+    package.view_extension = stub
+    monkeypatch.setitem(sys.modules, "opendox", package)
+    monkeypatch.setitem(sys.modules, "opendox.view_extension", stub)
+
+    bindings = view_extensions.GateLoopViews().views()
+    assert [b.id for b in bindings] == [spec["id"] for spec in SPECS]
+    assert not any(hasattr(b, "styles") for b in bindings)
 
 
 def test_the_styles_field_is_dropped_for_a_pin_that_cannot_express_it() -> None:
