@@ -139,21 +139,27 @@ def bundle(tmp_path) -> Path:
     """A COMPOSED bundle: openDox's own `web/`, with this column's six modules
     placed into it by the assembly hook RULED Q5 names.
 
-    Skipped — never failed — where the assembled `opendox` carries no bundle.
-    That was this leg's pinned state until the 2026-09-16 pin bump and is not
-    any more; the skip remains for an assembly that installs an older openDox
-    than this leg declares, because a probe that quietly ran against a stand-in
-    `helpers.js` would measure the stand-in rather than the shipped file.
+    Skipped where the assembled `opendox` carries no bundle AND that openDox is
+    demonstrably not the one this leg declares; FAILED where it IS the declared
+    one. That was a plain skip until the 2026-09-16 pin bump, when a missing
+    bundle stopped being the expected state and started being a regression —
+    see `tests/opendox_bundle.py::_absent`, which reads both commits before it
+    decides. A probe that quietly ran against a stand-in `helpers.js` would
+    measure the stand-in rather than the shipped file, so the skip is still the
+    right outcome for a genuinely older consumer.
     """
     source = _opendox_bundle()
     if source is None:
-        pytest.skip(
-            "the installed `opendox` carries no `web/` bundle, so there is "
-            "nothing to assemble into. This leg's declared pin is NOT the "
-            "explanation any more — it names openDox-code#23 (`0b4e8bbf`), "
-            "which carries the bundle, and under it these probes run. Reaching "
-            "this reason means the installed `opendox` came from somewhere "
-            "older than the declared pin")
+        # FAIL at the declared pin, SKIP only for a different one — the shared
+        # rule in `tests/opendox_bundle.py::_absent`, which READS the installed
+        # distribution's PEP 610 provenance instead of asserting it. Copilot's
+        # round-1 review of #21 found this file claiming "came from somewhere
+        # older than the declared pin" on a check that only tested for a marker;
+        # if `0b4e8bbf` itself ever stopped shipping `web/**`, all thirteen
+        # probes below would have skipped and this required check would have
+        # stayed green over the regression.
+        import opendox_bundle
+        opendox_bundle._absent("openDox's `web/` bundle", module_level=False)
     target = tmp_path / "web"
     shutil.copytree(source, target)
     web_assets.install_view_modules(target)

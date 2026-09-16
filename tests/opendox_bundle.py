@@ -54,6 +54,8 @@ only one of those is true.
 from __future__ import annotations
 
 import atexit
+import json
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -65,16 +67,12 @@ import pytest
 #: one of the six modules openXdox itself contributes back under RULED Q5.
 _MARKER = ("views", "helpers.js")
 
-_REASON = (
-    "the installed `opendox` carries no `web/` bundle, so there is nothing here "
-    "to read. This leg's own pin is NOT the explanation any more: it names "
-    "openDox-code#23 (`0b4e8bbf`), which is past openDox's packaging "
-    "declaration (`[tool.setuptools.package-data] opendox = [\"web/**\"]`, "
-    "openDox-code#20, § 3.4 slice S5), and under that pin this suite RUNS. "
-    "Reaching this reason means the `opendox` actually installed came from "
-    "somewhere older than the declared pin — an assembly at its own pin, or a "
-    "stale editable checkout. SKIPPED, never failed: the code under test is "
-    "not what is missing.")
+# `_REASON`, the module-level skip string, is GONE — `_absent()` below composes the
+# reason from what it measured instead of stating it in advance. It read "this leg
+# pins a commit older than openDox's own packaging declaration … The pin bump makes
+# this suite run", which was true of `a99eba03` and became false at `0b4e8bbf`; the
+# replacement's whole point is that it cannot go stale, because it names the two
+# commits it just compared.
 
 
 def find() -> Path | None:
@@ -85,6 +83,93 @@ def find() -> Path | None:
         return None
     web = Path(opendox.__file__).resolve().parent / "web"
     return web if web.joinpath(*_MARKER).is_file() else None
+
+
+
+# ---------------------------------------------------------------------------
+# PROVENANCE — WHICH openDox IS ACTUALLY INSTALLED, and why the skip must ask.
+#
+# Copilot's round-1 review of openXdox-code#21 (suppressed comment on this file,
+# and the same finding twice more on `tests/test_gate_loop_probes.py` and
+# `tests/test_gate_loop_views.py`) was ACCURATE and is answered here rather than
+# argued: `find()` tests for a MARKER, never for an identity, so a skip reason
+# that says "the installed `opendox` came from somewhere older than the declared
+# pin" was asserting something it had not measured. Before the pin bump that cost
+# nothing — a missing bundle WAS the declared state. After it the same skip would
+# hide the opposite fact: if the declared pin itself ever stopped shipping
+# `web/**`, thirteen node probes, three materialization assertions and every
+# bundle suite would go quietly green in a REQUIRED check, and the coverage this
+# bump exists to gain would be lost in silence.
+#
+# So the two facts are now READ, and the skip is conditional on them:
+#   * `declared_pin()`   — the 40-hex this leg's own `pyproject.toml` declares.
+#   * `installed_commit()` — the commit pip actually built, out of the
+#     distribution's `direct_url.json` (PEP 610), which a VCS install always
+#     records.
+# Bundle missing AND the two agree  -> FAIL: a regression at the declared pin.
+# Bundle missing AND they differ    -> SKIP: a consumer assembling at its own,
+#                                      older pin, named in the reason.
+# Provenance unreadable             -> SKIP, saying so: nothing was measured, so
+#                                      nothing may be claimed either way.
+# ---------------------------------------------------------------------------
+
+_PIN_RE = re.compile(r"opendox\s*@\s*git\+[^@\s\"']+@([0-9a-f]{40})")
+
+
+def declared_pin() -> str | None:
+    """The openDox-code commit `pyproject.toml` declares, or None if unreadable."""
+    toml = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    try:
+        match = _PIN_RE.search(toml.read_text(encoding="utf-8"))
+    except OSError:                          # pragma: no cover - no checkout
+        return None
+    return match.group(1) if match else None
+
+
+def installed_commit() -> str | None:
+    """The commit the INSTALLED `opendox` was built from (PEP 610), or None.
+
+    None is not "no provenance exists"; it is "this installation did not record
+    one" — an editable checkout, a wheel copied in by hand. The callers treat it
+    as unknown and skip rather than guess.
+    """
+    try:
+        from importlib.metadata import distribution
+        raw = distribution("opendox").read_text("direct_url.json")
+    except Exception:                        # pragma: no cover - not installed
+        return None
+    if not raw:
+        return None
+    try:
+        commit = json.loads(raw).get("vcs_info", {}).get("commit_id")
+    except (ValueError, AttributeError):     # pragma: no cover - malformed
+        return None
+    return commit if isinstance(commit, str) and len(commit) == 40 else None
+
+
+def _absent(subject: str, *, module_level: bool):
+    """Raise the RIGHT outcome for a missing `subject` — fail at the declared pin."""
+    declared, installed = declared_pin(), installed_commit()
+    if declared is not None and installed is not None and declared == installed:
+        pytest.fail(
+            f"{subject} is missing from the `opendox` this leg DECLARES "
+            f"(`pyproject.toml` pins {declared[:8]}, and the installed "
+            f"distribution records that same commit in its `direct_url.json`). "
+            f"That is a REGRESSION at the declared pin, not a stale consumer, so "
+            f"it fails here instead of skipping: a skip would take thirteen node "
+            f"probes, three materialization assertions and every bundle suite "
+            f"quietly green in a required check.")
+    where = (f"the installed distribution was built from {installed[:8]}, while "
+             f"`pyproject.toml` declares {declared[:8]}"
+             if declared and installed else
+             "this installation records no PEP 610 provenance, so the two cannot "
+             "be compared and nothing is claimed about which commit is installed")
+    pytest.skip(
+        f"{subject} is missing, and this is NOT the declared pin's doing: {where}. "
+        f"Under the declared pin these suites RUN — reaching this reason means the "
+        f"`opendox` actually installed came from somewhere else (an assembly at "
+        f"its own pin, or a stale editable checkout).",
+        allow_module_level=module_level)
 
 
 _STAGED: Path | None = None
@@ -124,7 +209,7 @@ def require(*, module_level: bool = True) -> Path:
     if _STAGED is None:
         web = find()
         if web is None:
-            pytest.skip(_REASON, allow_module_level=module_level)
+            _absent("openDox's `web/` bundle", module_level=module_level)
         staging = Path(tempfile.mkdtemp(prefix="opendox-bundle-"))
         atexit.register(shutil.rmtree, staging, True)
         target = staging / "web"

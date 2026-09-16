@@ -629,20 +629,33 @@ def _view_extension_or_skip():
     leg's declared pin — the section header above says so — and an assembly is
     free to install an openDox behind the view contract. That is the same
     condition `view_extensions.ViewContractUnsupported` names at runtime, and
-    these two skips are its test-time counterpart.
+    these two guards are its test-time counterpart.
+
+    BUT THEY NO LONGER SKIP BLINDLY. Copilot's round-1 review of openXdox-code#21
+    was right that `pytest.importorskip` cannot tell "an older assembly" from "a
+    regression in the openDox this leg DECLARES", and after the bump only the
+    first of those may skip: if `0b4e8bbf` lost `view_extension` or the `exports`
+    field, all three assertions below would have gone quietly green in a required
+    check. `tests/opendox_bundle.py::_absent` decides by READING the declared pin
+    out of `pyproject.toml` and the installed commit out of the distribution's
+    PEP 610 `direct_url.json`: equal -> FAIL, different (or unrecorded) -> SKIP,
+    with both commits named in the reason either way.
     """
-    view_extension = pytest.importorskip(
-        "opendox.view_extension",
-        reason="the assembled `opendox` has no `view_extension` module (§ 3.4 "
-               "slice S3's view registry); the specs above are asserted as "
-               "data, and the materialization is asserted wherever a "
-               "contract-bearing opendox is installed")
+    import opendox_bundle
+    try:
+        from opendox import view_extension
+    except ImportError:
+        # FAIL at the declared pin, SKIP only for a different one. `importorskip`
+        # could not tell those apart, and after the pin bump that difference is
+        # the whole point: a packaging or API regression at `0b4e8bbf` would have
+        # taken all three assertions below quietly green in a required check.
+        opendox_bundle._absent(
+            "`opendox.view_extension` (§ 3.4 slice S3's view registry)",
+            module_level=False)
     if "exports" not in getattr(view_extension.ViewBinding, "__annotations__", {}):
-        pytest.skip(
-            "the assembled `opendox.view_extension.ViewBinding` does not take "
-            "RULED Q2's `exports` field (openxFactory#656 comment 5648049748); "
-            "this leg's own pin does — reaching this skip means the installed "
-            "`opendox` is older than the declared one")
+        opendox_bundle._absent(
+            "RULED Q2's `exports` field on `opendox.view_extension.ViewBinding` "
+            "(openxFactory#656 comment 5648049748)", module_level=False)
     return view_extension
 
 
