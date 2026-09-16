@@ -301,7 +301,7 @@ def declared_pin() -> str | None:
     settles the name (case-insensitively, PEP 503), the extras, the url and where
     the marker starts, because every hand-rolled version of that split lost a legal
     declaration shape — an `@` in an SSH authority, a `;` in a url path — or
-    admitted an illegal one. Five review rounds, one per shape.
+    admitted an illegal one, once per review round.
     """
     toml = Path(__file__).resolve().parents[1] / "pyproject.toml"
     try:
@@ -412,11 +412,22 @@ def _unreadable_side(declared: str | None, installed: str | None) -> str:
     branch came to name the side (review of `27a89fd`) while the CI branch did not.
     """
     if declared is None and installed is None:
-        return ("NEITHER side could be read: this leg's declared pin is unreadable "
-                "in `pyproject.toml` and the installed distribution records no "
-                "usable PEP 610 provenance")
+        return ("NEITHER side is usable: this leg's declared pin could not be read "
+                "from `pyproject.toml` (see `declared_pin()` for the six states "
+                "that reach this) and the installed distribution records no usable "
+                "PEP 610 provenance")
     if declared is None:
-        return "this leg's declared pin could not be read from `pyproject.toml`"
+        # NOT "the file could not be read": `declared_pin()` returns None for six
+        # states and only two of them are a failed READ (the review of `9ff630d`
+        # caught this phrase blaming the file for the other four — an inactive
+        # marker, no `opendox` requirement, a requirement that is not a 40-hex VCS
+        # pin, or a pin at another project, every one of them a perfectly readable
+        # `pyproject.toml`). The sentence says what IS true of all six.
+        return ("this leg's declared pin could not be read from `pyproject.toml` "
+                "— the file is unreadable or unparseable, declares no `opendox` "
+                "requirement, declares one that is not a 40-hex direct VCS pin at "
+                "openDox-code, or carries an environment marker that does not hold "
+                "here (`declared_pin()` lists the six)")
     return ("no usable PEP 610 provenance could be read from the installed "
             "distribution")
 

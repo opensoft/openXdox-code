@@ -772,7 +772,7 @@ def test_both_sides_unreadable_says_NEITHER_rather_than_picking_one(
     call = _decide(monkeypatch, None, None, ci=True)
     with pytest.raises(pytest.fail.Exception) as raised:
         call()
-    assert "NEITHER side could be read" in str(raised.value)
+    assert "NEITHER side is usable" in str(raised.value)
 
 
 def test_unknown_provenance_SKIPS_off_ci(monkeypatch) -> None:
@@ -1010,11 +1010,22 @@ def test_declared_pin_is_none_for_a_pin_whose_marker_is_FALSE(monkeypatch) -> No
     """
     for marker, expected in (('python_version >= "3.0"', _PIN_A),
                              ('python_version < "3.0"', None),
-                             ('this is not a marker', None)):
+                             # A SYNTACTICALLY VALID marker naming a variable this
+                             # environment has no value for. The case here used to
+                             # be `this is not a marker`, which `Requirement()`
+                             # rejects outright — so it proved the InvalidRequirement
+                             # branch and never reached `_marker_holds()` at all.
+                             # Copilot's review of `9ff630d`.
+                             ('extra == "nothing-declares-this"', None)):
         _with_pyproject_text(monkeypatch, _pyproject(
             f"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}"
             f" ; {marker}"))
         assert _ob.declared_pin() == expected, marker
+    # ...and the unevaluable path is driven at the function, where a marker that
+    # PARSES but cannot be evaluated here must read as false rather than raise.
+    assert _ob._marker_holds('extra == "x"') is False
+    assert _ob._marker_holds("this is not a marker") is False
+    assert _ob._marker_holds('python_version >= "3.0"') is True
 
 
 def test_declared_pin_is_none_when_pyproject_does_not_parse(monkeypatch) -> None:
