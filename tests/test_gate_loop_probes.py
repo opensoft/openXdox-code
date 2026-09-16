@@ -891,10 +891,26 @@ class _FakeDist:
         return self._payload
 
 
+#: The ONE distribution `installed_commit()` may ask about. Both fakes below assert
+#: it, because neither did until the review of `a0eed16`: they answered to ANY name,
+#: so a regression to `distribution("openxdox")` — or to any other installed package
+#: — would have read a STRANGER's `direct_url.json`, compared that commit against
+#: this leg's declared pin, and left all ten parser tests green while doing it.
+_ASKED = "opendox"
+
+
 def _with_dist(monkeypatch, payload):
-    """Install a fake distribution whose `read_text` returns (or raises) `payload`."""
+    """Install a fake distribution whose `read_text` returns (or raises) `payload`.
+
+    The fake ASSERTS the name it is asked for (see `_ASKED`): the provenance this
+    guard reads is worthless if it is read off the wrong package.
+    """
     import importlib.metadata as md
-    monkeypatch.setattr(md, "distribution", lambda name: _FakeDist(payload))
+
+    def _lookup(name):
+        assert name == _ASKED, f"installed_commit() asked for {name!r}, not {_ASKED!r}"
+        return _FakeDist(payload)
+    monkeypatch.setattr(md, "distribution", _lookup)
 
 
 def _with_no_dist(monkeypatch, exc):
@@ -903,13 +919,36 @@ def _with_no_dist(monkeypatch, exc):
     Caught at `7c0a3b6`: `_with_dist(PackageNotFoundError(...))` made `read_text`
     raise, so the test named for an uninstalled package never exercised
     `distribution("opendox")` failing, which is the call `installed_commit()`
-    actually guards.
+    actually guards. It asserts the requested name too, for `_with_dist`'s reason.
     """
     import importlib.metadata as md
 
     def _raise(name):
+        assert name == _ASKED, f"installed_commit() asked for {name!r}, not {_ASKED!r}"
         raise exc
     monkeypatch.setattr(md, "distribution", _raise)
+
+
+def test_installed_commit_asks_for_the_opendox_distribution_and_no_other(
+        monkeypatch) -> None:
+    """The lookup NAME is the assertion, and nothing else asserted it.
+
+    `_with_dist` answered to any name, so `distribution("openxdox")` would have read
+    a stranger's PEP 610 record and compared ITS commit against this leg's declared
+    pin — a provenance check on the wrong package, with every parser test green.
+    Caught at the review of `a0eed16` on #21.
+    """
+    import importlib.metadata as md
+    asked = []
+
+    def _lookup(name):
+        asked.append(name)
+        return _FakeDist(json.dumps(
+            {"url": "https://github.com/opensoft/openDox-code",
+             "vcs_info": {"vcs": "git", "commit_id": _PIN_B}}))
+    monkeypatch.setattr(md, "distribution", _lookup)
+    assert _ob.installed_commit() == _PIN_B
+    assert asked == ["opendox"]
 
 
 def test_installed_commit_reads_a_real_vcs_record(monkeypatch) -> None:

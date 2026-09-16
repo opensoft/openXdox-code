@@ -65,22 +65,31 @@ jobs:
       #     the other TEN are carved suites that RUN here, and FOUR of them reach
       #     the PINNED openDox — in TWO DIFFERENT WAYS, which this line ran
       #     together until the review of `24cd5f2` on #21 measured them apart:
-      #       - TWO read the pinned WEB BUNDLE through `tests/opendox_bundle.py`
-      #         (`test_gate_loop_views.py`, `test_gate_loop_probes.py`), so the
-      #         provenance guard below decides what a missing bundle costs them;
-      #       - TWO import pinned openDox PYTHON MODULES directly and never touch
-      #         that helper: `test_doxbench_abstract_store.py:43,45`
+      #       - ONE reads the pinned WEB BUNDLE: `test_gate_loop_probes.py`, whose
+      #         `_opendox_bundle()` finds the marker under the installed `opendox`
+      #         and whose `bundle` fixture composes it. `tests/opendox_bundle.py`'s
+      #         own `find()` / `require()` call site is driven from that file too;
+      #         `test_gate_loop_views.py` never calls `find()`, `require()` or that
+      #         fixture, which this bullet claimed until the review of `a0eed16`;
+      #       - THREE import pinned openDox PYTHON MODULES:
+      #         `test_gate_loop_views.py` takes `opendox.view_extension` through its
+      #         own guarded helper (`_view_extension_or_skip`, which is why it
+      #         imports `opendox_bundle` at all — for `_absent()`, the CLASSIFIER,
+      #         not for the bundle), while `test_doxbench_abstract_store.py:43,45`
       #         (`from opendox import doxbench_abstract_store`, `doxbench_turns`)
       #         and `test_doxbench_telemetry.py:21` (`from opendox import
-      #         doxbench_telemetry`). A regression in the pin reaches those two as
-      #         an ImportError or a failing assertion — loudly, and with no guard
-      #         in the path to classify it.
-      #     `test_gate_loop_views.py` does both (it imports
-      #     `opendox.view_extension` through its own guarded helper). Measured
-      #     over the fourteen files named below, not asserted:
-      #       grep -ln 'import opendox_bundle' <the 14>  -> views, probes
-      #       grep -ln 'from opendox import'   <the 14>  -> views, telemetry,
-      #                                                     abstract_store
+      #         doxbench_telemetry`) import at module scope with NO guard in the
+      #         path: a regression in the pin reaches those two as an ImportError
+      #         or a failing assertion, loudly and unclassified.
+      #     So `tests/opendox_bundle.py::_absent` decides for TWO of the four —
+      #     the bundle for probes, the view contract for views — and for neither
+      #     doxbench suite. Measured over the fourteen files named below:
+      #       grep -ln 'import opendox_bundle' <the 14>   -> views, probes
+      #       grep -ln 'from opendox import'   <the 14>   -> views, telemetry,
+      #                                                      abstract_store
+      #       grep -n  'opendox_bundle\.' tests/test_gate_loop_views.py
+      #                                                  -> three `_absent()` calls,
+      #                                                     no `find`/`require`
       # What Q-L8 (b′) still keeps out is the REST of the carved corpus, which
       # is BUILD-blocked on `doc_health` / `ideation_dashboard` — and
       # `tests/test_doxbench_mutation_boundary.py` is the one file this act
@@ -246,7 +255,7 @@ jobs:
       # alongside `test_doxbench_turns.py`.
       #
       # WITH IT GONE AND THE PIN MOVED, this invocation goes 301 passed /
-      # 23 skipped -> 348 passed / 6 skipped, and BOTH HALVES OF THAT DELTA HAVE
+      # 23 skipped -> 349 passed / 6 skipped, and BOTH HALVES OF THAT DELTA HAVE
       # TO BE SAID SEPARATELY, because Copilot's round-3 review of #21 caught this
       # block conflating them:
       #
@@ -260,7 +269,7 @@ jobs:
       #     file leaves this list, so that skip is no longer RUN rather than
       #     cleared. Counting it as cleared would describe a transition that never
       #     happened.
-      #   * The remaining rise to 348 is NOT the bump: it is the 31 direct tests
+      #   * The remaining rise to 349 is NOT the bump: it is the 32 direct tests
       #     of the provenance guard that Copilot's review rounds asked for, which
       #     live in `tests/test_gate_loop_probes.py` and
       #     `tests/test_gate_loop_views.py` and are therefore both on this list.
@@ -268,9 +277,9 @@ jobs:
       #     rather than carried:
       #       git diff main -- tests/test_gate_loop_probes.py \
       #                        tests/test_gate_loop_views.py | grep -c '^+def test_'
-      #     gives 31, and the passing figure has run 317 -> 323 -> 330 -> 332 ->
-      #     333 -> 334 -> 336 -> 343 -> 346 -> 348, once per round that added tests
-      #     — the
+      #     gives 32, and the passing figure has run 317 -> 323 -> 330 -> 332 ->
+      #     333 -> 334 -> 336 -> 343 -> 346 -> 348 -> 349, once per round that added
+      #     tests — the
       #     same discipline the block above applies to the skip counts. The review
       #     of `8b23f6f` asked for the CALL SITES: the tests before it proved what
       #     the guard decides and what it reads, and none of them proved that the
@@ -286,7 +295,13 @@ jobs:
       #     their declared-pin FAIL driven, so making either an unconditional
       #     failure would have passed every added test while breaking the consumer
       #     RULED 5700475319 protects — the assembly that pins an openDox behind
-      #     the view contract. Each is now driven at a DIFFERENT commit too.)
+      #     the view contract. Each is now driven at a DIFFERENT commit too. The
+      #     review of `a0eed16` took the last one, in the PARSER: both fakes for
+      #     `importlib.metadata.distribution` answered to ANY name, so a regression
+      #     to `distribution("openxdox")` would have read a stranger's PEP 610
+      #     record and compared ITS commit against this leg's declared pin with all
+      #     ten parser tests green. Both fakes assert the name now, and one test
+      #     asserts the lookup itself.)
       #
       # The 6 skips that remain are the three seam suites' `doc_health` pairs,
       # which no pin bump touches.
