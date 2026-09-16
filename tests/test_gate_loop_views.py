@@ -138,7 +138,7 @@ def test_no_module_reaches_an_external_url() -> None:
         f"modules: {offenders}")
 
 
-def test_the_assembly_hook_places_every_module_in_the_bundle(tmp_path) -> None:
+def test_the_assembly_hook_places_every_asset_in_the_bundle(tmp_path) -> None:
     """RULED Q5's primary mechanism: the composed install copies them into
     openDox's one `--web-dir` at assembly — and since RULED Q7, the SHEETS by
     the same act. A bundle carrying this column's modules and not its sheets is
@@ -186,7 +186,7 @@ def test_the_assembly_hook_can_refuse_to_overwrite(tmp_path) -> None:
         web_assets.VIEW_SHEET_NAMES[0]]
 
 
-def test_an_undeclared_module_name_is_refused() -> None:
+def test_an_undeclared_asset_name_is_refused() -> None:
     with pytest.raises(web_assets.ViewAssetError):
         web_assets.module_path("../../etc/passwd")
     with pytest.raises(web_assets.ViewAssetError):

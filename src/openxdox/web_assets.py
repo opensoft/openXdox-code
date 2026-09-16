@@ -267,9 +267,10 @@ def install_view_modules(web_dir: str | Path, *,
         except OSError as exc:
             raise ViewAssetError(
                 f"could not place {name!r} at {str(destination)!r}: {exc}. "
-                "The assembly step (RULED Q5) copies this column's view modules "
-                "into openDox's bundle; a bundle that cannot receive them is an "
-                "assembly error, not a partial install to continue past"
+                "The assembly step (RULED Q5) copies this column's view ASSETS "
+                "— its modules and, since RULED Q7, the sheets that paint them "
+                "— into openDox's bundle; a bundle that cannot receive them is "
+                "an assembly error, not a partial install to continue past"
             ) from exc
         placed.append(destination)
     return tuple(placed)
