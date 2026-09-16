@@ -226,13 +226,39 @@ _SHA_RE = re.compile(r"[0-9a-fA-F]{40}")
 #: happily, and the guard would have failed closed under CI on a correct file.
 #: Greedy `\S+` under `fullmatch` backtracks to the LAST `@` that leaves forty hex
 #: and nothing after them, which is the pin by construction.
-#: THE NAME MATCHES CASE-INSENSITIVELY, because distribution names are
-#: (PEP 503, and `tests/test_dependency_direction.py` normalizes with `.lower()`
-#: for the same reason): `OpenDox @ git+…@<sha>` is the same declaration pip
-#: installs, and reading no pin out of it would fail this guard CLOSED under CI on
-#: a correct file. Copilot's review of `18e8c12`.
-_PIN_RE = re.compile(
-    r"(?i:opendox)(?:\[[^\]]*\])?\s*@\s*git\+\S+@([0-9a-fA-F]{40})")
+#: The pin inside a direct-reference URL. The NAME, the extras and the marker are
+#: the PEP 508 parser's business now (review of `0e3922d`); what is left here is
+#: "this URL ends in `@<40-hex>` and nothing else", which is what refuses a ref
+#: that merely BEGINS with forty hex characters. `\S+` rather than `[^@\s]+`
+#: because an SSH url carries an `@` in its authority (review of `18e8c12`), and
+#: greedy backtracking under `fullmatch` lands on the LAST such `@`.
+_URL_PIN_RE = re.compile(r"git\+\S+@([0-9a-fA-F]{40})")
+
+#: The repository this leg is entitled to reason about. `installed_commit()`
+#: compares SHAS ONLY, so a declaration re-pointed at another repository at some
+#: other 40-hex commit would have made a missing bundle look like the lawful
+#: "different commit" case and SKIP under CI — while this leg was no longer
+#: testing openDox-code at all. Copilot's thread on `0e3922d`. A pin at another
+#: repository is not a declaration this guard can interpret, so it reads as NO
+#: pin, which is the fail-closed path under CI rather than a silent skip.
+#: The `;…` tail is RFC 3986 path parameters, legal in a VCS url and the very
+#: shape the review of `0e3922d` named (`…/repo;component@<sha>`); it belongs to
+#: the path, not to the repository's name, so it is allowed and ignored here.
+_OPENDOX_CODE_RE = re.compile(r".*/opendox-code(?:\.git)?(?:;[^/]*)?$")
+
+
+def _names_opendox_code(url: str) -> bool:
+    """Whether a direct-reference URL names `opensoft/openDox-code`.
+
+    Compared on the repository PATH and case-insensitively (the estate spells it
+    `openDox-code`, `opendox-code` and `OpenDox-code` in different places), with
+    the `git+` scheme prefix, any `@<ref>` suffix and a trailing `.git` stripped
+    first. A fork or mirror under another account still passes — what this refuses
+    is a DIFFERENT PROJECT, which is the case the thread on `0e3922d` names.
+    """
+    without_scheme = url[len("git+"):] if url.startswith("git+") else url
+    repository = without_scheme.rsplit("@", 1)[0] if "@" in without_scheme else without_scheme
+    return bool(_OPENDOX_CODE_RE.fullmatch(repository.rstrip("/").lower()))
 
 
 def _marker_holds(text: str) -> bool:
@@ -261,13 +287,21 @@ def _marker_holds(text: str) -> bool:
 def declared_pin() -> str | None:
     """The openDox-code commit this leg's `project.dependencies` pins `opendox` to.
 
-    None where there is NO SUCH PIN TO READ, which is four states and not one —
-    the docstring said "if unreadable" until the review of `a9264b8` pointed out
-    that the caller cannot tell them apart from that word: the file is unreadable,
-    it is not valid TOML, it declares no `opendox` requirement, or the requirement
-    it declares is not a 40-hex direct VCS pin (a branch ref, a version range, a
-    path install). `_absent()` treats all four the same — fail-closed under CI —
-    and that is the point: NONE of them tells this run which openDox it declares.
+    None where there is NO SUCH PIN TO READ, which is SIX states and not one — the
+    docstring said "if unreadable" until the review of `a9264b8` pointed out that
+    the caller cannot tell them apart from that word: the file is unreadable, it is
+    not valid TOML, it declares no `opendox` requirement, the requirement it
+    declares is not a 40-hex direct VCS pin (a branch ref, a version range, a path
+    install), its environment marker does not hold on this interpreter (review of
+    `18e8c12`), or it points at a DIFFERENT PROJECT than openDox-code (the thread
+    on `0e3922d`). `_absent()` treats all six the same — fail-closed under CI — and
+    that is the point: NONE of them tells this run which openDox it declares.
+
+    THE REQUIREMENT IS PARSED, never split by hand: `packaging.requirements`
+    settles the name (case-insensitively, PEP 503), the extras, the url and where
+    the marker starts, because every hand-rolled version of that split lost a legal
+    declaration shape — an `@` in an SSH authority, a `;` in a url path — or
+    admitted an illegal one. Five review rounds, one per shape.
     """
     toml = Path(__file__).resolve().parents[1] / "pyproject.toml"
     try:
@@ -290,19 +324,31 @@ def declared_pin() -> str | None:
     dependencies = project.get("dependencies") if isinstance(project, dict) else None
     if not isinstance(dependencies, list):
         return None
-    for requirement in dependencies:
-        if not isinstance(requirement, str):
+    try:
+        from packaging.requirements import InvalidRequirement, Requirement
+    except ModuleNotFoundError:          # pragma: no cover - ships with pytest
+        return None
+    for entry in dependencies:
+        if not isinstance(entry, str):
             continue
-        # PEP 508 allows an environment marker after `;`. The pin is in the part
-        # before it — `fullmatch` on that is what refuses a continuing ref — and the
-        # marker decides whether this requirement is INSTALLED AT ALL.
-        spec, _, marker = requirement.partition(";")
-        match = _PIN_RE.fullmatch(spec.strip())
-        if not match:
+        # THE PEP 508 PARSER SPLITS THIS, not `partition(";")`. A semicolon is a
+        # legal URI character, so `git+https://host/repo;component@<sha>` was
+        # truncated at it and read as NO pin — the guard failing closed on a
+        # declaration pip installs. Copilot's review of `0e3922d`; the parser knows
+        # where the marker starts and this function no longer guesses.
+        try:
+            requirement = Requirement(entry)
+        except InvalidRequirement:
             continue
-        if marker.strip() and not _marker_holds(marker.strip()):
+        if requirement.name.lower() != "opendox" or not requirement.url:
             continue
-        return match.group(1).lower()
+        # A marker that does not hold means pip installs nothing from this line, so
+        # the sha on it is not "the commit this leg declares" (review of `18e8c12`).
+        if requirement.marker is not None and not _marker_holds(str(requirement.marker)):
+            continue
+        match = _URL_PIN_RE.fullmatch(requirement.url)
+        if match and _names_opendox_code(requirement.url):
+            return match.group(1).lower()
     return None
 
 

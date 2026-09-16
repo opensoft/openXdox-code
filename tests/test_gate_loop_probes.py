@@ -816,14 +816,26 @@ def test_under_ci_reads_the_environment_the_runner_sets(monkeypatch) -> None:
     assert _ob.under_ci() is False
 
 
-def test_the_declared_pin_is_read_from_this_legs_own_pyproject() -> None:
-    """Not a constant: the guard re-reads the file the bump edits."""
+def test_the_declared_pin_is_read_from_this_legs_own_pyproject(monkeypatch) -> None:
+    """Not a constant: the guard re-reads the file the bump edits.
+
+    The first half checks the LIVE file, and on its own it proved nothing — a
+    hard-coded return of today's sha would satisfy a substring assertion against
+    the file that contains it (Copilot, review of `0e3922d`). The second half is
+    the proof: with `pyproject.toml` replaced by a synthetic one declaring a
+    DIFFERENT commit, the function must return THAT commit, which only a real read
+    can do.
+    """
     declared = _ob.declared_pin()
     assert declared is not None
     assert len(declared) == 40
     toml = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(
         encoding="utf-8")
     assert f"openDox-code@{declared}" in toml
+    assert _PIN_A != declared
+    _with_pyproject_text(monkeypatch, _pyproject(
+        f"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}"))
+    assert _ob.declared_pin() == _PIN_A
 
 
 def _with_unreadable_pyproject(monkeypatch, exc) -> None:
@@ -917,6 +929,28 @@ def test_declared_pin_refuses_anything_but_a_whole_40_hex_direct_pin(
             assert _ob.declared_pin() is None, (url, tail)
 
 
+def test_declared_pin_refuses_a_pin_at_a_DIFFERENT_REPOSITORY(monkeypatch) -> None:
+    """A 40-hex pin at another project is not a declaration this guard can read.
+
+    `installed_commit()` compares SHAS ONLY, so a dependency re-pointed at another
+    repository at some other 40-hex commit would have made a missing bundle look
+    like the lawful "different commit" case and SKIP under CI — while this leg was
+    no longer testing openDox-code at all. Copilot's thread on `0e3922d`. Such a
+    pin reads as NO pin, which is the fail-closed path, and a fork or mirror of
+    openDox-code under another account still reads (what is refused is a different
+    PROJECT, not a different host).
+    """
+    for url, expected in (
+            (f"git+https://github.com/opensoft/openDox-code@{_PIN_A}", _PIN_A),
+            (f"git+https://github.com/someone/openDox-code@{_PIN_A}", _PIN_A),
+            (f"git+https://example.invalid/mirrors/opendox-code.git@{_PIN_A}", _PIN_A),
+            (f"git+https://github.com/opensoft/openXdox-code@{_PIN_A}", None),
+            (f"git+https://github.com/opensoft/some-other-project@{_PIN_A}", None),
+    ):
+        _with_pyproject_text(monkeypatch, _pyproject(f"opendox @ {url}"))
+        assert _ob.declared_pin() == expected, url
+
+
 def test_declared_pin_ignores_a_commented_out_dependency(monkeypatch) -> None:
     """The stale sha in a COMMENT is not what this leg declares.
 
@@ -952,6 +986,13 @@ def test_declared_pin_reads_the_pin_through_extras_markers_and_position(
             # Distribution names are case-insensitive (PEP 503), and this one is
             # spelled `openDox` half the time in this estate. Copilot, `18e8c12`.
             f"OpenDox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}",
+            # A SEMICOLON is a legal URI character, and `partition(";")` truncated
+            # the url at it — the guard failing closed on a declaration pip
+            # installs. The PEP 508 parser knows where a marker starts.
+            # Copilot, review of `0e3922d`.
+            f"opendox @ git+https://github.com/opensoft/openDox-code;branch@{_PIN_A}",
+            # ...and a `.git` suffix, which the source check must not refuse.
+            f"opendox @ git+ssh://git@github.com/opensoft/openDox-code.git@{_PIN_A}",
     ):
         _with_pyproject_text(monkeypatch, _pyproject(
             "PyYAML>=6.0", requirement, "jsonschema>=4.18"))
@@ -1235,9 +1276,9 @@ def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) ->
 # number is not carried here. What is true at any head is the command:
 #   git diff main -- tests/test_gate_loop_probes.py | grep -c '^+def test_'
 #   git diff main -- tests/test_gate_loop_views.py  | grep -c '^+def test_'
-# (33 in this file and 6 in the views file at THIS head — 18 decision/read cases,
+# (34 in this file and 6 in the views file at THIS head — 19 decision/read cases,
 # 11 `installed_commit` parser tests and 4 call-site tests here; `validate.yml`'s
-# record block carries the total, 39. The review of `fd3af6a` caught this pair
+# record block carries the total, 40. The review of `fd3af6a` caught this pair
 # reading 25 and 6, and the review of `de7d966` moved it again by asking for the
 # two undeclared-pin tests: a count written in prose is stale one round later,
 # which is why the commands are printed above it every time.)
