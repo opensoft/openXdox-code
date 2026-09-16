@@ -98,7 +98,12 @@ VIEW_MODULE_NAMES: tuple[str, ...] = (
 #: so they name ONE sheet — the only shape that neither duplicates those eleven
 #: into two files nor makes one optional binding depend on another's sheet.
 #: openDox's registry dedupes the injected `<link>` by resolved href, which is
-#: what makes naming one sheet twice correct rather than merely tolerated.
+#: what makes naming one sheet twice correct rather than merely tolerated —
+#: and that de-duplication is LOAD-BEARING BY RULING and not by convenience:
+#: RULED openxFactory#656 comment `5700475319` (Brett Heap, 2026-09-16, by
+#: interactive multi-choice) keeps this measured shape against a tuple-valued
+#: `styles` with a seventh shared sheet, and against six sheets duplicating the
+#: eleven blocks both workbench modules name.
 VIEW_SHEET_NAMES: tuple[str, ...] = (
     "gate.css",
     "gate-projects.css",

@@ -60,7 +60,13 @@ sitting rather than against this module's own account of it:
       REALIZED: each binding that owns selectors names its sheet in `styles`
       below, the bytes ship as package data beside the modules
       (`web_assets.VIEW_SHEET_NAMES`), and `STYLE_RESIDUE` records the
-      discharge with the figures it was opened with.
+      discharge with the figures it was opened with. THE SHAPE IS RULED, not
+      merely measured: FOUR sheets rather than six, a single `styles`
+      specifier, and href de-duplication load-bearing — RULED openxFactory#656
+      comment `5700475319` (Brett Heap, 2026-09-16, by interactive
+      multi-choice), on the question this column's author put after measuring
+      that `gate-lens.js` owns no selector of its own and that the two
+      workbench modules name eleven blocks between them.
   Q8  `page-overlay`, the declared host for page-level panels — the region
       `gate.dispose` mounts its refusal panel into, replacing this column's old
       reach into `document.body`.
@@ -228,12 +234,17 @@ STYLE_RESIDUE: dict[str, Any] = {
                      "lines the blocks left on are declared `adapter calls` on "
                      "the `styles.css` row (RULED Q-L1's form, `#656` comment "
                      "`5628560136`)",
-    #: The one thing this act does NOT close, stated rather than skipped, on
-    #: the same footing the blocked note kept: the sheets read 13 of openDox's
-    #: NON-token custom properties, which RULED Q7's own sentence says are not
-    #: a stable surface. Inlining their values would end dark mode for this
-    #: column on every install, so the reads stay and the coupling is COUNTED
-    #: by `tests/test_gate_loop_views.py` instead of being hidden.
+    #: THE ONE THING THIS ACT DOES NOT CLOSE, AND IT IS RULED THAT WAY. The
+    #: sheets read 13 of openDox's NON-token custom properties, which RULED
+    #: Q7's own sentence says are not a stable surface. Put to Brett Heap with
+    #: the three alternatives (widen the stable surface by ruling; a second
+    #: declared token family for contributed chrome; defer to the BUILD arc)
+    #: and RULED openxFactory#656 comment `5700475319` (2026-09-16, by
+    #: interactive multi-choice): **MOVE them VERBATIM and REGISTER the
+    #: coupling BY MEASUREMENT** — this entry, asserted by this leg's own
+    #: `tests/test_gate_loop_views.py`. The only alternative that removes the
+    #: coupling is inlining the colour values, which would end dark mode for
+    #: this column on every install.
     "open_coupling": {
         "non_token_custom_properties_read": 13,
         "st_tokens_read": 3,

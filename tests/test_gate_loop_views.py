@@ -673,6 +673,15 @@ def test_the_style_residue_records_the_discharge_rather_than_the_block() -> None
     assert residue["rule_blocks_in_sheets"] == 61
     assert (residue["rule_blocks_moved"] + residue["mixed_blocks_handled"]
             == residue["rule_blocks_in_sheets"])
+    # THE RULING IS CITED WHERE THE DECISION IS STATED (RULED openxFactory#656
+    # comment `5700475319`, Brett Heap, 2026-09-16, by interactive
+    # multi-choice). Both halves of this act that were put to him — the
+    # verbatim move with the coupling REGISTERED, and the four-sheet shape —
+    # are his answers rather than this column's preference, and a reader of the
+    # residue must be able to see that without leaving the file.
+    for module in (view_extensions, web_assets):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "5700475319" in source, module.__name__
     assert residue["styles_css_lines_declared"] == 89
     assert residue["sheets"] == web_assets.VIEW_SHEET_NAMES
     assert "RULED Q7 realized" in residue["discharged_by"]
