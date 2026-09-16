@@ -1400,14 +1400,18 @@ def test_require_SKIPS_for_a_different_installed_commit(monkeypatch) -> None:
 
 
 def test_require_forwards_its_DEFAULT_module_level_to_the_skip(monkeypatch) -> None:
-    """THE DEFAULT IS THE PATH THE IMPORTERS TAKE, and no test drove it.
+    """THE DEFAULT IS THE PATH THE MODULE-SCOPE CALLERS TAKE, and no test drove it.
 
     Both call-site tests above pass `module_level=False`, because that is what a
-    test function needs; the 29 `OPENDOX_WEB` importers call `require()` with no
-    argument at MODULE scope, where a skip must carry `allow_module_level=True` or
-    pytest raises instead of skipping. A regression that stopped forwarding the
-    default would have left every test above green and broken exactly the callers
-    this guard exists for. Copilot's review of `5285cf2`.
+    test function needs. The TWENTY-NINE annotated module-scope sites take the
+    default instead — 26 importing `OPENDOX_WEB`, which PEP 562's `__getattr__`
+    resolves with a bare `require()`, and 3 calling `composed()`, which calls a
+    bare `require()` of its own (the two forms `opendox_bundle.py`'s own annotation
+    note keeps apart, and which the review of `2dfd669` caught being collapsed into
+    one). At module scope a skip must carry `allow_module_level=True` or pytest
+    raises instead of skipping, so a regression that stopped forwarding the default
+    would have left every test above green and broken exactly those callers.
+    Copilot's review of `5285cf2`.
     """
     _pin(monkeypatch, _PIN_A, _PIN_B)
     monkeypatch.setattr(_ob, "_STAGED", None)

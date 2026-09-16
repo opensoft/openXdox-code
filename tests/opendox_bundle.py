@@ -562,9 +562,15 @@ def require(*, module_level: bool = True) -> Path:
     the review of `2dfd669`); `web()` below passes False, so a skip takes only
     the calling TEST (see its docstring for when that is the honest reading). The
     FAIL outcomes — the declared pin, and an unreadable side under CI — are not
-    scoped by it at all: `pytest.fail` fails the test that reached the guard,
-    whichever flag was passed. The review of `e6cd0e8` caught this paragraph
-    reading as though the flag governed every outcome.
+    scoped by it at all, and no flag softens one. WHERE a failure lands is decided
+    by where the guard was REACHED, never by `module_level`: reached from a test,
+    `pytest.fail` fails that test; reached while a module is being imported — the
+    `OPENDOX_WEB` line, through PEP 562's `__getattr__`, or a module-scope
+    `composed()` — it raises during COLLECTION, and pytest reports that module as a
+    collection ERROR rather than a failed test. Red either way, which is the point.
+    The review of `e6cd0e8` caught this paragraph reading as though the flag
+    governed every outcome; the review of `ca327c2` caught the sentence that
+    replaced it promising a failed TEST in the one case that cannot produce one.
 
     WHY A STAGED COPY AND NOT THE INSTALLED DIRECTORY ITSELF (Copilot review of
     openXdox-code#19, the `test_round_trip.py` finding — accurate). Several of
