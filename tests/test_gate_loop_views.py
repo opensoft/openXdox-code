@@ -615,7 +615,13 @@ def test_the_style_residue_is_recorded_rather_than_skipped() -> None:
 # ---------------------------------------------------------------------------
 
 def _view_extension_or_skip():
-    """The assembled openDox's view registry, or SKIP where it has none.
+    """The assembled openDox's view registry, or — where it has none — a FAIL if
+    that openDox is the one this leg DECLARES (or its provenance is unreadable
+    under CI) and a SKIP only for a demonstrably different consumer.
+
+    The summary line used to read "or SKIP where it has none", which contradicted
+    the table four paragraphs down; Copilot's review of `42741fd` on #21 caught
+    it. The summary is the line a reader trusts, so it carries the outcome now.
 
     BOTH GUARDS ARE SATISFIED BY THIS LEG'S OWN PIN, since 2026-09-16.
     They were not when slice S5 wrote them: the pin was `a99eba03`, the first

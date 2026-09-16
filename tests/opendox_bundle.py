@@ -124,6 +124,8 @@ def find() -> Path | None:
 #                                      nothing measured means nothing claimed.
 # ---------------------------------------------------------------------------
 
+_SHA_RE = re.compile(r"[0-9a-f]{40}")
+
 _PIN_RE = re.compile(r"opendox\s*@\s*git\+[^@\s\"']+@([0-9a-f]{40})")
 
 
@@ -157,10 +159,20 @@ def installed_commit() -> str | None:
     if not raw:
         return None
     try:
-        commit = json.loads(raw).get("vcs_info", {}).get("commit_id")
+        vcs_info = json.loads(raw).get("vcs_info") or {}
+        vcs, commit = vcs_info.get("vcs"), vcs_info.get("commit_id")
     except (ValueError, AttributeError):     # pragma: no cover - malformed
         return None
-    return commit if isinstance(commit, str) and len(commit) == 40 else None
+    # BOTH CHECKS ARE LOAD-BEARING, and the second is Copilot's finding at the
+    # head before this one: `len(commit) == 40` admitted any forty CHARACTERS, so
+    # a malformed record carrying a forty-character non-hex id read as "a
+    # different pin" and `_absent()` SKIPPED under CI — the silent green this
+    # whole guard exists to prevent, reached through the parser instead of
+    # through the decision. A commit id is 40 lowercase hex and the record must
+    # say it is git, or this function does not know what is installed.
+    if vcs != "git" or not isinstance(commit, str):
+        return None
+    return commit if _SHA_RE.fullmatch(commit) else None
 
 
 def under_ci() -> bool:
@@ -230,8 +242,11 @@ _STAGED: Path | None = None
 
 
 def require(*, module_level: bool = True) -> Path:
-    """The pinned bundle, STAGED once per process as an ESM-marked tree — or
-    SKIP where the pin carries no bundle.
+    """The pinned bundle, STAGED once per process as an ESM-marked tree — or,
+    where there is none, whatever `_absent()` decides: FAIL for the pin this leg
+    DECLARES (and for unknown provenance under CI), SKIP for a demonstrably
+    different consumer. It is not an unconditional skip, and this docstring said
+    it was until Copilot's review of `42741fd` on #21.
 
     `module_level=True` skips the IMPORTING MODULE, which is what the thirty
     suites whose whole subject is the bundle want. `web()` below passes False,
@@ -293,8 +308,9 @@ def require(*, module_level: bool = True) -> Path:
 
 
 def web() -> Path:
-    """The pinned bundle, skipping ONLY THE CALLING TEST where the pin carries
-    none.
+    """The pinned bundle; where there is none, `_absent()`'s outcome scoped to
+    the CALLING TEST rather than the module — a FAIL for the declared pin (or
+    unknown provenance under CI) and a SKIP for a different consumer.
 
     FOR THE SUITE WHOSE SUBJECT IS NOT THE BUNDLE (Copilot review of
     `openXdox-code#19` is the class of finding this anticipates, and the

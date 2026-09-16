@@ -787,7 +787,28 @@ def test_installed_commit_is_none_for_a_non_vcs_install(monkeypatch) -> None:
 
 def test_installed_commit_refuses_a_commit_id_that_is_not_40_hex(monkeypatch) -> None:
     """A short id is not a commit this guard may compare — round 3's parser case."""
-    _with_dist(monkeypatch, json.dumps({"vcs_info": {"commit_id": "0b4e8bbf"}}))
+    _with_dist(monkeypatch, json.dumps(
+        {"vcs_info": {"vcs": "git", "commit_id": "0b4e8bbf"}}))
+    assert _ob.installed_commit() is None
+
+
+def test_installed_commit_refuses_forty_characters_that_are_not_hex(monkeypatch) -> None:
+    """THE SILENT-GREEN PATH THROUGH THE PARSER, caught at `42741fd`.
+
+    `len(commit) == 40` admitted any forty characters, so a malformed record
+    carrying a forty-character non-hex id read as "a different pin" and `_absent()`
+    SKIPPED under CI — the exact outcome this guard exists to prevent, reached
+    through the reading rather than through the decision.
+    """
+    _with_dist(monkeypatch, json.dumps(
+        {"vcs_info": {"vcs": "git", "commit_id": "z" * 40}}))
+    assert _ob.installed_commit() is None
+
+
+def test_installed_commit_refuses_a_record_that_is_not_git(monkeypatch) -> None:
+    """A 40-hex id under a non-git VCS is not an openDox-code commit."""
+    _with_dist(monkeypatch, json.dumps(
+        {"vcs_info": {"vcs": "hg", "commit_id": _PIN_B}}))
     assert _ob.installed_commit() is None
 
 
