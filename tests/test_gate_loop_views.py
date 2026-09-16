@@ -617,8 +617,8 @@ def test_the_style_residue_is_recorded_rather_than_skipped() -> None:
 def _view_extension_or_skip():
     """The assembled openDox's view registry, or — where it has none — whichever
     of FAIL and SKIP `tests/opendox_bundle.py::_absent` measures: FAIL for the
-    commit this leg DECLARES and for unrecorded provenance UNDER CI; SKIP for a
-    DIFFERENT commit and for unrecorded provenance OFF CI.
+    commit this leg DECLARES and for an UNREADABLE SIDE (either commit) under CI;
+    SKIP for a DIFFERENT commit and for an unreadable side OFF CI.
 
     This summary took two goes. It read "or SKIP where it has none", which
     contradicted the table four paragraphs down; the review of `42741fd` on #21
@@ -656,10 +656,11 @@ def _view_extension_or_skip():
     out of `pyproject.toml` and the installed commit out of the distribution's
     PEP 610 `direct_url.json`. This docstring said "different (or unrecorded) ->
     SKIP", and Copilot's round-3 review of #21 was right that the parenthesis is
-    false: UNRECORDED provenance FAILS under CI and skips only off it, because a
+    false: an UNREADABLE SIDE fails under CI and skips only off it, because a
     skip on the required path is the silent green the guard exists to prevent.
     The table `_absent()` actually carries: equal -> FAIL; different -> SKIP with
-    both commits named; unrecorded -> FAIL under CI, SKIP off it.
+    both commits named; either side unreadable -> FAIL under CI naming WHICH side
+    it was, SKIP off it.
     """
     import opendox_bundle
     try:
@@ -672,7 +673,20 @@ def _view_extension_or_skip():
         opendox_bundle._absent(
             "`opendox.view_extension` (§ 3.4 slice S3's view registry)",
             module_level=False)
-    if "exports" not in getattr(view_extension.ViewBinding, "__annotations__", {}):
+    binding = getattr(view_extension, "ViewBinding", None)
+    if binding is None:
+        # THE MODULE WITHOUT ITS CLASS — a third unsupported shape, and until the
+        # review of `24cd5f2` on #21 the only one that escaped this guard: the
+        # class was dereferenced here directly, so an assembly shipping
+        # `view_extension` without `ViewBinding` raised AttributeError instead of
+        # taking the declared FAIL/SKIP. `view_extensions.ViewContractUnsupported`
+        # names exactly that assembly as unsupported (its docstring: "an assembly
+        # that pins an openDox without `view_extension.ViewBinding`"), so it is
+        # `_absent()`'s to classify, like the other two.
+        opendox_bundle._absent(
+            "`opendox.view_extension.ViewBinding` (§ 3.4 slice S3's view "
+            "registry class)", module_level=False)
+    if "exports" not in getattr(binding, "__annotations__", {}):
         opendox_bundle._absent(
             "RULED Q2's `exports` field on `opendox.view_extension.ViewBinding` "
             "(openxFactory#656 comment 5648049748)", module_level=False)
@@ -813,7 +827,14 @@ def test_a_missing_view_extension_FAILS_at_the_declared_pin(monkeypatch) -> None
 
 def test_a_missing_view_extension_SKIPS_for_a_different_installed_commit(
         monkeypatch) -> None:
-    """...and the older-assembly reading RULED 5700475319 keeps still holds."""
+    """...and the DIFFERENT-COMMIT reading RULED 5700475319 keeps still holds.
+
+    Not "older", and the thread on `24cd5f2` was right to say so twice: `_absent()`
+    compares two identities and never asks git which came first, so `b`*40 against
+    `a`*40 is a different assembly and nothing more. The ruling's own ground — an
+    assembly is free to install an openDox behind the view contract — is what this
+    skip serves, and it needs no ordering to hold.
+    """
     _guard_reads(monkeypatch, _PIN_DECLARED, _PIN_OTHER)
     _without_view_extension(monkeypatch)
     with pytest.raises(pytest.skip.Exception) as raised:
@@ -830,10 +851,36 @@ def test_a_ViewBinding_without_exports_FAILS_at_the_declared_pin(
     This is the branch a partial packaging regression would take — the registry
     present, the contract behind it — and it was the less obvious of the two to
     leave unproven.
+
+    THE MODULE COMES THROUGH THE HELPER, not `from opendox import view_extension`:
+    the review of `24cd5f2` caught that a bare import here raises ImportError for
+    exactly the consumer this helper exists to SKIP (a different openDox without
+    the module), turning a supported assembly into a hard failure inside the test
+    that proves the guard. This call is made BEFORE `_guard_reads()` patches
+    anything, so it is the real installed module or the real skip.
     """
-    from opendox import view_extension
+    view_extension = _view_extension_or_skip()
     _guard_reads(monkeypatch, _PIN_DECLARED, _PIN_DECLARED)
     monkeypatch.setattr(view_extension.ViewBinding, "__annotations__", {})
     with pytest.raises(pytest.fail.Exception) as raised:
         _view_extension_or_skip()
     assert "`exports` field" in str(raised.value)
+
+
+def test_a_view_extension_without_ViewBinding_FAILS_at_the_declared_pin(
+        monkeypatch) -> None:
+    """THE THIRD unsupported shape: the module imports, the CLASS is not there.
+
+    It raised `AttributeError` before the review of `24cd5f2` — the one path out
+    of this guard that never reached `_absent()` — and an AttributeError three
+    frames from a dataclass is precisely what
+    `view_extensions.ViewContractUnsupported` exists to replace with a sentence.
+    """
+    view_extension = _view_extension_or_skip()
+    _guard_reads(monkeypatch, _PIN_DECLARED, _PIN_DECLARED)
+    monkeypatch.delattr(view_extension, "ViewBinding")
+    with pytest.raises(pytest.fail.Exception) as raised:
+        _view_extension_or_skip()
+    message = str(raised.value)
+    assert "ViewBinding" in message
+    assert "REGRESSION at the declared pin" in message

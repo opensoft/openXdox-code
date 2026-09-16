@@ -173,12 +173,17 @@ def bundle(tmp_path) -> Path:
     openxFactory#656 comment 5700475319 (Brett Heap, 2026-09-16, by interactive
     multi-choice), answer (a): keep the guards, correct their reasons.
 
-    That was a plain skip until the 2026-09-16 pin bump, when a missing
-    bundle stopped being the expected state and started being a regression —
-    see `tests/opendox_bundle.py::_absent`, which reads both commits before it
-    decides. A probe that quietly ran against a stand-in `helpers.js` would
-    measure the stand-in rather than the shipped file, so a skip is still the
-    right outcome wherever `_absent()` gives one.
+    That was a plain skip until the 2026-09-16 pin bump, when a missing bundle
+    stopped being the expected state AT THE COMMIT THIS LEG DECLARES and started
+    being a regression THERE — see `tests/opendox_bundle.py::_absent`, which reads
+    both commits before it decides. Only the equal-commit row is a regression: a
+    DIFFERENT installed commit still skips, an unreadable side still skips off CI,
+    and the CI failure for an unreadable side is a comparison anomaly rather than
+    a verdict on the package. The review of `24cd5f2` caught this sentence
+    generalizing the one row to all four, two paragraphs below the table.
+    A probe that quietly ran against a stand-in `helpers.js` would measure the
+    stand-in rather than the shipped file, so a skip is still the right outcome
+    wherever `_absent()` gives one.
     """
     source = _opendox_bundle()
     if source is None:
@@ -728,11 +733,46 @@ def test_a_different_installed_commit_SKIPS_and_names_both(monkeypatch) -> None:
 
 
 def test_unknown_provenance_FAILS_under_ci(monkeypatch) -> None:
-    """The round-2 finding: on the REQUIRED path, unknown is not neutral."""
+    """The round-2 finding: on the REQUIRED path, unknown is not neutral.
+
+    The message says the two commits could not be COMPARED and names the side that
+    could not be read — it no longer says "this run cannot say which `opendox` is
+    installed", which was false whenever the unreadable side was `pyproject.toml`
+    (the review of `24cd5f2`, and the assertion below moved with it).
+    """
     call = _decide(monkeypatch, _PIN_A, None, ci=True)
     with pytest.raises(pytest.fail.Exception) as raised:
         call()
-    assert "cannot say which `opendox` is installed" in str(raised.value)
+    message = str(raised.value)
+    assert "could not be COMPARED" in message
+    assert "no usable PEP 610 provenance could be read" in message
+
+
+def test_an_unreadable_declared_pin_under_ci_does_not_blame_the_install(
+        monkeypatch) -> None:
+    """THE CI TWIN of the off-CI test below, and the review of `24cd5f2`'s finding.
+
+    `declared_pin()` unreadable with a perfectly good `direct_url.json` used to FAIL
+    saying "this run cannot say which `opendox` is installed" while the very next
+    field printed the installed hash. What is unknown is the COMPARISON, and the
+    message has to say which side went missing — under CI exactly as off it.
+    """
+    call = _decide(monkeypatch, None, _PIN_B, ci=True)
+    with pytest.raises(pytest.fail.Exception) as raised:
+        call()
+    message = str(raised.value)
+    assert "declared pin could not be read" in message
+    assert "no usable PEP 610 provenance" not in message
+    assert _PIN_B in message
+
+
+def test_both_sides_unreadable_says_NEITHER_rather_than_picking_one(
+        monkeypatch) -> None:
+    """The third shape, which the either/or phrasing could only half-report."""
+    call = _decide(monkeypatch, None, None, ci=True)
+    with pytest.raises(pytest.fail.Exception) as raised:
+        call()
+    assert "NEITHER side could be read" in str(raised.value)
 
 
 def test_unknown_provenance_SKIPS_off_ci(monkeypatch) -> None:

@@ -72,12 +72,16 @@ says, and they are four different claims:
     the required path an unreadable side is lawful;
   * EQUAL commits -> FAIL, saying "the openDox we declare is wrong". This is the
     only outcome that is an assertion about the package;
-  * an unreadable side, UNDER CI -> FAIL, saying "this run cannot say which
-    openDox is installed". That is a PROVENANCE ANOMALY, not proof of a bad
+  * an unreadable side, UNDER CI -> FAIL, naming WHICH side could not be read
+    and saying the two commits could not be COMPARED. It does NOT say "this run
+    cannot say which openDox is installed": where `pyproject.toml` is the
+    unreadable side the installed commit is in hand and gets printed, so that
+    claim was false for one of the two shapes this row covers — caught at the
+    review of `24cd5f2` on #21. It is a COMPARISON anomaly, not proof of a bad
     package: `validate.yml` installs `-e ".[test]"` against a PEP 508 direct VCS
     reference and pip records `direct_url.json` for that every time, so a
-    required run that cannot read one has lost the ability to check, which is
-    itself worth stopping for.
+    required run that cannot read one side has lost the ability to check, which
+    is itself worth stopping for.
 
 The guard's whole job is to keep those four apart instead of answering "skip" to
 all of them.
@@ -246,6 +250,27 @@ def under_ci() -> bool:
     return os.environ.get("CI", "").strip().lower() in {"1", "true", "yes"}
 
 
+def _unreadable_side(declared: str | None, installed: str | None) -> str:
+    """WHICH side of the comparison could not be read — never "which openDox is
+    installed", because two of these three shapes have a commit in hand.
+
+    Copilot's review of `24cd5f2` on #21 caught the CI branch saying "this run
+    cannot say which `opendox` is installed" while the very next field printed the
+    installed hash: when `pyproject.toml` is the unreadable side, the provenance is
+    known and it is the COMPARISON that cannot be made. Both branches compose their
+    phrase here now, so the two can no longer drift apart — which is how the off-CI
+    branch came to name the side (review of `27a89fd`) while the CI branch did not.
+    """
+    if declared is None and installed is None:
+        return ("NEITHER side could be read: this leg's declared pin is unreadable "
+                "in `pyproject.toml` and the installed distribution records no "
+                "usable PEP 610 provenance")
+    if declared is None:
+        return "this leg's declared pin could not be read from `pyproject.toml`"
+    return ("no usable PEP 610 provenance could be read from the installed "
+            "distribution")
+
+
 def _absent(subject: str, *, module_level: bool) -> NoReturn:
     """Raise the RIGHT outcome for a missing `subject`.
 
@@ -276,25 +301,26 @@ def _absent(subject: str, *, module_level: bool) -> NoReturn:
             f"it fails here instead of skipping: a skip would take every suite "
             f"that depends on {subject} quietly green in a required check.")
     if declared is None or installed is None:
+        unreadable = _unreadable_side(declared, installed)
         if under_ci():
             pytest.fail(
-                f"{subject} is missing AND this run cannot say which `opendox` is "
-                f"installed (declared={declared or 'unreadable'}, "
-                f"installed={installed or 'unrecorded'}). On CI that is itself the "
-                f"anomaly: `validate.yml` installs `-e \".[test]\"` against a PEP 508 "
-                f"direct VCS reference, and pip records `direct_url.json` for that "
-                f"every time. Failing rather than skipping, because a skip here is "
-                f"exactly the silent green this guard exists to prevent.")
-        missing = ("this leg's declared pin could not be read from "
-                   "`pyproject.toml`" if declared is None else
-                   "no usable PEP 610 provenance could be read from the installed "
-                   "distribution")
+                f"{subject} is missing and the two commits could not be COMPARED: "
+                f"{unreadable} (declared={declared or 'unreadable'}, "
+                f"installed={installed or 'unrecorded'}). Where the field above "
+                f"prints a commit, THAT side was read fine; nothing here claims the "
+                f"installed openDox is unknown. On CI the unreadable side is itself "
+                f"the anomaly: `validate.yml` installs `-e \".[test]\"` against a "
+                f"PEP 508 direct VCS reference, and pip records `direct_url.json` "
+                f"for that every time. Failing rather than skipping, because a skip "
+                f"here is exactly the silent green this guard exists to prevent.")
         pytest.skip(
-            f"{subject} is missing and the comparison could not be made: {missing} "
+            f"{subject} is missing and the comparison could not be made: {unreadable} "
             f"(declared={declared or 'unreadable'}, "
             f"installed={installed or 'unreadable'}). NOTHING is claimed here about "
-            f"which openDox is installed — this is not the different-commit skip, "
-            f"which names both. Off the CI path an unreadable side is lawful (an "
+            f"whether the installed openDox IS the declared one — the comparison "
+            f"never happened. This is not the different-commit skip, which reads "
+            f"both sides and names them. Off the CI path an unreadable side is "
+            f"lawful (an "
             f"editable checkout or a hand-placed wheel records none). Under CI this "
             f"same condition FAILS.",
             allow_module_level=module_level)
