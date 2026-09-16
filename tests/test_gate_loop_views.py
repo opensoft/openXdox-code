@@ -666,7 +666,7 @@ def test_the_style_residue_records_the_discharge_rather_than_the_block() -> None
     residue = view_extensions.STYLE_RESIDUE
     assert residue["blocked_by"] is None
     assert residue["exclusive_classes"] == 54
-    assert residue["shared_classes"] == 22
+    assert residue["shared_classes"] == 21
     assert residue["rule_blocks_moved"] == 59
     assert residue["styles_css_lines_declared"] == 89
     assert residue["sheets"] == web_assets.VIEW_SHEET_NAMES

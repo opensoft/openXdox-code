@@ -198,12 +198,12 @@ CTX_MODEL_REACH: dict[str, dict[str, tuple[str, ...]]] = {
 #: `cb343ae8` reproduces EXACTLY under a literal-only scan — and the `51` was
 #: three short: `.dispose-accepted`, `.dispose-rejected` and `.dispose-deferred`
 #: are built by `"disposebtn dispose-" + v.outcome` (`dispose.js`:275), which no
-#: literal search can see. 54 classes are this column's own; 22 are shared with
+#: literal search can see. 54 classes are this column's own; 21 are shared with
 #: modules that stay and are openDox's, which is where they remain.
 STYLE_RESIDUE: dict[str, Any] = {
     "measured_at": "opensoft/openDox-code 0b4e8bbf, opensoft/openXdox-code 0a0265f7",
     "exclusive_classes": 54,
-    "shared_classes": 22,
+    "shared_classes": 21,
     "rule_blocks_moved": 59,
     "styles_css_lines_declared": 89,
     "sheets": web_assets.VIEW_SHEET_NAMES,
