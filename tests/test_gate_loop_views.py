@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import ast
 import dataclasses
+import fnmatch
 import re
 from pathlib import Path
 
@@ -254,6 +255,27 @@ def test_the_hosted_fallback_serves_only_declared_names() -> None:
     other_leg = Probe("/views/app.js")
     other_leg._serve_contributed_view_module(False)
     assert other_leg.served is None and other_leg.errored[0] == 404
+
+    # AND A DECLARED SHEET, THROUGH THE SAME HANDLER (Copilot review, round 1).
+    # Asserting the `CTYPES` table alone left the `.css` branch of
+    # `_serve_contributed_view_module` unexercised: a regression in the suffix
+    # lookup, in the bytes, or in the content type would pass while every
+    # hosted stylesheet was served as `text/javascript` — which a browser in
+    # standards mode answers by DROPPING the sheet, with no error event and an
+    # unstyled panel as the only symptom.
+    sheet = Probe("/views/gate.css")
+    sheet._serve_contributed_view_module(False)
+    assert sheet.errored is None
+    assert sheet.served[0] == web_assets.module_source("gate.css")
+    assert sheet.served[1] == serve_views.CSS_CTYPE
+    assert sheet.served[1] != serve_views.JS_CTYPE
+    # every declared sheet, not just the one above
+    for name in web_assets.VIEW_SHEET_NAMES:
+        probe = Probe(f"/views/{name}")
+        probe._serve_contributed_view_module(True)
+        assert probe.errored is None, name
+        assert probe.served[1] == serve_views.CSS_CTYPE, name
+        assert probe.served[2] is True, name
 
 
 # ---------------------------------------------------------------------------
@@ -669,6 +691,47 @@ def _sheet_body(name: str) -> str:
     return "".join(out)
 
 
+def test_the_package_data_globs_cover_every_declared_asset() -> None:
+    """A TYPO IN `pyproject.toml` LEAVES THIS SUITE GREEN AND THE WHEEL EMPTY
+    (Copilot review, round 1).
+
+    Every asset test above reads `src/openxdox/web/views/` directly, so none of
+    them touches `[tool.setuptools.package-data]`. Drop the `*.css` pattern and
+    a source checkout still passes while the built wheel carries four bindings
+    whose sheets cannot load — and `module_path()`'s own refusal message is
+    written for exactly that day. The patterns are read from the real file and
+    matched against the real declared set, which is the check a wheel build
+    would make without needing one.
+    """
+    # ANCHORED ON THIS FILE, not on the package: `view_extensions.__file__`
+    # points into site-packages under a non-editable install, where there is no
+    # `pyproject.toml` to read — and this suite runs `--noconftest` from the
+    # checkout, whose root is this file's parent's parent.
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    if not pyproject.is_file():
+        pytest.skip("no `pyproject.toml` beside `tests/`: this is an installed "
+                    "tree, and the pattern it declares is not there to read")
+    text = pyproject.read_text(encoding="utf-8")
+    block = re.search(r"^\[tool\.setuptools\.package-data\]\s*$(.*?)(?=^\[|\Z)",
+                      text, re.M | re.S)
+    assert block, "pyproject.toml declares no [tool.setuptools.package-data]"
+    patterns = re.findall(r'"([^"]+)"', block.group(1))
+    assert patterns, block.group(1)
+    # A package-data pattern is relative to the PACKAGE directory, so the path
+    # to match is `web/views/<name>` — DERIVED from `VIEW_MODULE_DIR` rather
+    # than spelled here, or this test would carry a second copy of the layout
+    # it is checking.
+    package_dir = Path(web_assets.__file__).resolve().parent
+    subdir = web_assets.VIEW_MODULE_DIR.resolve().relative_to(package_dir)
+    for name in web_assets.VIEW_ASSET_NAMES:
+        rel = f"{subdir.as_posix()}/{name}"
+        assert any(fnmatch.fnmatch(rel, pattern) for pattern in patterns), (
+            f"{rel!r} is declared in `VIEW_ASSET_NAMES` and matches no "
+            f"package-data pattern {patterns}: it would be missing from the "
+            "built wheel while every test in this file, which reads the source "
+            "tree, stayed green")
+
+
 def test_every_declared_sheet_ships_and_every_shipped_sheet_is_declared() -> None:
     """`VIEW_MODULE_NAMES`' own rule, applied to the sheets: a file nothing
     declares is a file shipped into another leg's bundle with no binding naming
@@ -714,9 +777,32 @@ def test_no_contributed_sheet_declares_a_design_token() -> None:
     authority, and a second would shadow a host's declared role per theme.
     """
     for name in web_assets.VIEW_SHEET_NAMES:
-        written = re.findall(r"^\s*(--st-[A-Za-z0-9_-]+)\s*:", _sheet_body(name),
-                             re.M)
+        written = _declared_st_tokens(_sheet_body(name))
         assert written == [], f"{name} declares {written}"
+
+
+#: A DECLARATION FOLLOWS THE START OF THE TEXT, A `{`, OR A `;` — never only a
+#: newline (Copilot review, round 1). These sheets are written one rule per
+#: line, so `.x { --st-proposed: red; }` declares the token after a `{` and a
+#: second one after a `;`, and a `^\s*` scan saw neither. `(` is deliberately
+#: not in the list: that is what bounds a `var()` READ, which RULED Q7 permits
+#: and this guard must not catch.
+_ST_DECLARATION = re.compile(r"(?:^|[{;])\s*(--st-[A-Za-z0-9_-]+)\s*:")
+
+
+def _declared_st_tokens(css: str) -> list[str]:
+    """Every `--st-*` a sheet WRITES. Comments must already be blanked."""
+    return _ST_DECLARATION.findall(css)
+
+
+def test_the_design_token_guard_sees_an_inline_declaration() -> None:
+    """The guard above is worth running only if it catches the shape these
+    sheets are actually written in. Asserted, because a guard that cannot fail
+    is a comment."""
+    assert _declared_st_tokens(".x { --st-proposed: red; }") == ["--st-proposed"]
+    assert _declared_st_tokens("a{color:red;--st-captured:blue}") == ["--st-captured"]
+    assert _declared_st_tokens("  --st-organized: green;") == ["--st-organized"]
+    assert _declared_st_tokens(".x { color: var(--st-proposed); }") == []
 
 
 def test_the_non_token_coupling_is_the_number_the_residue_records() -> None:
@@ -779,11 +865,19 @@ def test_the_sheets_carry_no_remote_asset_and_no_import() -> None:
     which is `test_renderer.py::test_no_external_urls_anywhere_in_bundle`'s
     subject one file over.
     """
+    # CSS AT-RULES AND `url()` ARE CASE-INSENSITIVE (Copilot review, round 1):
+    # `@IMPORT` and `URL(https://…)` are valid CSS and both evaded a lowercase
+    # scan, which is the whole policy this test states. The scheme is folded
+    # too, because `HTTPS://` is equally valid.
     for name in web_assets.VIEW_SHEET_NAMES:
         body = _sheet_body(name)
-        assert "@import" not in body, name
-        for url in re.findall(r"url\(([^)]*)\)", body):
-            assert not re.match(r"\s*['\"]?(https?:)?//", url), (name, url)
+        assert not re.search(r"@import\b", body, re.I), name
+        for url in re.findall(r"url\(([^)]*)\)", body, re.I):
+            assert not re.match(r"\s*['\"]?(?:https?:)?//", url, re.I), (name, url)
+
+    # AND THE SCAN CATCHES BOTH SPELLINGS, asserted rather than assumed.
+    assert re.search(r"@import\b", "@IMPORT url(x);", re.I)
+    assert re.match(r"\s*['\"]?(?:https?:)?//", "HTTPS://cdn.example/x.css", re.I)
 
 
 # ---------------------------------------------------------------------------
