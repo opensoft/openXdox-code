@@ -833,6 +833,18 @@ def test_installed_commit_refuses_forty_characters_that_are_not_hex(monkeypatch)
     assert _ob.installed_commit() is None
 
 
+def test_installed_commit_normalizes_an_upper_case_commit_id(monkeypatch) -> None:
+    """A lawful record spelled in upper case is compared, not discarded.
+
+    Asked for on #21. It can only ever turn an "unknown" into a real comparison:
+    without it an upper-case id would read as unreadable provenance and FAIL under
+    CI over a formatting difference rather than a regression.
+    """
+    _with_dist(monkeypatch, json.dumps(
+        {"vcs_info": {"vcs": "git", "commit_id": _PIN_B.upper()}}))
+    assert _ob.installed_commit() == _PIN_B
+
+
 def test_installed_commit_refuses_a_record_that_is_not_git(monkeypatch) -> None:
     """A 40-hex id under a non-git VCS is not an openDox-code commit."""
     _with_dist(monkeypatch, json.dumps(

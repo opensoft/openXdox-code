@@ -135,9 +135,14 @@ def find() -> Path | None:
 #                                      nothing measured means nothing claimed.
 # ---------------------------------------------------------------------------
 
-_SHA_RE = re.compile(r"[0-9a-f]{40}")
+#: A git object name, matched CASE-INSENSITIVELY and normalized to lowercase
+#: below. Copilot asked for the normalization on openXdox-code#21, and it can
+#: only ever turn an "unknown" into a real comparison: a lawful record that
+#: happens to spell its commit in upper case would otherwise read as
+#: unreadable provenance and FAIL under CI for a formatting difference.
+_SHA_RE = re.compile(r"[0-9a-fA-F]{40}")
 
-_PIN_RE = re.compile(r"opendox\s*@\s*git\+[^@\s\"']+@([0-9a-f]{40})")
+_PIN_RE = re.compile(r"opendox\s*@\s*git\+[^@\s\"']+@([0-9a-fA-F]{40})")
 
 
 def declared_pin() -> str | None:
@@ -147,7 +152,7 @@ def declared_pin() -> str | None:
         match = _PIN_RE.search(toml.read_text(encoding="utf-8"))
     except OSError:                          # pragma: no cover - no checkout
         return None
-    return match.group(1) if match else None
+    return match.group(1).lower() if match else None
 
 
 def installed_commit() -> str | None:
@@ -183,7 +188,7 @@ def installed_commit() -> str | None:
     # say it is git, or this function does not know what is installed.
     if vcs != "git" or not isinstance(commit, str):
         return None
-    return commit if _SHA_RE.fullmatch(commit) else None
+    return commit.lower() if _SHA_RE.fullmatch(commit) else None
 
 
 def under_ci() -> bool:
