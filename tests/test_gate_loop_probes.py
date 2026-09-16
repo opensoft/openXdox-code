@@ -879,48 +879,87 @@ def test_declared_pin_is_none_when_pyproject_declares_no_opendox_pin(
     assert _ob.declared_pin() is None
 
 
-def test_declared_pin_refuses_a_40_hex_PREFIX_of_a_longer_ref(monkeypatch) -> None:
-    """`…@<40-hex>dead` is NOT a pin, and the regex used to read one out of it.
+def _pyproject(*requirements, extra="") -> str:
+    """A minimal, VALID `pyproject.toml` declaring exactly these requirements.
 
-    Copilot's finding at `8b9ece1` (thread on `tests/opendox_bundle.py:197`), and it
-    is the parser bug with the widest blast radius found on this PR: `_PIN_RE` had no
-    delimiter after `{40}`, so any ref that merely BEGAN with forty hex characters
-    yielded that prefix as "the commit this leg declares". The guard would then
-    compare a commit this leg does NOT declare against what is installed — equal by
-    accident FAILS naming the wrong culprit, unequal SKIPS over a real regression.
-    A continuing ref must read as NO pin, which takes the fail-closed path under CI.
-
-    THE FIRST FIX WAS TOO NARROW AND THE THREAD ON `2dfd669` SAID SO: a negative
-    lookahead over `[0-9a-zA-Z]` still admitted `-feature`, `/branch`, `_suffix` and
-    `.1`, all legal git refs. Refusing ref characters one class at a time is a losing
-    game; the pattern requires a POSITIVE terminator now — the characters that can
-    legitimately follow the sha in `pyproject.toml` — and every separator named in
-    that thread is in the loop below.
+    The quote is chosen per requirement — a TOML literal string for the usual
+    case, a basic string where the value itself carries a `'` — because two cases
+    below put a quote character INSIDE the requirement on purpose, and a helper
+    that emitted invalid TOML would make `declared_pin()` return None for the
+    wrong reason, passing the test while proving nothing.
     """
-    for tail in ("dead", "x", "0", "-feature", "/branch", "_suffix", ".1"):
-        _with_pyproject_text(monkeypatch, (
-            "dependencies = [\n"
-            f"    \"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}{tail}\",\n"
-            "]\n"))
+    body = ""
+    for requirement in requirements:
+        quote = '"' if "'" in requirement else "'"
+        assert quote not in requirement, requirement
+        body += f"    {quote}{requirement}{quote},\n"
+    return ('[project]\nname = "openxdox-code"\n'
+            f"{extra}dependencies = [\n{body}]\n")
+
+
+def test_declared_pin_refuses_anything_but_a_whole_40_hex_direct_pin(
+        monkeypatch) -> None:
+    """A ref that CONTINUES past the sha is not a pin, and every escape is closed.
+
+    Four review rounds walked this one class of bug out of a text search — no
+    terminator at all (`8b9ece1`), a negative lookahead that let `-feature`,
+    `/branch`, `_suffix` and `.1` through (`2dfd669`), a positive terminator set
+    that still let `,` and `'` through INSIDE the quoted URL (`a9264b8`) — and the
+    answer was to stop searching text: `tomllib` hands over the dependency VALUE,
+    and `fullmatch` admits it only if the WHOLE requirement is the pin. Every
+    continuation those rounds named is driven here, on one `assert`.
+    """
+    for tail in ("dead", "x", "0", "-feature", "/branch", "_suffix", ".1",
+                 ",feature", "'feature", " feature", "#feature"):
+        _with_pyproject_text(monkeypatch, _pyproject(
+            f"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}{tail}"))
         assert _ob.declared_pin() is None, tail
 
 
-def test_declared_pin_still_reads_the_real_pin_beside_that_guard(
-        monkeypatch) -> None:
-    """...and the delimiter guard does not cost the pin it is there to protect.
+def test_declared_pin_ignores_a_commented_out_dependency(monkeypatch) -> None:
+    """The stale sha in a COMMENT is not what this leg declares.
 
-    The live `pyproject.toml` is read by
-    `test_the_declared_pin_is_read_from_this_legs_own_pyproject`; this drives the
-    same line's ENDINGS — the closing quote, a comma, a newline, a `#` comment —
-    because a lookahead that is too strict fails closed on a correct file, which is
-    the opposite defect and just as silent.
+    Copilot's finding at `a9264b8`: a search over the raw file text reads a sha out
+    of a commented-out old line, so a leg whose real dependency had been changed or
+    removed would still report the commented commit — and `_absent()` would compare
+    against a pin this file no longer declares. `tomllib` never sees comments.
     """
-    for line in (f'    "opendox @ git+https://x/openDox-code@{_PIN_A}",',
-                 f'    "opendox @ git+https://x/openDox-code@{_PIN_A}"',
-                 f'opendox @ git+https://x/openDox-code@{_PIN_A}  # the pin',
-                 f'opendox @ git+https://x/openDox-code@{_PIN_A}'):
-        _with_pyproject_text(monkeypatch, f"dependencies = [\n{line}\n]\n")
-        assert _ob.declared_pin() == _PIN_A, line
+    _with_pyproject_text(monkeypatch, _pyproject(
+        "PyYAML>=6.0",
+        extra=(f'# opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}\n'
+               "# (kept as provenance, and not a declaration)\n")))
+    assert _ob.declared_pin() is None
+
+
+def test_declared_pin_reads_the_pin_through_extras_markers_and_position(
+        monkeypatch) -> None:
+    """...and the parse does not cost the pin it protects.
+
+    PEP 508 lets the requirement carry extras and an environment marker, and the
+    list has no required order. A guard too strict to read a legitimate declaration
+    fails closed on a CORRECT file, which is the opposite defect and just as silent.
+    """
+    for requirement in (
+            f"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}",
+            f"opendox[test] @ git+https://github.com/opensoft/openDox-code@{_PIN_A}",
+            f'opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A} ; python_version >= "3.11"',
+    ):
+        _with_pyproject_text(monkeypatch, _pyproject(
+            "PyYAML>=6.0", requirement, "jsonschema>=4.18"))
+        assert _ob.declared_pin() == _PIN_A, requirement
+
+
+def test_declared_pin_is_none_when_pyproject_does_not_parse(monkeypatch) -> None:
+    """A `pyproject.toml` that is not TOML declares nothing, and fails closed.
+
+    The read became a PARSE at `a9264b8`'s review, so `TOMLDecodeError` joined
+    `OSError` and `UnicodeDecodeError` in the same refusal. Without it the guard
+    would raise out of `declared_pin()` and bypass `_absent()`'s policy entirely —
+    the defect the review of `27a89fd` found for `UnicodeDecodeError`, one parser
+    later.
+    """
+    _with_pyproject_text(monkeypatch, "[project\nname = broken")
+    assert _ob.declared_pin() is None
 
 
 def test_an_undeclared_pin_FAILS_under_ci_like_any_other_unreadable_side(
@@ -1169,9 +1208,9 @@ def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) ->
 # number is not carried here. What is true at any head is the command:
 #   git diff main -- tests/test_gate_loop_probes.py | grep -c '^+def test_'
 #   git diff main -- tests/test_gate_loop_views.py  | grep -c '^+def test_'
-# (30 in this file and 6 in the views file at THIS head — 15 decision/read cases,
+# (32 in this file and 6 in the views file at THIS head — 17 decision/read cases,
 # 11 `installed_commit` parser tests and 4 call-site tests here; `validate.yml`'s
-# record block carries the total, 36. The review of `fd3af6a` caught this pair
+# record block carries the total, 38. The review of `fd3af6a` caught this pair
 # reading 25 and 6, and the review of `de7d966` moved it again by asking for the
 # two undeclared-pin tests: a count written in prose is stale one round later,
 # which is why the commands are printed above it every time.)

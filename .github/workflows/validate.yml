@@ -146,7 +146,12 @@ jobs:
       # until the pin bump that lands with the openDox half". THAT BUMP HAS
       # LANDED: `pyproject.toml` names `0b4e8bbf` (openDox-code#23, § 3.4 slice
       # S8 leg B) since 2026-09-16, and this file goes 32 passed / 3 skipped ->
-      # 35 passed / 0 skipped under the invocation below.
+      # 35 passed / 0 skipped under the invocation below. THAT PAIR IS THE
+      # PIN-BUMP-ONLY MEASUREMENT, at `708591b`, and it is labelled because the
+      # review of `a9264b8` read it as the current one: the review rounds then
+      # added six guard tests to this file, so under the same invocation at the
+      # head it is 41 passed / 0 skipped
+      # (`python -m pytest -q tests/test_gate_loop_views.py --noconftest`).
       #
       # `tests/test_gate_loop_probes.py` joins it on the same footing and for
       # the reason the slice exists: slice S4 proved its two new modules by
@@ -161,7 +166,11 @@ jobs:
       # end "where the installed `opendox` carries no bundle (this leg's pinned
       # state until the pin bump) every probe SKIPS". THE SAME BUMP CLEARED IT:
       # at `0b4e8bbf` the bundle is in the wheel and this file goes 0 passed /
-      # 13 skipped -> 13 passed / 0 skipped. The skip survives for an assembly
+      # 13 skipped -> 13 passed / 0 skipped — again the PIN-BUMP-ONLY pair, at
+      # `708591b`; the rounds added thirty-two guard tests here, so at the head the
+      # same invocation reads 45 passed / 0 skipped
+      # (`python -m pytest -q tests/test_gate_loop_probes.py --noconftest`).
+      # The skip survives for an assembly
       # that installs a DIFFERENT openDox from the one this leg declares — the
       # guard compares two commit identities and never asks git which came first,
       # so "different" is all it can say — and the `node` one for a runner
@@ -255,7 +264,7 @@ jobs:
       # alongside `test_doxbench_turns.py`.
       #
       # WITH IT GONE AND THE PIN MOVED, this invocation goes 301 passed /
-      # 23 skipped -> 353 passed / 6 skipped, and BOTH HALVES OF THAT DELTA HAVE
+      # 23 skipped -> 355 passed / 6 skipped, and BOTH HALVES OF THAT DELTA HAVE
       # TO BE SAID SEPARATELY, because Copilot's round-3 review of #21 caught this
       # block conflating them:
       #
@@ -269,7 +278,7 @@ jobs:
       #     file leaves this list, so that skip is no longer RUN rather than
       #     cleared. Counting it as cleared would describe a transition that never
       #     happened.
-      #   * The remaining rise to 353 is NOT the bump: it is the 36 direct tests
+      #   * The remaining rise to 355 is NOT the bump: it is the 38 direct tests
       #     of the provenance guard that Copilot's review rounds asked for, which
       #     live in `tests/test_gate_loop_probes.py` and
       #     `tests/test_gate_loop_views.py` and are therefore both on this list.
@@ -277,9 +286,9 @@ jobs:
       #     rather than carried:
       #       git diff main -- tests/test_gate_loop_probes.py \
       #                        tests/test_gate_loop_views.py | grep -c '^+def test_'
-      #     gives 36, and the passing figure has run 317 -> 323 -> 330 -> 332 ->
-      #     333 -> 334 -> 336 -> 343 -> 346 -> 348 -> 349 -> 351 -> 353, once per
-      #     round that added tests — the
+      #     gives 38, and the passing figure has run 317 -> 323 -> 330 -> 332 ->
+      #     333 -> 334 -> 336 -> 343 -> 346 -> 348 -> 349 -> 351 -> 353 -> 355, once
+      #     per round that added tests — the
       #     same discipline the block above applies to the skip counts. The review
       #     of `8b23f6f` asked for the CALL SITES: the tests before it proved what
       #     the guard decides and what it reads, and none of them proved that the
@@ -313,10 +322,22 @@ jobs:
       #     merely BEGAN with forty hex characters (`…@<40-hex>dead`) yielded that
       #     prefix as the declared commit — and the guard would compare a commit this
       #     leg does NOT declare against what is installed, failing on the wrong
-      #     culprit or skipping over a real regression. A trailing `(?![0-9a-zA-Z])`
-      #     makes a continuing ref read as NO pin, which is the fail-closed path, and
-      #     two tests hold both sides of it: three continuing refs refused, four
-      #     legitimate line endings still read.)
+      #     culprit or skipping over a real regression. A trailing negative
+      #     lookahead over alphanumerics made a continuing ref read as NO pin —
+      #     THE EXPRESSION IS NOT REPRODUCED HERE, at the request of the review of
+      #     `a9264b8`, because a rejected pattern written out in a workflow is a
+      #     pattern somebody copies back; it was still a TEXT SEARCH,
+      #     and the next two rounds walked the same class of hole out of it: a
+      #     positive terminator set still admitted `,` and `'` INSIDE the quoted PEP
+      #     508 URL, and a search over raw text could read a sha out of a
+      #     COMMENTED-OUT dependency line. `declared_pin()` PARSES the file with
+      #     `tomllib` now and `fullmatch`es the dependency VALUE, so a pin is read
+      #     only when the entire declared requirement is
+      #     `opendox @ git+<url>@<40-hex>` — and a comment is not in
+      #     `project.dependencies` at all. Eleven continuations are refused in one
+      #     test, and three legitimate declarations (plain, with extras, with an
+      #     environment marker) are still read in another, because a guard too
+      #     strict to read a correct file fails closed just as silently.)
       #
       # The 6 skips that remain are the three seam suites' `doc_health` pairs,
       # which no pin bump touches.

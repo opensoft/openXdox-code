@@ -106,6 +106,7 @@ import os
 import re
 import shutil
 import tempfile
+import tomllib
 from pathlib import Path
 from typing import NoReturn
 
@@ -194,34 +195,43 @@ def find() -> Path | None:
 #: unreadable provenance and FAIL under CI for a formatting difference.
 _SHA_RE = re.compile(r"[0-9a-fA-F]{40}")
 
-#: THE TRAILING GUARD IS LOAD-BEARING, and it is Copilot's finding at `8b9ece1`,
-#: sharpened by its finding at `2dfd669`.
-#: Without a terminator this pattern matched a 40-hex PREFIX of a longer ref:
-#: `…@<40-hex>dead` is not pinned to that commit at all, yet `declared_pin()`
-#: returned the prefix, and the guard would then compare a commit this leg does
-#: NOT declare against what is installed — equal by accident is a FAIL that names
-#: the wrong culprit, and unequal is a SKIP that hides a real regression. A ref
-#: that merely CONTINUES is not a 40-hex pin, so it reads as no pin at all and
-#: takes the fail-closed path under CI.
-#: IT IS A POSITIVE TERMINATOR, not a list of refused characters — the first try
-#: was `(?![0-9a-zA-Z])`, and the review of `2dfd669` was right that it lets
-#: `…@<sha>-feature`, `…@<sha>/branch`, `…@<sha>_suffix` and `…@<sha>.1` through,
-#: all of them legal git refs. Refusing ref characters one class at a time is a
-#: losing game (git allows nearly everything a URL does); requiring the pin to END
-#: where a TOML string or line ends is not. The terminator set is exactly the
-#: characters that can legitimately follow the sha in `pyproject.toml`: a closing
-#: quote, whitespace (the newline included), a comma, a closing bracket, or a `#`
-#: comment — or the end of the file.
+#: THE PIN IS READ OUT OF THE PARSED DEPENDENCY LIST, NOT OUT OF THE FILE TEXT,
+#: and that is where four review rounds drove it. The text-search version had a
+#: new hole every round, each one the same class — a 40-hex PREFIX read as a pin:
+#:   `8b9ece1`  no terminator at all (`…@<sha>dead`);
+#:   `2dfd669`  `(?![0-9a-zA-Z])`, which still let `-feature`, `/branch`,
+#:              `_suffix` and `.1` through, all legal git refs;
+#:   `a9264b8`  a positive terminator set, which still let `,` and `'` through
+#:              INSIDE the quoted PEP 508 URL, where both are ref continuations;
+#:   and, independently of any terminator, a search over the raw text could read
+#:   the sha out of a COMMENTED-OUT old dependency line and compare against a pin
+#:   this file no longer declares.
+#: Refusing ref characters one class at a time is a losing game — git allows
+#: nearly everything a URL does. `tomllib` ends it: the dependency VALUE is a
+#: string the parser hands over whole, so `fullmatch` against it admits a pin only
+#: when the ENTIRE declared requirement is `opendox @ git+<url>@<40-hex>`, and a
+#: comment is not in `project.dependencies` at all. Copilot's finding at `a9264b8`.
+#: The optional-dependency tables are NOT searched: a test extra is not what this
+#: leg is built against, and `validate.yml` installs `.[test]` against this list.
 _PIN_RE = re.compile(
-    r"opendox\s*@\s*git\+[^@\s\"']+@([0-9a-fA-F]{40})(?=[\"'\s,\]#]|$)")
+    r"opendox(?:\[[^\]]*\])?\s*@\s*git\+[^@\s]+@([0-9a-fA-F]{40})")
 
 
 def declared_pin() -> str | None:
-    """The openDox-code commit `pyproject.toml` declares, or None if unreadable."""
+    """The openDox-code commit this leg's `project.dependencies` pins `opendox` to.
+
+    None where there is NO SUCH PIN TO READ, which is four states and not one —
+    the docstring said "if unreadable" until the review of `a9264b8` pointed out
+    that the caller cannot tell them apart from that word: the file is unreadable,
+    it is not valid TOML, it declares no `opendox` requirement, or the requirement
+    it declares is not a 40-hex direct VCS pin (a branch ref, a version range, a
+    path install). `_absent()` treats all four the same — fail-closed under CI —
+    and that is the point: NONE of them tells this run which openDox it declares.
+    """
     toml = Path(__file__).resolve().parents[1] / "pyproject.toml"
     try:
-        match = _PIN_RE.search(toml.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError):
+        parsed = tomllib.loads(toml.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
         # UnicodeDecodeError is a ValueError, NOT an OSError, so a non-UTF-8
         # `pyproject.toml` would have escaped this function and bypassed
         # `_absent()`'s explicit unknown-provenance policy altogether. Caught at
@@ -231,8 +241,23 @@ def declared_pin() -> str | None:
         # types are now driven by
         # `tests/test_gate_loop_probes.py::test_declared_pin_is_none_when_*`, so
         # the pragma had become a false claim about the branch it labelled.
+        # `TOMLDecodeError` joined them at `a9264b8`'s review, when the read became
+        # a PARSE: a `pyproject.toml` that does not parse declares nothing, and the
+        # guard must fail closed on it exactly as it does on an unreadable one.
         return None
-    return match.group(1).lower() if match else None
+    project = parsed.get("project")
+    dependencies = project.get("dependencies") if isinstance(project, dict) else None
+    if not isinstance(dependencies, list):
+        return None
+    for requirement in dependencies:
+        if not isinstance(requirement, str):
+            continue
+        # PEP 508 allows an environment marker after `;`; the pin is in the part
+        # before it, and `fullmatch` on the rest is what refuses a continuing ref.
+        match = _PIN_RE.fullmatch(requirement.split(";", 1)[0].strip())
+        if match:
+            return match.group(1).lower()
+    return None
 
 
 def installed_commit() -> str | None:
