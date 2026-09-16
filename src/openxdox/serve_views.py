@@ -39,6 +39,8 @@ import route_extension
 from openxdox import web_assets
 
 __all__ = [
+    "CSS_CTYPE",
+    "CTYPES",
     "JS_CTYPE",
     "ContributedViewModuleRoutes",
     "ViewModuleRoutesExtension",
@@ -50,6 +52,18 @@ __all__ = [
 #: loader is exactly the "failed to load" refusal `resolveView` reports without
 #: being able to say why — so it is stated here rather than inferred.
 JS_CTYPE = "text/javascript; charset=utf-8"
+
+#: And the one a STYLESHEET must be served with. A browser in standards mode
+#: DROPS a `<link rel="stylesheet">` whose response is not `text/css`, and the
+#: symptom is a panel that mounts and renders unstyled with nothing logged —
+#: exactly the failure `injectBindingStyles`' own console refusal exists to
+#: name, arriving by a route that produces no error event at all.
+CSS_CTYPE = "text/css; charset=utf-8"
+
+#: Suffix -> media type, for the ONE handler that answers for both. Stated as a
+#: table rather than branched in the handler so a third asset kind cannot be
+#: added without choosing its type here.
+CTYPES: dict[str, str] = {".js": JS_CTYPE, ".css": CSS_CTYPE}
 
 
 class ContributedViewModuleRoutes:
@@ -74,22 +88,31 @@ class ContributedViewModuleRoutes:
         path = self.path.split("?", 1)[0].split("#", 1)[0]
         prefix = f"/{web_assets.BUNDLE_SUBDIR}/"
         name = path[len(prefix):] if path.startswith(prefix) else ""
-        if name not in web_assets.VIEW_MODULE_NAMES:
+        if name not in web_assets.VIEW_ASSET_NAMES:
             # Not this column's to answer. 404 rather than falling through:
             # the dispatcher already decided this route is ours, and serving
             # openDox's bundle from here would be the fork the seam prevents.
             self.send_error(404, "not found")
             return
-        self._serve_bytes(web_assets.module_source(name), JS_CTYPE, head_only)
+        suffix = name[name.rfind("."):]
+        self._serve_bytes(web_assets.module_source(name), CTYPES[suffix],
+                          head_only)
 
 
 def view_module_bindings() -> tuple[route_extension.RouteBinding, ...]:
-    """One EXACT GET binding per declared view module, in declaration order."""
+    """One EXACT GET binding per declared view ASSET, in declaration order.
+
+    The sheets RULED Q7 sends with the bindings need the fallback for the same
+    reason the modules do: a deployment that cannot write into openDox's bundle
+    cannot receive either, and a gate loop served unstyled through a fallback
+    that answers only for `.js` is the half-assembly `install_view_modules`
+    refuses to produce.
+    """
     return tuple(
         route_extension.RouteBinding(
             "GET", web_assets.served_path(name), False,
             "_serve_contributed_view_module")
-        for name in web_assets.VIEW_MODULE_NAMES
+        for name in web_assets.VIEW_ASSET_NAMES
     )
 
 

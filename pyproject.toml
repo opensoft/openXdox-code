@@ -148,7 +148,7 @@ where = ["src"]
 # `openxdox.serve_views` (the declared hosted fallback) both able to find them
 # in an INSTALLED package rather than only in a source checkout.
 [tool.setuptools.package-data]
-openxdox = ["web/views/*.js"]
+openxdox = ["web/views/*.js", "web/views/*.css"]
 
 [tool.pytest.ini_options]
 # The ROOTDIR ANCHOR. With no pytest ini table anywhere, pytest infers a

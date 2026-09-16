@@ -1,0 +1,47 @@
+/* gate-projects.css — the project-commission panel (`views/gate-projects.js`), RULED Q7.
+
+   *"a contributed binding's CSS lives WITH THE BINDING, in its own sheet;
+   openDox's declared design tokens (the `--st-*` family, S7) are the one
+   stable styling surface; nothing else in `styles.css` is."*
+   — Brett Heap, 2026-09-12, `opensoft/openxFactory#656` comment `5648049748`
+
+   EVERY RULE HERE LEFT openDox's `src/opendox/web/styles.css` VERBATIM, and
+   the manifest row that carries that file declares the lines they left on
+   (RULED Q-L1's form, `#656` comment `5628560136`). What selects them is
+   measured, never chosen: each selector's every class is named by this
+   column's six modules and by no file of openDox's own bundle
+   (`measure-css-census.py`, the BROAD scan).
+
+   WHAT THIS SHEET READS THAT IS NOT A `--st-*` TOKEN is openDox's own
+   non-token custom properties, which RULED Q7 declares are NOT a stable
+   surface. They are read here because the alternative is inlining colour
+   values, which would end dark mode for this column on every install. The
+   coupling is REGISTERED rather than hidden: this column's own
+   `tests/test_gate_loop_views.py` counts every non-token property these
+   sheets read and holds the number, so a rename at openDox turns this
+   column's suite red instead of turning its panels invisible.
+
+   Placed into openDox's `--web-dir` at assembly by `openxdox.web_assets`
+   (RULED Q5), beside the module it belongs to, and named by that module's
+   `ViewBinding.styles`. */
+
+/* The create form is a LABELED PANEL anchored under the header controls,
+   the same visual family as the filter popover. */
+.projectform.projectpanel {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 40;
+  display: flex; flex-direction: column; gap: 6px; min-width: 260px;
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 4px; padding: 10px; box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+}
+.panelhead { font-family: var(--mono); font-size: 13px; font-weight: 700; }
+.panelnote { font-size: 11px; color: var(--muted); max-width: 300px; }
+.panelfield { display: flex; flex-direction: column; gap: 2px; }
+.panellabel { font-size: 11px; color: var(--muted); letter-spacing: 0.04em; }
+.panelmembers {
+  display: flex; flex-direction: column; gap: 2px;
+  max-height: 220px; overflow-y: auto;
+}
+.panelbuttons { display: flex; gap: 6px; }
+.projectform .projectmember { font-size: 12px; display: inline-flex; align-items: center; gap: 3px; }
+.projectname { font-family: var(--mono); font-size: 12px; padding: 2px 6px; }
+.projectform.projectpanel[hidden] { display: none; }

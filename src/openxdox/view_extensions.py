@@ -22,7 +22,9 @@ WHY THE BINDINGS ARE DECLARED AS DATA AND MATERIALIZED LATE. This leg pins
 `opendox` by commit (`pyproject.toml`), and the pinned commit is older than the
 view registry itself — `opendox.view_extension` does not exist there, and the
 `exports` field RULED Q2 adds is newer still, landing in openDox-code's own S5
-leg. Importing either at module-import time would make this module unimportable
+leg; the `styles` field RULED Q7 adds is newer again, landing in openDox-code's
+own Q7 leg, which is why `views()` below FEATURE-DETECTS it rather than
+declaring it unconditionally. Importing either at module-import time would make this module unimportable
 under its own declared dependency and would put this leg's `validate` red for a
 reason that has nothing to do with this column. So `VIEW_BINDING_SPECS` below is
 plain data — the same JSON shape the manifest crosses the process boundary as —
@@ -54,8 +56,11 @@ sitting rather than against this module's own account of it:
       binding through its `ctx` — `CTX_MODEL_REACH` below is the whole of what
       each binding asks the shell for — and `BUNDLE_REACH` is held to the
       guarantee by `tests/test_gate_loop_views.py`.
-  Q7  a contributed binding's CSS lives with the binding. NOT realized in this
-      slice and NOT silently skipped: see `STYLE_RESIDUE` below.
+  Q7  a contributed binding's CSS lives with the binding, in its own sheet.
+      REALIZED: each binding that owns selectors names its sheet in `styles`
+      below, the bytes ship as package data beside the modules
+      (`web_assets.VIEW_SHEET_NAMES`), and `STYLE_RESIDUE` records the
+      discharge with the figures it was opened with.
   Q8  `page-overlay`, the declared host for page-level panels — the region
       `gate.dispose` mounts its refusal panel into, replacing this column's old
       reach into `document.body`.
@@ -75,6 +80,7 @@ A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
 
 from __future__ import annotations
 
+import dataclasses
 from typing import Any
 
 from openxdox import web_assets
@@ -89,6 +95,7 @@ __all__ = [
     "GateLoopViews",
     "ViewContractUnsupported",
     "declared_routes",
+    "specs_for",
 ]
 
 
@@ -166,31 +173,68 @@ CTX_MODEL_REACH: dict[str, dict[str, tuple[str, ...]]] = {
                                          "firstEditBody", "firstEditVerdict")},
 }
 
-#: Q7's UNFINISHED HALF, stated rather than skipped. RULED Q7 (`5648049748`):
-#: "a contributed binding's CSS lives WITH THE BINDING, in its own sheet;
-#: openDox's declared design tokens (the `--st-*` family, S7) are the one stable
-#: styling surface; nothing else in `styles.css` is." This slice does NOT move
-#: the gate loop's selectors out of openDox's `styles.css`, and the reason is a
-#: floor constraint rather than an omission: that file is a `moved_verbatim` row
-#: of openxFactory's `docs/opendox-carve-manifest.yaml`, whose declared-edit
+#: Q7's DISCHARGE, with the figures it was opened with. RULED Q7
+#: (`5648049748`): "a contributed binding's CSS lives WITH THE BINDING, in its
+#: own sheet; openDox's declared design tokens (the `--st-*` family, S7) are the
+#: one stable styling surface; nothing else in `styles.css` is."
+#:
+#: WHAT WAS HERE AND WHY IT IS GONE. At `01b06c94` this table recorded the
+#: extraction as BLOCKED: `styles.css` was a `moved_verbatim` row of
+#: openxFactory's `docs/opendox-carve-manifest.yaml`, whose declared-edit
 #: vocabulary is the RULED closed list `import rewrites | path constants |
-#: adapter calls`, and "a stylesheet block leaves for another leg" is in none of
-#: them — the same wall slice S6 met on one test file and WITHDREW from rather
-#: than work round. It needs the `re_destined:` form RULED Q6 of the boundary
-#: note (`5648044785`), which is being built in parallel, or its own ruling.
-#: MEASURED at openDox-code `cb343ae8`, so the successor slice starts from a
-#: number and not from a re-derivation: 51 CSS classes are used by this column's
-#: six modules and by nothing else in openDox's bundle; 24 more are shared with
-#: modules that stay.
+#: adapter calls`, and "a stylesheet block leaves for another leg" was in none
+#: of them. **That wall no longer stands, and it was not worked round.** Slice
+#: S7 (openxFactory #1030 -> `b3a75537`) converted the row to
+#: `moved_with_declared_edit` with 152 `adapter calls` lines, so the question
+#: narrowed from "may this row carry an edit at all" to "is a DELETION
+#: declarable", which the floor already answers twice: § 3.4 slice S6 declared
+#: 122 `serve_projection.py` DELETIONS under `adapter calls` and landed, and
+#: `scripts/verify-carve-arrival.py` accepts this act's own 89 deleted carve
+#: lines under the same class — MEASURED, not argued, before a line of this
+#: column was written.
+#:
+#: THE CENSUS, RE-MEASURED at openDox-code `0b4e8bbf` and openXdox-code
+#: `0a0265f7` rather than carried forward. The `51 / 24` this table recorded at
+#: `cb343ae8` reproduces EXACTLY under a literal-only scan — and the `51` was
+#: three short: `.dispose-accepted`, `.dispose-rejected` and `.dispose-deferred`
+#: are built by `"disposebtn dispose-" + v.outcome` (`dispose.js`:275), which no
+#: literal search can see. 54 classes are this column's own; 22 are shared with
+#: modules that stay and are openDox's, which is where they remain.
 STYLE_RESIDUE: dict[str, Any] = {
-    "measured_at": "opensoft/openDox-code cb343ae8",
-    "exclusive_classes": 51,
-    "shared_classes": 24,
-    "blocked_by": "styles.css is a moved_verbatim carve row; no edit class "
-                  "covers a stylesheet block leaving for another leg",
-    "discharged_by": "the re_destined: form (RULED Q6, openxFactory#656 "
-                     "comment 5648044785) or a ruling of its own; the shared "
-                     "half is slice S7's --st-* token work",
+    "measured_at": "opensoft/openDox-code 0b4e8bbf, opensoft/openXdox-code 0a0265f7",
+    "exclusive_classes": 54,
+    "shared_classes": 22,
+    "rule_blocks_moved": 59,
+    "styles_css_lines_declared": 89,
+    "sheets": web_assets.VIEW_SHEET_NAMES,
+    "previously_measured_at": "opensoft/openDox-code cb343ae8 (51 exclusive / "
+                              "24 shared; the 51 missed the three classes "
+                              "`dispose.js` builds by concatenation)",
+    "blocked_by": None,
+    "discharged_by": "RULED Q7 realized here and at openDox-code: `ViewBinding."
+                     "styles` names each sheet, `views/view_extension.js` "
+                     "injects one `<link>` per href into `document.head` "
+                     "(never `document.body`, RULED Q8), and the 89 carve "
+                     "lines the blocks left on are declared `adapter calls` on "
+                     "the `styles.css` row (RULED Q-L1's form, `#656` comment "
+                     "`5628560136`)",
+    #: The one thing this act does NOT close, stated rather than skipped, on
+    #: the same footing the blocked note kept: the sheets read 13 of openDox's
+    #: NON-token custom properties, which RULED Q7's own sentence says are not
+    #: a stable surface. Inlining their values would end dark mode for this
+    #: column on every install, so the reads stay and the coupling is COUNTED
+    #: by `tests/test_gate_loop_views.py` instead of being hidden.
+    "open_coupling": {
+        "non_token_custom_properties_read": 13,
+        "st_tokens_read": 3,
+        "st_tokens_declared": 0,
+        "host_context_classes": ("swb-draftchrome",),
+        "note": "RULED Q7 makes the `--st-*` family the one stable styling "
+                "surface; these sheets also READ openDox's own non-token "
+                "properties and one openDox class as host context. Registered "
+                "here and held by this leg's own suite, so a rename at openDox "
+                "turns this column red rather than blank",
+    },
 }
 
 
@@ -224,6 +268,7 @@ VIEW_BINDING_SPECS: tuple[dict[str, Any], ...] = (
         # is the read-only web surface working as designed. Declaring the
         # capability would delete that surface on every non-loopback plane.
         "id": "gate.bar",
+        "styles": "./views/gate.css",
         "region": "viewer-gatebar",
         "module": "./views/gate.js",
         "entry": "mountGateBar",
@@ -240,6 +285,11 @@ VIEW_BINDING_SPECS: tuple[dict[str, Any], ...] = (
         # THE LENS'S TWO GATE VERBS (slice S4's module). The plan panel's
         # execute box is a live gate control with no descriptor form, so the
         # capability is a genuine mount requirement.
+        # NO `styles`, AND THAT IS MEASURED. `gate-lens.js` names no class
+        # that openDox's own bundle does not also name: its plan-panel controls
+        # reuse the shell's shared `.cbtn` / `.lens` chrome. RULED Q7 sends a
+        # binding's OWN CSS to its own sheet; this binding has none, and an
+        # empty sheet shipped for symmetry would be a file nothing declares.
         "id": "gate.lens",
         "region": "lens-gate",
         "module": "./views/gate-lens.js",
@@ -255,6 +305,7 @@ VIEW_BINDING_SPECS: tuple[dict[str, Any], ...] = (
         # THE PROJECT COMMISSIONS (slice S4's module). Same reading: the
         # create/edit-project controls are live gate verbs or they are nothing.
         "id": "gate.projects",
+        "styles": "./views/gate-projects.css",
         "region": "repo-projects",
         "module": "./views/gate-projects.js",
         "entry": "mountProjectCommissions",
@@ -279,6 +330,7 @@ VIEW_BINDING_SPECS: tuple[dict[str, Any], ...] = (
         # 2's literal grep cannot see. They are literals in the module now and
         # they are declared here.
         "id": "gate.dispose",
+        "styles": "./views/dispose.css",
         "region": "page-overlay",
         "module": "./views/dispose.js",
         "entry": "mountRefusalPanel",
@@ -319,6 +371,7 @@ VIEW_BINDING_SPECS: tuple[dict[str, Any], ...] = (
         # bar's reason: without `actions.gate` this module renders the seeded
         # CLI descriptor (`renderDescriptor`), which is the read-only surface.
         "id": "gate.workbench.create",
+        "styles": "./views/swb.css",
         "region": "workbench-create",
         "module": "./views/swb-create.js",
         "entry": "mountCreateAffordance",
@@ -343,6 +396,7 @@ VIEW_BINDING_SPECS: tuple[dict[str, Any], ...] = (
         # capability is off and nothing at all when the plane declares
         # `session: false`, both of which are its own correct behaviour.
         "id": "gate.workbench.session",
+        "styles": "./views/swb.css",
         "region": "workbench-session",
         "module": "./views/swb-session.js",
         "entry": "mountSessionAffordances",
@@ -359,6 +413,39 @@ VIEW_BINDING_SPECS: tuple[dict[str, Any], ...] = (
         "optional": True,
     },
 )
+
+
+def specs_for(binding_cls: Any) -> tuple[dict[str, Any], ...]:
+    """The declared specs, ADAPTED to the `ViewBinding` an assembly installed.
+
+    RULED Q7's `styles` FIELD IS NEWER THAN THE PIN, and this is slice S5's
+    posture applied in the other direction. `styles` lands in openDox-code's own
+    Q7 leg; until this leg pins an `opendox` that carries it, handing it to the
+    constructor raises the same `TypeError` `ViewContractUnsupported` names for
+    `exports` — and refusing the WHOLE COLUMN because its panels would be
+    unstyled is the "a declaration deleting the surface it was meant to
+    describe" defect `gate.dispose`'s own `requires` note argues against at
+    length. Unstyled panels are degraded; absent panels are deleted.
+
+    So the field is DROPPED where the installed class does not take it, the
+    column mounts, and the pin bump that follows openDox-code's Q7 leg turns
+    the sheets on with no edit here. `exports` is NOT treated this way and must
+    not be: an undeclared reach is a refusal RULED Q2 asks for, so a pin that
+    cannot express it is a pin this column cannot run on, which is what
+    `ViewContractUnsupported` says.
+
+    A FIELD SET, never a `try`/`except TypeError` retry: the retry cannot tell
+    "this class has no `styles`" from "this spec is malformed", and swallowing
+    the second is how a declaration defect becomes a silent degrade.
+    """
+    try:
+        fields = {f.name for f in dataclasses.fields(binding_cls)}
+    except TypeError:                                   # not a dataclass at all
+        return VIEW_BINDING_SPECS
+    if "styles" in fields:
+        return VIEW_BINDING_SPECS
+    return tuple({k: v for k, v in spec.items() if k != "styles"}
+                 for spec in VIEW_BINDING_SPECS)
 
 
 def declared_routes() -> tuple[str, ...]:
@@ -398,7 +485,7 @@ class GateLoopViews:
                 "contract and re-assemble") from exc
         try:
             return tuple(view_extension.ViewBinding(**spec)
-                         for spec in VIEW_BINDING_SPECS)
+                         for spec in specs_for(view_extension.ViewBinding))
         except TypeError as exc:
             raise ViewContractUnsupported(
                 "this assembly's `opendox.view_extension.ViewBinding` does not "
@@ -430,3 +517,8 @@ VIEW_EXTENSIONS: tuple[GateLoopViews, ...] = (GateLoopViews(),)
 #: Re-exported so a reader of this module can see, in one place, that the
 #: BYTES and the DECLARATION are two halves of one contribution (RULED Q5).
 VIEW_MODULE_NAMES = web_assets.VIEW_MODULE_NAMES
+
+#: And the sheets, RULED Q7 — same reason, one tier over: the BYTES of a
+#: binding's appearance and the DECLARATION that names them are two halves of
+#: one contribution, and a reader should see both from one place.
+VIEW_SHEET_NAMES = web_assets.VIEW_SHEET_NAMES

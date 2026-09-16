@@ -39,8 +39,10 @@ from pathlib import Path
 
 __all__ = [
     "BUNDLE_SUBDIR",
+    "VIEW_ASSET_NAMES",
     "VIEW_MODULE_DIR",
     "VIEW_MODULE_NAMES",
+    "VIEW_SHEET_NAMES",
     "ViewAssetError",
     "install_view_modules",
     "module_path",
@@ -86,20 +88,46 @@ VIEW_MODULE_NAMES: tuple[str, ...] = (
 )
 
 
+#: THE SHEETS, RULED Q7 (`opensoft/openxFactory#656` comment `5648049748`,
+#: Brett Heap, 2026-09-12): *"a contributed binding's CSS lives WITH THE
+#: BINDING, in its own sheet."* Declared rather than globbed, for
+#: `VIEW_MODULE_NAMES`' own reason, and FOUR rather than six because that is
+#: what the census measures: `gate-lens.js` owns no selector of its own (its
+#: plan-panel controls reuse the shell's shared chrome), and the two workbench
+#: modules are named by eleven of the nineteen blocks in `swb.css` between them,
+#: so they name ONE sheet — the only shape that neither duplicates those eleven
+#: into two files nor makes one optional binding depend on another's sheet.
+#: openDox's registry dedupes the injected `<link>` by resolved href, which is
+#: what makes naming one sheet twice correct rather than merely tolerated.
+VIEW_SHEET_NAMES: tuple[str, ...] = (
+    "gate.css",
+    "gate-projects.css",
+    "dispose.css",
+    "swb.css",
+)
+
+#: EVERY BYTE THIS COLUMN PLACES IN openDox's BUNDLE, modules and sheets alike.
+#: One tuple, because an assembly places them by one act and a hosted fallback
+#: answers for them by one rule, and two lists to keep in step would be the
+#: drift `VIEW_MODULE_NAMES`' "declared rather than globbed" note is about.
+VIEW_ASSET_NAMES: tuple[str, ...] = VIEW_MODULE_NAMES + VIEW_SHEET_NAMES
+
+
 def module_path(name: str) -> Path:
-    """The packaged path of one declared module, refusing an undeclared name."""
-    if name not in VIEW_MODULE_NAMES:
+    """The packaged path of one declared asset, refusing an undeclared name."""
+    if name not in VIEW_ASSET_NAMES:
         raise ViewAssetError(
-            f"{name!r} is not one of this column's declared view modules "
-            f"({list(VIEW_MODULE_NAMES)}): a module nothing declares is a file "
+            f"{name!r} is not one of this column's declared view assets "
+            f"({list(VIEW_ASSET_NAMES)}): a file nothing declares is a file "
             "shipped into another leg's bundle with no binding naming it")
     path = VIEW_MODULE_DIR / name
     if not path.is_file():
         raise ViewAssetError(
             f"declared view module {name!r} is missing from this package at "
             f"{path}: the wheel was built without "
-            "`[tool.setuptools.package-data] openxdox = [\"web/views/*.js\"]`, "
-            "so every binding this column declares names a module that cannot "
+            "`[tool.setuptools.package-data] openxdox = [\"web/views/*.js\", "
+            "\"web/views/*.css\"]`, "
+            "so every binding this column declares names a file that cannot "
             "load — and a binding that cannot be mounted must not look "
             "registered (openDox `views/view_extension.js`'s own rule)")
     return path
@@ -122,7 +150,11 @@ def served_path(name: str) -> str:
 
 def install_view_modules(web_dir: str | Path, *,
                          overwrite: bool = True) -> tuple[Path, ...]:
-    """THE ASSEMBLY HOOK. Copy this column's view modules into openDox's bundle.
+    """THE ASSEMBLY HOOK. Copy this column's view ASSETS into openDox's bundle.
+
+    Modules AND the sheets RULED Q7 sends with them, by one act: a bundle
+    carrying this column's modules and not its sheets is a gate loop that
+    mounts unstyled, which is a half-assembly and not a lawful deployment.
 
     `web_dir` is the ONE directory `serve.build_server(web_dir=…)` serves. The
     modules land in its `views/` subdirectory, which is where the specifier
@@ -160,7 +192,7 @@ def install_view_modules(web_dir: str | Path, *,
     # to know the bundle was clean, so the answer has to come before the first
     # write.
     if not overwrite:
-        collisions = [target_dir / name for name in VIEW_MODULE_NAMES
+        collisions = [target_dir / name for name in VIEW_ASSET_NAMES
                       if (target_dir / name).exists()]
         if collisions:
             raise ViewAssetError(
@@ -180,7 +212,7 @@ def install_view_modules(web_dir: str | Path, *,
     # this function can answer without touching the tree are now answered
     # before the first write. What stays inside the loop is the I/O the
     # filesystem decides, which no amount of pre-checking can foresee.
-    sources = [(name, module_path(name)) for name in VIEW_MODULE_NAMES]
+    sources = [(name, module_path(name)) for name in VIEW_ASSET_NAMES]
     placed: list[Path] = []
     for name, source in sources:
         destination = target_dir / name
