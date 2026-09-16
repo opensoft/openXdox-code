@@ -180,8 +180,8 @@ jobs:
       # state until the pin bump) every probe SKIPS". THE SAME BUMP CLEARED IT:
       # at `0b4e8bbf` the bundle is in the wheel and this file goes 0 passed /
       # 13 skipped -> 13 passed / 0 skipped — again the PIN-BUMP-ONLY pair, at
-      # `708591b`; the rounds added thirty-four guard tests here, so at the head
-      # the same invocation reads 47 passed / 0 skipped
+      # `708591b`; the rounds added thirty-six guard tests here, so at the head
+      # the same invocation reads 49 passed / 0 skipped
       # (`python -m pytest -q tests/test_gate_loop_probes.py --noconftest`).
       # The skip survives for an assembly
       # that installs a DIFFERENT openDox from the one this leg declares — the
@@ -277,7 +277,7 @@ jobs:
       # alongside `test_doxbench_turns.py`.
       #
       # WITH IT GONE AND THE PIN MOVED, this invocation goes 301 passed /
-      # 23 skipped -> 357 passed / 6 skipped, and BOTH HALVES OF THAT DELTA HAVE
+      # 23 skipped -> 359 passed / 6 skipped, and BOTH HALVES OF THAT DELTA HAVE
       # TO BE SAID SEPARATELY, because Copilot's round-3 review of #21 caught this
       # block conflating them:
       #
@@ -291,7 +291,7 @@ jobs:
       #     file leaves this list, so that skip is no longer RUN rather than
       #     cleared. Counting it as cleared would describe a transition that never
       #     happened.
-      #   * The remaining rise to 357 is NOT the bump: it is the 40 direct tests
+      #   * The remaining rise to 359 is NOT the bump: it is the 42 direct tests
       #     of the provenance guard that Copilot's review rounds asked for, which
       #     live in `tests/test_gate_loop_probes.py` and
       #     `tests/test_gate_loop_views.py` and are therefore both on this list.
@@ -299,9 +299,9 @@ jobs:
       #     rather than carried:
       #       git diff main -- tests/test_gate_loop_probes.py \
       #                        tests/test_gate_loop_views.py | grep -c '^+def test_'
-      #     gives 40, and the passing figure has run 317 -> 323 -> 330 -> 332 ->
+      #     gives 42, and the passing figure has run 317 -> 323 -> 330 -> 332 ->
       #     333 -> 334 -> 336 -> 343 -> 346 -> 348 -> 349 -> 351 -> 353 -> 355 ->
-      #     356 -> 357, once per round that added tests — the
+      #     356 -> 357 -> 359, once per round that added tests — the
       #     same discipline the block above applies to the skip counts. The review
       #     of `8b23f6f` asked for the CALL SITES: the tests before it proved what
       #     the guard decides and what it reads, and none of them proved that the
@@ -348,11 +348,14 @@ jobs:
       #     only when the entire declared requirement is
       #     `opendox @ git+<url>@<40-hex>` — and a comment is not in
       #     `project.dependencies` at all. Eleven continuations are refused in one
-      #     test — eleven continuations against BOTH url shapes — and SEVEN
+      #     test — eleven continuations against BOTH url shapes — and NINE
       #     legitimate declarations are still read in another (plain HTTPS · with
       #     extras · an SSH url whose AUTHORITY carries an `@` · a `;` path
       #     parameter · a `.git` suffix · a true environment marker · `OpenDox`
-      #     spelled in mixed case, names being case-insensitive per PEP 503),
+      #     spelled in mixed case, names being case-insensitive per PEP 503 ·
+      #     a `#subdirectory=src` fragment · an `#egg=…&subdirectory=…` one —
+      #     the two the review of `e92fb06` added, which this inventory still
+      #     counted as seven until the review of `9ab8521` measured it),
       #     because a guard too strict to read a correct file fails closed just as
       #     silently. A FALSE marker is the one conditional
       #     that must NOT read as a pin — pip installs nothing from that line — and
@@ -364,7 +367,13 @@ jobs:
       #     hand-splitting on it truncated a declaration pip installs — and the
       #     SOURCE is checked, because comparing shas alone let a dependency
       #     re-pointed at a different PROJECT read as the lawful "different commit"
-      #     skip while this leg was no longer testing openDox-code at all.)
+      #     skip while this leg was no longer testing openDox-code at all. The
+      #     review of `9ab8521` closed the OTHER HALF of that: the check sat on the
+      #     DECLARED url only, so an `opendox` INSTALLED from an unrelated
+      #     repository still reached that skip — `installed_commit()` reads
+      #     `direct_url.json`'s `url` as well as its `commit_id` now, a fork or a
+      #     mirror of openDox-code passing (RULED 5700475319) and a different
+      #     project failing closed.)
       #
       # The 6 skips that remain are the three seam suites' `doc_health` pairs,
       # which no pin bump touches.

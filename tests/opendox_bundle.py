@@ -271,9 +271,19 @@ def _names_opendox_code(url: str) -> bool:
     the `git+` scheme prefix, any `@<ref>` suffix and a trailing `.git` stripped
     first. A fork or mirror under another account still passes — what this refuses
     is a DIFFERENT PROJECT, which is the case the thread on `0e3922d` names.
+
+    IT READS BOTH SIDES' URLS, and that is why the `@<ref>` suffix is stripped
+    POSITIONALLY rather than at the last `@`: a DECLARED url carries the ref
+    (`…/openDox-code@<40-hex>`) and an INSTALLED one never does — PEP 610 keeps it
+    in `vcs_info.requested_revision` — so `rsplit("@", 1)` cut a perfectly ordinary
+    `ssh://git@github.com/opensoft/openDox-code` down to `ssh://git` and read a
+    correct install as a different project. A ref can only follow the final `/`;
+    an authority's `@` cannot. Copilot's thread on `9ab8521`.
     """
     without_scheme = url[len("git+"):] if url.startswith("git+") else url
-    repository = without_scheme.rsplit("@", 1)[0] if "@" in without_scheme else without_scheme
+    last_segment = without_scheme.rsplit("/", 1)[-1]
+    repository = (without_scheme.rsplit("@", 1)[0]
+                  if "@" in last_segment else without_scheme)
     return bool(_OPENDOX_CODE_RE.fullmatch(repository.rstrip("/").lower()))
 
 
@@ -376,8 +386,10 @@ def installed_commit() -> str | None:
     recorded", and saying only the narrow thing made this contract inaccurate
     (caught at the review of `27a89fd` on #21). It covers: no `direct_url.json`,
     malformed JSON, an `archive_info` (non-VCS) install, a record whose `vcs` is
-    not git, a `commit_id` that is not 40 hex, the distribution lookup raising,
-    and the read raising. Every one of those has its own test below.
+    not git, a `commit_id` that is not 40 hex, a record whose `url` names a
+    PROJECT other than openDox-code (Copilot's thread on `9ab8521`), the
+    distribution lookup raising, and the read raising. Every one of those has its
+    own test below.
 
     WHAT THE CALLER DOES WITH None IS NOT "always skip", and this docstring said
     so until Copilot's round-3 review of #21 caught it: `_absent()` FAILS on None
@@ -395,7 +407,9 @@ def installed_commit() -> str | None:
     if not raw:
         return None
     try:
-        vcs_info = json.loads(raw).get("vcs_info") or {}
+        record = json.loads(raw)
+        vcs_info = record.get("vcs_info") or {}
+        source = record.get("url")
         vcs, commit = vcs_info.get("vcs"), vcs_info.get("commit_id")
     except (ValueError, AttributeError):
         # Driven by `test_installed_commit_is_none_on_malformed_json`.
@@ -408,6 +422,19 @@ def installed_commit() -> str | None:
     # through the decision. A commit id is 40 lowercase hex and the record must
     # say it is git, or this function does not know what is installed.
     if vcs != "git" or not isinstance(commit, str):
+        return None
+    # THE SOURCE IS THE OTHER HALF OF THE PROVENANCE, and this function read only
+    # the commit until Copilot's thread on `9ab8521`: a distribution NAMED
+    # `opendox` but built from an unrelated repository at its own 40-hex commit
+    # was handed to `_absent()` as the lawful DIFFERENT-COMMIT case and SKIPPED
+    # the required suite — while nothing installed here came from openDox-code at
+    # all. `declared_pin()` got exactly this check at `9ff630d`, on the side that
+    # is DECLARED; this is the same check on the side that is IMPORTED, and
+    # half a provenance check is the silent green the other half exists to stop.
+    # A FORK or a MIRROR still reads (RULED openxFactory#656 comment 5700475319 —
+    # a consumer may pin an openDox of its own choosing); what is refused is a
+    # different PROJECT, and it lands on the fail-closed path under CI.
+    if not isinstance(source, str) or not _names_opendox_code(_without_fragment(source)):
         return None
     return commit.lower() if _SHA_RE.fullmatch(commit) else None
 
@@ -431,8 +458,8 @@ def _unreadable_side(declared: str | None, installed: str | None) -> str:
     if declared is None and installed is None:
         return ("NEITHER side is usable: this leg's declared pin could not be read "
                 "from `pyproject.toml` (see `declared_pin()` for the six states "
-                "that reach this) and the installed distribution records no usable "
-                "PEP 610 provenance")
+                "that reach this) and the installed distribution records no PEP 610 "
+                "provenance this guard can use")
     if declared is None:
         # NOT "the file could not be read": `declared_pin()` returns None for six
         # states and only two of them are a failed READ (the review of `9ff630d`
@@ -446,7 +473,9 @@ def _unreadable_side(declared: str | None, installed: str | None) -> str:
                 "openDox-code, or carries an environment marker that does not hold "
                 "here (`declared_pin()` lists the six)")
     return ("no usable PEP 610 provenance could be read from the installed "
-            "distribution")
+            "distribution — it records none, it records one this guard cannot "
+            "read, or it records one built from a PROJECT other than openDox-code "
+            "(`installed_commit()` lists the states)")
 
 
 def _absent(subject: str, *, module_level: bool) -> NoReturn:

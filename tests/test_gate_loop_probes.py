@@ -191,9 +191,13 @@ def bundle(tmp_path) -> Path:
         # installed distribution's PEP 610 provenance instead of asserting it.
         # Its four-row table is there, not restated here. Round 1 of the review on
         # #21 found this file claiming the install "came from somewhere older than
-        # the declared pin" on a check that only tested for a marker; if `0b4e8bbf` itself ever stopped shipping `web/**`, all
-        # thirteen probes below would have skipped and this required check would
-        # have stayed green over the regression.
+        # the declared pin" on a check that only tested for a marker. UNDER THAT
+        # CHECK, had `0b4e8bbf` itself ever stopped shipping `web/**`, all thirteen
+        # probes below would have skipped and this required check would have stayed
+        # green over the regression. UNDER THE TABLE THEY OBEY NOW THEY FAIL: the
+        # installed commit equals the declared pin, which is the table's first row
+        # — said here because the review of `9ab8521` read the sentence above as a
+        # claim about the guard that replaced it.
         import opendox_bundle
         opendox_bundle._absent("openDox's `web/` bundle", module_level=False)
     target = tmp_path / "web"
@@ -1122,8 +1126,9 @@ class _FakeDist:
 #: so a regression to `distribution("openxdox")` — or to any other installed package
 #: — would have read a STRANGER's `direct_url.json`, compared that commit against
 #: this leg's declared pin, and left every parser test then standing green while
-#: doing it — all TEN of them; the eleventh is the one below, which exists because
-#: of this finding. (`grep -c '^def test_installed_commit' <this file>` -> 11.)
+#: doing it — all TEN of them then; the eleventh is the one below, which exists
+#: because of this finding. (`grep -c '^def test_installed_commit' <this file>`
+#: -> 13 at this head: the review of `9ab8521` added the two SOURCE cases.)
 _ASKED = "opendox"
 
 
@@ -1232,7 +1237,8 @@ def test_installed_commit_normalizes_an_upper_case_commit_id(monkeypatch) -> Non
     CI over a formatting difference rather than a regression.
     """
     _with_dist(monkeypatch, json.dumps(
-        {"vcs_info": {"vcs": "git", "commit_id": _PIN_B.upper()}}))
+        {"url": "https://github.com/opensoft/openDox-code",
+         "vcs_info": {"vcs": "git", "commit_id": _PIN_B.upper()}}))
     assert _ob.installed_commit() == _PIN_B
 
 
@@ -1241,6 +1247,49 @@ def test_installed_commit_refuses_a_record_that_is_not_git(monkeypatch) -> None:
     _with_dist(monkeypatch, json.dumps(
         {"vcs_info": {"vcs": "hg", "commit_id": _PIN_B}}))
     assert _ob.installed_commit() is None
+
+
+def test_installed_commit_refuses_a_record_from_a_DIFFERENT_PROJECT(monkeypatch) -> None:
+    """A 40-hex git commit OF SOMETHING ELSE is not provenance this leg may compare.
+
+    `installed_commit()` returned `vcs_info.commit_id` and dropped the record's
+    `url`, so an `opendox` built from an unrelated repository at its own commit
+    reached `_absent()` as the lawful DIFFERENT-COMMIT case and SKIPPED the required
+    suite — with nothing installed here coming from openDox-code at all. The
+    DECLARED side got this check at `9ff630d`
+    (`test_declared_pin_refuses_a_pin_at_a_DIFFERENT_REPOSITORY`); Copilot's thread
+    on `9ab8521` asked for it on the side that is actually imported.
+    """
+    for url in ("https://github.com/opensoft/openXdox-code",
+                "https://github.com/opensoft/openDox-spec",
+                "https://github.com/opensoft/openDox-code-mirror",
+                "file:///srv/wheels/opendox"):
+        _with_dist(monkeypatch, json.dumps(
+            {"url": url, "vcs_info": {"vcs": "git", "commit_id": _PIN_B}}))
+        assert _ob.installed_commit() is None, url
+
+
+def test_installed_commit_reads_a_fork_a_mirror_and_an_ssh_record(monkeypatch) -> None:
+    """...and the source check must not fail CLOSED on a lawful install.
+
+    An installed record carries no `@<ref>` — PEP 610 keeps the ref in
+    `requested_revision` — so stripping at the LAST `@` cut
+    `ssh://git@github.com/opensoft/openDox-code` down to `ssh://git` and read a
+    correct install as a different project: the "too strict" half of this defect,
+    which every round of this arc has found paired with the too-loose half. A fork
+    or a mirror under another account reads too, RULED openxFactory#656 comment
+    5700475319: a consumer may pin an openDox of its own choosing; what is refused
+    is a different PROJECT.
+    """
+    for url in ("https://github.com/opensoft/openDox-code",
+                "git+https://github.com/opensoft/openDox-code.git",
+                "ssh://git@github.com/opensoft/openDox-code",
+                "https://github.com/a-fork/openDox-code",
+                "https://git.example.test/mirrors/opendox-code.git",
+                "https://github.com/opensoft/openDox-code#subdirectory=src"):
+        _with_dist(monkeypatch, json.dumps(
+            {"url": url, "vcs_info": {"vcs": "git", "commit_id": _PIN_B}}))
+        assert _ob.installed_commit() == _PIN_B, url
 
 
 def test_installed_commit_is_none_when_the_package_is_not_installed(monkeypatch) -> None:
@@ -1257,11 +1306,13 @@ def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) ->
 
 # WHY THE CASES ABOVE ARE THE CASES: `_absent()` branches on `installed_commit()`'s
 # RETURN VALUE, so every test of the DECISION that monkeypatches that function
-# proves nothing about the READING. TEN cases cover the reading of the INSTALLED
+# proves nothing about the READING. TWELVE cases cover the reading of the INSTALLED
 # side — a real VCS record, an absent `direct_url.json`, malformed JSON, a non-VCS
 # (`archive_info`) install, a commit id that is not 40 characters, forty
 # characters that are not hex, an UPPER-CASE 40-hex id (normalized rather than
-# discarded), a 40-hex id under a non-git VCS, the distribution LOOKUP raising,
+# discarded), a 40-hex id under a non-git VCS, a record whose `url` names a
+# DIFFERENT PROJECT, the fork / mirror / SSH / fragment shapes that must still
+# read (the same defect's too-strict half), the distribution LOOKUP raising,
 # and the read raising. The DECLARED side's own reading is covered separately,
 # above, by the two `test_declared_pin_is_none_when_…` cases.
 #
@@ -1269,7 +1320,7 @@ def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) ->
 # of `f6f1b991` on #21 caught that the upper-case case added at `b177eef` had
 # never reached the inventory:
 #
-#     grep -c '^def test_installed_commit' tests/test_gate_loop_probes.py   -> 11
+#     grep -c '^def test_installed_commit' tests/test_gate_loop_probes.py   -> 13
 #
 # It read 10 until the review of `fd3af6a` caught the lookup-name test the review
 # of `a0eed16` had just asked for — the same staleness, one round later, which is
@@ -1296,9 +1347,9 @@ def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) ->
 # number is not carried here. What is true at any head is the command:
 #   git diff main -- tests/test_gate_loop_probes.py | grep -c '^+def test_'
 #   git diff main -- tests/test_gate_loop_views.py  | grep -c '^+def test_'
-# (34 in this file and 6 in the views file at THIS head — 19 decision/read cases,
-# 11 `installed_commit` parser tests and 4 call-site tests here; `validate.yml`'s
-# record block carries the total, 40. The review of `fd3af6a` caught this pair
+# (36 in this file and 6 in the views file at THIS head — 19 decision/read cases,
+# 13 `installed_commit` parser tests and 4 call-site tests here; `validate.yml`'s
+# record block carries the total, 42. The review of `fd3af6a` caught this pair
 # reading 25 and 6, and the review of `de7d966` moved it again by asking for the
 # two undeclared-pin tests: a count written in prose is stale one round later,
 # which is why the commands are printed above it every time.)
