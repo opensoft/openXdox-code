@@ -1859,15 +1859,29 @@ def test_the_ending_report_survives_the_re_render_the_ending_triggers():
     that owned the agreement —
     `test_the_ending_report_really_reaches_the_slot_the_re_render_rebuilt`, and
     the `_DOM_SHIM` / `_ENDING_REPLAY_HARNESS` / `_run_ending_replay` it drove —
-    is RETIRED here (openxFactory#656 comment 5656343213, Brett Heap
+    was REMOVED here (openxFactory#656 comment 5656343213, Brett Heap
     2026-09-13, citing RULED OQ-F): its node harness copied
     `views/intent-feed.js` out of the bundle, and that file STAYED at
     openxFactory and arrived at NEITHER leg, so the replay could not run here
-    at all. The retirement is DECLARED — openxFactory's carve manifest row for
-    this file records the removed lines — and it is not a claim that the
-    invariant stopped mattering. The gap is stated here rather than closed
-    here: re-proving the key agreement needs a harness built on the views this
-    leg HAS, which is its own act under its own ruling."""
+    at all.
+
+    AND IT IS AN ORDINARY DECLARED EDIT, NOT A `retired:` ROW — a distinction
+    this docstring blurred and a later reader would have had no way to recover
+    (Copilot review of openXdox-code#20). The ruling retires THREE suites: two
+    are whole files at openDox-code, and those rows DO carry `retired:` blocks
+    in openxFactory's carve manifest. This one is a BLOCK INSIDE a file whose
+    other tests drive surfaces this leg has, so this file's row goes on
+    arriving, the arrival verifier goes on asking for it, and what the manifest
+    records is the removed LINES under `edits[]` — checked by
+    `arrival-undeclared-edit` like every other declared edit (openxFactory's
+    cutover runbook § 5.8, "What the form CANNOT express, stated because the
+    first act to use it hit it"). Nothing here is omitted from a run, and
+    nothing here is retired in the manifest's sense of the word.
+
+    The removal is not a claim that the invariant stopped mattering. The gap is
+    stated here rather than closed here: re-proving the key agreement needs a
+    harness built on the views this leg HAS, which is its own act under its own
+    ruling."""
     body = SESSION_JS.read_text(encoding="utf-8")
     # the report is remembered per branch, beside the ending it belongs to
     assert "const endedReports = new Map();" in body
