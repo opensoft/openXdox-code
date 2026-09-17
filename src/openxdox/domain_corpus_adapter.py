@@ -309,9 +309,10 @@ class DomainCorpusAdapter:
         # membership by asking the listing -- one definition, so no second
         # membership rule can disagree with the first -- and re-walking the tree
         # per read would make classifying a corpus quadratic in its own size.
-        # The instance is bound to the revision it resolved, so the cache can
-        # only be stale for a caller that changed the tree underneath it, and
-        # such a caller has to resolve again anyway to learn the new revision.
+        # The instance is bound to the LAST corpus state it resolved. Re-resolving
+        # therefore clears the cache, because an unversioned tree has no revision
+        # token to key a changed listing by and a dirty git tree is now refused
+        # rather than being stamped with `HEAD`.
         self._listings: dict[tuple[str, str | None, str], tuple[str, ...]] = {}
 
     # -- the six -----------------------------------------------------------
@@ -339,8 +340,14 @@ class DomainCorpusAdapter:
             if not location.is_dir():
                 raise _refuse(CORPUS_UNREADABLE, str(location),
                               "the path is not a directory")
-            if not any((location / root).is_dir()
-                       for root in self._shape.scan_roots):
+            roots_present = False
+            for root in self._shape.scan_roots:
+                declared = location / root
+                if not declared.exists() or not declared.is_dir():
+                    continue
+                self._require_traversable(declared)
+                roots_present = True
+            if not roots_present:
                 raise _refuse(
                     CORPUS_UNCLASSIFIABLE, str(location),
                     "the directory holds none of the roots this corpus is "
@@ -350,6 +357,7 @@ class DomainCorpusAdapter:
                 CORPUS_UNREADABLE, str(location),
                 f"the path could not be read ({exc.strerror or exc})") from exc
 
+        self._listings.clear()
         resolved = location.resolve()
         revision = self._revision(resolved, ref.revision)
         write_path = self._shape.write_path
@@ -402,6 +410,7 @@ class DomainCorpusAdapter:
                 f"{corpus.ref.name} is resolved at {corpus.revision!r} and this "
                 "reader serves the tree it is pointed at, never another "
                 "revision from it")
+        self._require_own_identity(corpus, document)
         self._require_listed(corpus, (document.key,))
         path = Path(corpus.location) / document.key
         try:
@@ -447,6 +456,8 @@ class DomainCorpusAdapter:
         known = frozenset(self._keys(corpus, SCOPE_ALL))
         wanted = None
         if subjects is not None:
+            for document in subjects:
+                self._require_own_identity(corpus, document)
             wanted = tuple(doc.key for doc in subjects)
             self._require_listed(corpus, wanted, known=known)
         verdict = self._shape.verdict
@@ -498,6 +509,8 @@ class DomainCorpusAdapter:
                 "the reference this write was made against reports the declared "
                 "path unavailable, and a write is not the place to resolve that "
                 "disagreement -- resolve the corpus again")
+        self._require_own_identity(corpus, document)
+        self._require_listed(corpus, (document.key,))
         target = write_path.routes(document.key)
         if target is None:
             raise _refuse(
@@ -554,6 +567,17 @@ class DomainCorpusAdapter:
                 "pointed at and never the repository that happens to enclose "
                 "it, so it refuses rather than answering with another corpus's "
                 "revision")
+        status = self._git(location, "status", "--porcelain", "--untracked-files=all")
+        if status is None:
+            raise _refuse(
+                REVISION_UNKNOWN, ref,
+                f"{location} carries a version marker but git would not report "
+                "whether its work tree is clean")
+        if status:
+            raise _refuse(
+                REVISION_UNKNOWN, ref,
+                f"{location} has uncommitted changes, so the live tree is at no "
+                "named revision this reader can answer for")
         resolved = self._git(location, "rev-parse", "--verify", f"{ref}^{{commit}}")
         if resolved is None:
             raise _refuse(
@@ -572,7 +596,8 @@ class DomainCorpusAdapter:
         failure of any kind -- git absent, the directory not a work tree, a
         timeout, a non-zero exit -- comes back as None and the caller turns it
         into a named refusal, because a reader that cannot answer must say so
-        rather than guess.
+        rather than guess. A successful command returning no stdout answers `""`,
+        which lets `_revision` distinguish "clean work tree" from "git failed".
 
         THE AMBIENT GIT ENVIRONMENT IS DROPPED, and that is the other half of
         "one directory" (see `AMBIENT_GIT_VARIABLES`). `-C` alone is not enough:
@@ -595,7 +620,7 @@ class DomainCorpusAdapter:
             return None
         if completed.returncode != 0:
             return None
-        return (completed.stdout or "").strip() or None
+        return (completed.stdout or "").strip()
 
     def _keys(self, corpus: ResolvedCorpus, scope: str) -> tuple[str, ...]:
         cached = self._listings.get((corpus.location, corpus.revision, scope))
@@ -612,15 +637,61 @@ class DomainCorpusAdapter:
 
     def _scope_keys(self, location: Path, scope: Scope) -> set[str]:
         keys: set[str] = set()
-        for pattern in scope.globs:
-            for match in location.glob(pattern):
-                if not match.is_file():
-                    continue
-                rel = match.relative_to(location)
-                if any(part in scope.excluded_parts for part in rel.parts):
-                    continue
+        for rel in self._walk_files(location):
+            if any(part in scope.excluded_parts for part in rel.parts):
+                continue
+            if any(self._matches_glob(rel, pattern) for pattern in scope.globs):
                 keys.add(rel.as_posix())
         return keys
+
+    def _walk_files(self, location: Path):
+        for root_name in self._shape.scan_roots:
+            root = location / root_name
+            if not root.exists():
+                continue
+            self._require_traversable(root)
+
+            def _onerror(exc: OSError) -> None:
+                raise _refuse(
+                    CORPUS_UNREADABLE, exc.filename or str(root),
+                    f"the path could not be read ({exc.strerror or exc})") from exc
+
+            for dirpath, _, filenames in os.walk(root, onerror=_onerror):
+                directory = Path(dirpath)
+                for filename in filenames:
+                    yield (directory / filename).relative_to(location)
+
+    @staticmethod
+    def _matches_glob(path: Path, pattern: str) -> bool:
+        variants = {pattern}
+        pending = [pattern]
+        while pending:
+            current = pending.pop()
+            if "**/" not in current:
+                continue
+            narrower = current.replace("**/", "", 1)
+            if narrower not in variants:
+                variants.add(narrower)
+                pending.append(narrower)
+        return any(path.match(candidate) for candidate in variants)
+
+    @staticmethod
+    def _require_traversable(path: Path) -> None:
+        try:
+            with os.scandir(path):
+                pass
+        except OSError as exc:
+            raise _refuse(
+                CORPUS_UNREADABLE, str(path),
+                f"the path could not be read ({exc.strerror or exc})") from exc
+
+    @staticmethod
+    def _require_own_identity(corpus: ResolvedCorpus, document: DocumentId) -> None:
+        if document.corpus != corpus.ref.name:
+            raise _refuse(
+                DOCUMENT_UNKNOWN, document.key,
+                f"{document.corpus!r} does not name {corpus.ref.name!r}; this "
+                "reader answers only for this corpus's own document identities")
 
     def _require_listed(self, corpus: ResolvedCorpus, keys: tuple[str, ...],
                         known: frozenset | None = None) -> None:

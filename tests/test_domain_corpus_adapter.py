@@ -29,6 +29,7 @@ runs, and it imports nothing beyond `pytest`, the standard library, the PINNED
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -257,6 +258,21 @@ def test_a_versioned_corpus_resolves_to_its_own_commit(reader, populated,
     assert _refusal(caught) == REVISION_UNKNOWN
 
 
+def test_a_dirty_versioned_corpus_refuses_rather_than_stamping_head(
+        reader, populated, git_available) -> None:
+    _git(populated, "init", "-q")
+    _git(populated, "config", "user.email", "corpus@example.invalid")
+    _git(populated, "config", "user.name", "The Corpus")
+    _git(populated, "add", "-A")
+    _git(populated, "commit", "-q", "-m", "the corpus")
+    (populated / "notes" / "delta.md").write_text("Type: note\nTitle: Delta\n")
+
+    with pytest.raises(CorpusRefused) as caught:
+        _resolved(reader, populated)
+    assert _refusal(caught) == REVISION_UNKNOWN
+    assert "uncommitted changes" in caught.value.refusal.detail
+
+
 def test_a_corpus_inside_someone_elses_checkout_is_not_that_checkouts(
         reader, tmp_path, git_available) -> None:
     """THE SHARPEST ONE, and it is a measured failure of a real reader
@@ -372,6 +388,16 @@ def test_the_listing_is_sorted_unique_and_stable(reader, populated) -> None:
     assert {document.corpus for document in first} == {"populated"}
 
 
+def test_resolving_again_rebuilds_the_listing_for_an_unversioned_tree(
+        reader, populated) -> None:
+    first = reader.list_documents(_resolved(reader, populated))
+    (populated / "notes" / "delta.md").write_text("Type: note\nTitle: Delta\n")
+    second = reader.list_documents(_resolved(reader, populated))
+    assert [document.key for document in first] == sorted(DOCUMENTS)
+    assert [document.key for document in second] == sorted(
+        (*DOCUMENTS, "notes/delta.md"))
+
+
 def test_a_scope_this_corpus_does_not_declare_refuses(reader,
                                                       populated) -> None:
     """Rather than quietly widening to everything: "a silent widening is
@@ -414,6 +440,44 @@ def test_excluded_parts_drop_a_document_from_its_scope(tmp_path) -> None:
         d.key for d in excluding.list_documents(corpus)}
 
 
+def test_an_unreadable_declared_root_refuses(reader, tmp_path) -> None:
+    root = _lay_down(tmp_path / "c")
+    locked = root / "notes"
+    original = locked.stat().st_mode
+    locked.chmod(0)
+    if os.access(locked, os.R_OK | os.X_OK):  # pragma: no cover
+        locked.chmod(original)
+        pytest.skip("directory permissions are not enforced here")
+    try:
+        with pytest.raises(CorpusRefused) as caught:
+            _resolved(reader, root)
+    finally:
+        locked.chmod(original)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+    assert caught.value.refusal.subject == str(locked)
+
+
+def test_an_unreadable_subtree_refuses_listing_rather_than_omitting_it(
+        reader, tmp_path) -> None:
+    root = _lay_down(tmp_path / "c")
+    locked = root / "notes" / "locked"
+    locked.mkdir()
+    (locked / "delta.md").write_text("Type: note\nTitle: Delta\n")
+    original = locked.stat().st_mode
+    locked.chmod(0)
+    if os.access(locked, os.R_OK | os.X_OK):  # pragma: no cover
+        locked.chmod(original)
+        pytest.skip("directory permissions are not enforced here")
+    corpus = _resolved(reader, root)
+    try:
+        with pytest.raises(CorpusRefused) as caught:
+            reader.list_documents(corpus)
+    finally:
+        locked.chmod(original)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+    assert caught.value.refusal.subject == str(locked)
+
+
 def test_read_returns_the_bytes_and_the_resolved_revision(reader,
                                                           populated) -> None:
     corpus = _resolved(reader, populated)
@@ -432,6 +496,21 @@ def test_an_identity_this_corpus_does_not_hold_refuses(reader,
         reader.read(corpus, absent)
     assert _refusal(caught) == DOCUMENT_UNKNOWN
     assert caught.value.refusal.subject == "notes/nowhere.md"
+
+
+@pytest.mark.parametrize("operation", [
+    lambda reader, corpus, document: reader.read(corpus, document),
+    lambda reader, corpus, document: reader.classify(corpus, document),
+    lambda reader, corpus, document: reader.check(corpus, (document,)),
+])
+def test_a_foreign_document_identity_refuses_before_key_membership(
+        reader, populated, operation) -> None:
+    corpus = _resolved(reader, populated)
+    foreign = DocumentId(corpus="some-other-corpus", key="notes/alpha.md")
+    with pytest.raises(CorpusRefused) as caught:
+        operation(reader, corpus, foreign)
+    assert _refusal(caught) == DOCUMENT_UNKNOWN
+    assert "some-other-corpus" in caught.value.refusal.detail
 
 
 def test_a_revision_this_reader_cannot_serve_never_falls_back(reader,
@@ -784,6 +863,20 @@ def test_a_forged_reference_naming_another_path_is_refused(tmp_path) -> None:
                            basis_revision="r")
     assert _refusal(caught) == WRITE_PATH_UNREACHABLE
     assert caught.value.refusal.subject == "some-other-path"
+
+
+def test_write_back_refuses_a_foreign_document_identity_before_dispatch(
+        tmp_path) -> None:
+    dispatched: list[tuple] = []
+    adapter, corpus, _ = _writable(
+        tmp_path, _write_path(dispatch=lambda request, proposal:
+                              dispatched.append((request, proposal))))
+    document = DocumentId(corpus="some-other-corpus", key="notes/alpha.md")
+    with pytest.raises(CorpusRefused) as caught:
+        adapter.write_back(corpus, document, b"proposed", actor="a",
+                           basis_revision="r")
+    assert _refusal(caught) == DOCUMENT_UNKNOWN
+    assert dispatched == []
 
 
 def test_a_reference_disagreeing_about_reachability_fails_closed(
