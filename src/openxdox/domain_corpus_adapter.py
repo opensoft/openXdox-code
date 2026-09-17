@@ -309,10 +309,12 @@ class DomainCorpusAdapter:
         # membership by asking the listing -- one definition, so no second
         # membership rule can disagree with the first -- and re-walking the tree
         # per read would make classifying a corpus quadratic in its own size.
-        # The instance is bound to the LAST corpus state it resolved. Re-resolving
-        # therefore clears the cache, because an unversioned tree has no revision
-        # token to key a changed listing by and a dirty git tree is now refused
-        # rather than being stamped with `HEAD`.
+        # The instance is bound to the LAST corpus state it resolved, and
+        # `resolve` CLEARS this cache for that reason: an unversioned tree has
+        # no revision token for the key to change with, so a caller that
+        # re-resolves after editing the tree would otherwise be served the
+        # listing from before its own edit. Re-resolving is the one act that
+        # says "the tree may have moved", and it is cheap.
         self._listings: dict[tuple[str, str | None, str], tuple[str, ...]] = {}
 
     # -- the six -----------------------------------------------------------
@@ -509,8 +511,6 @@ class DomainCorpusAdapter:
                 "the reference this write was made against reports the declared "
                 "path unavailable, and a write is not the place to resolve that "
                 "disagreement -- resolve the corpus again")
-        self._require_own_identity(corpus, document)
-        self._require_listed(corpus, (document.key,))
         target = write_path.routes(document.key)
         if target is None:
             raise _refuse(
@@ -567,17 +567,6 @@ class DomainCorpusAdapter:
                 "pointed at and never the repository that happens to enclose "
                 "it, so it refuses rather than answering with another corpus's "
                 "revision")
-        status = self._git(location, "status", "--porcelain", "--untracked-files=all")
-        if status is None:
-            raise _refuse(
-                REVISION_UNKNOWN, ref,
-                f"{location} carries a version marker but git would not report "
-                "whether its work tree is clean")
-        if status:
-            raise _refuse(
-                REVISION_UNKNOWN, ref,
-                f"{location} has uncommitted changes, so the live tree is at no "
-                "named revision this reader can answer for")
         resolved = self._git(location, "rev-parse", "--verify", f"{ref}^{{commit}}")
         if resolved is None:
             raise _refuse(
@@ -596,8 +585,7 @@ class DomainCorpusAdapter:
         failure of any kind -- git absent, the directory not a work tree, a
         timeout, a non-zero exit -- comes back as None and the caller turns it
         into a named refusal, because a reader that cannot answer must say so
-        rather than guess. A successful command returning no stdout answers `""`,
-        which lets `_revision` distinguish "clean work tree" from "git failed".
+        rather than guess.
 
         THE AMBIENT GIT ENVIRONMENT IS DROPPED, and that is the other half of
         "one directory" (see `AMBIENT_GIT_VARIABLES`). `-C` alone is not enough:
@@ -620,7 +608,7 @@ class DomainCorpusAdapter:
             return None
         if completed.returncode != 0:
             return None
-        return (completed.stdout or "").strip()
+        return (completed.stdout or "").strip() or None
 
     def _keys(self, corpus: ResolvedCorpus, scope: str) -> tuple[str, ...]:
         cached = self._listings.get((corpus.location, corpus.revision, scope))
@@ -636,44 +624,61 @@ class DomainCorpusAdapter:
         return listed
 
     def _scope_keys(self, location: Path, scope: Scope) -> set[str]:
+        """One scope's document keys, matched by the shape's own glob syntax.
+
+        MEMBERSHIP IS `Path.glob`'s AND NOTHING HAND-ROLLED. A replacement
+        matcher was tried here and is recorded because its defect is the exact
+        failure class this seam exists to end: built on `PurePath.match`, which
+        has no recursive `**`, it answered a rooted `notes/**/*.md` with the
+        documents at depth 0 and 1 and SILENTLY DROPPED every one below them --
+        measured, 2 of 4 against `Path.glob`'s 4. The conformance corpus cannot
+        catch that (its three documents are all one directory deep) and
+        `from_profile` emits exactly those rooted patterns, so a governed corpus
+        would have lost its deeper documents with nothing anywhere reporting a
+        loss. A listing that is quietly short is worse than one that is quietly
+        wide: the seam forbids the second by name, and the first is the same lie
+        with less to look at.
+
+        THE UNREADABLE DIRECTORY IS STILL A REFUSAL, and that is what the walk
+        below is for and all it is for. `Path.glob` swallows `OSError` and
+        returns the entries it could reach, so a directory this process cannot
+        open would come back as an absence -- a corpus that "has no documents
+        there" -- which is the degradation the interface's second requirement
+        forbids in terms. The pre-flight walks the declared roots with
+        `os.walk`'s `onerror`, refuses `CORPUS_UNREADABLE` naming the path it
+        could not open, and decides nothing about membership.
+        """
+        self._require_readable_tree(location)
         keys: set[str] = set()
-        for rel in self._walk_files(location):
-            if any(part in scope.excluded_parts for part in rel.parts):
-                continue
-            if any(self._matches_glob(rel, pattern) for pattern in scope.globs):
+        for pattern in scope.globs:
+            for match in location.glob(pattern):
+                if not match.is_file():
+                    continue
+                rel = match.relative_to(location)
+                if any(part in scope.excluded_parts for part in rel.parts):
+                    continue
                 keys.add(rel.as_posix())
         return keys
 
-    def _walk_files(self, location: Path):
+    def _require_readable_tree(self, location: Path) -> None:
+        """Refuse a declared root, or anything under one, that cannot be opened.
+
+        Detection only: it yields no keys and applies no pattern, so the
+        listing's membership rule stays `Path.glob`'s alone.
+        """
+        def _onerror(exc: OSError) -> None:
+            raise _refuse(
+                CORPUS_UNREADABLE, exc.filename or str(location),
+                f"the path could not be read ({exc.strerror or exc})") from exc
+
         for root_name in self._shape.scan_roots:
             root = location / root_name
-            if not root.exists():
+            if not root.is_dir():
                 continue
             self._require_traversable(root)
-
-            def _onerror(exc: OSError) -> None:
-                raise _refuse(
-                    CORPUS_UNREADABLE, exc.filename or str(root),
-                    f"the path could not be read ({exc.strerror or exc})") from exc
-
-            for dirpath, _, filenames in os.walk(root, onerror=_onerror):
-                directory = Path(dirpath)
-                for filename in filenames:
-                    yield (directory / filename).relative_to(location)
-
-    @staticmethod
-    def _matches_glob(path: Path, pattern: str) -> bool:
-        variants = {pattern}
-        pending = [pattern]
-        while pending:
-            current = pending.pop()
-            if "**/" not in current:
-                continue
-            narrower = current.replace("**/", "", 1)
-            if narrower not in variants:
-                variants.add(narrower)
-                pending.append(narrower)
-        return any(path.match(candidate) for candidate in variants)
+            for _dirpath, _dirnames, _filenames in os.walk(root,
+                                                           onerror=_onerror):
+                pass
 
     @staticmethod
     def _require_traversable(path: Path) -> None:

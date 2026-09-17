@@ -271,19 +271,37 @@ def test_a_versioned_corpus_resolves_to_its_own_commit(reader, populated,
     assert _refusal(caught) == REVISION_UNKNOWN
 
 
-def test_a_dirty_versioned_corpus_refuses_rather_than_stamping_head(
+def test_a_dirty_work_tree_still_resolves_at_its_own_head(
         reader, populated, git_available) -> None:
+    """A REFUSAL WAS TRIED HERE AND IS REVERTED, recorded because the argument
+    for it is a real one: bytes read out of an edited work tree are not the
+    bytes at `HEAD`, so stamping them with `HEAD` overstates what was read.
+
+    It is not this reader's call to make. The interface says `revision` is "the
+    revision they were read at" and nowhere requires a clean tree; openxFactory's
+    own § 2.2a adapter resolves `HEAD` over a dirty checkout and serves the
+    working tree; and a reader that refused would be unusable for the ordinary
+    case of projecting from a checkout somebody is working in — one edited file,
+    or one untracked editor swap file, and the whole corpus becomes
+    unreadable. Two readers over one corpus giving opposite answers is the thing
+    § 3.7 exists to prevent, so the change belongs to a ruling and not to this
+    act. The question is registered in this PR rather than decided in it.
+    """
     _git(populated, "init", "-q")
     _git(populated, "config", "user.email", "corpus@example.invalid")
     _git(populated, "config", "user.name", "The Corpus")
     _git(populated, "add", "-A")
     _git(populated, "commit", "-q", "-m", "the corpus")
-    (populated / "notes" / "delta.md").write_text("Type: note\nTitle: Delta\n")
+    committed = _head(populated)
+    (populated / "notes" / "alpha.md").write_text("Type: note\nTitle: edited\n")
+    (populated / "notes" / "untracked.md").write_text("Type: note\nTitle: U\n")
 
-    with pytest.raises(CorpusRefused) as caught:
-        _resolved(reader, populated)
-    assert _refusal(caught) == REVISION_UNKNOWN
-    assert "uncommitted changes" in caught.value.refusal.detail
+    corpus = _resolved(reader, populated)
+    assert corpus.revision == committed
+    document = DocumentId(corpus="populated", key="notes/alpha.md")
+    assert b"edited" in reader.read(corpus, document).content, (
+        "the working tree is what is served, which is what a projection over a "
+        "checkout somebody is editing has to be able to do")
 
 
 def test_a_corpus_inside_someone_elses_checkout_is_not_that_checkouts(
@@ -434,6 +452,40 @@ def test_a_declared_scope_lists_only_its_own_globs(tmp_path) -> None:
     assert [d.key for d in narrow.list_documents(corpus, "publications")] == [
         "papers/gamma.md"]
     assert len(narrow.list_documents(corpus, SCOPE_ALL)) == 3
+
+
+def test_a_rooted_double_star_lists_every_depth_beneath_it(tmp_path) -> None:
+    """THE REGRESSION GUARD FOR A MATCHER THAT WAS TRIED AND MEASURED WRONG.
+
+    `from_profile` emits rooted `**` patterns for every directory-shaped
+    location a domain profile declares (`docs/**/*.md`,
+    `ideation/staging/*/**/*.md`, ...), so "how deep does `**` go" is not a
+    corner case here — it is the ordinary case for every governed corpus this
+    reader is meant to serve.
+
+    A hand-rolled matcher built on `PurePath.match`, which has no recursive
+    `**`, answered `notes/**/*.md` with 2 of these 4 documents and dropped the
+    two below depth one, with nothing reporting a loss. The neutral conformance
+    corpus cannot catch it: all three of its documents are exactly one directory
+    deep, so it returns 17 of 17 either way. This test is the one that does.
+    """
+    root = tmp_path / "c"
+    for relative in ("notes/top.md", "notes/a/one.md", "notes/a/b/two.md",
+                     "notes/a/b/c/three.md", "papers/p.md"):
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("Type: note\nTitle: T\n", encoding="utf-8")
+
+    deep = DomainCorpusAdapter(CorpusShape(
+        scan_roots=("notes", "papers"),
+        scopes={SCOPE_ALL: Scope(globs=("notes/**/*.md",))},
+        header_scan_lines=6))
+    corpus = deep.resolve(CorpusRef(name="populated", location=str(root)))
+    assert [d.key for d in deep.list_documents(corpus)] == [
+        "notes/a/b/c/three.md", "notes/a/b/two.md", "notes/a/one.md",
+        "notes/top.md"], (
+        "a rooted `**` lists EVERY depth beneath its root, and `papers/p.md` "
+        "is outside the pattern rather than missing from it")
 
 
 def test_excluded_parts_drop_a_document_from_its_scope(tmp_path) -> None:
@@ -875,18 +927,27 @@ def test_a_forged_reference_naming_another_path_is_refused(tmp_path) -> None:
     assert caught.value.refusal.subject == "some-other-path"
 
 
-def test_write_back_refuses_a_foreign_document_identity_before_dispatch(
+def test_write_back_raises_only_the_kinds_its_row_of_the_interface_names(
         tmp_path) -> None:
-    dispatched: list[tuple] = []
-    adapter, corpus, _ = _writable(
-        tmp_path, _write_path(dispatch=lambda request, proposal:
-                              dispatched.append((request, proposal))))
-    document = DocumentId(corpus="some-other-corpus", key="notes/alpha.md")
+    """A `DOCUMENT_UNKNOWN` guard was tried on `write_back` and is reverted.
+
+    The interface enumerates the refusal kinds each operation may raise and says
+    what an extra one is: "an implementation raising a kind outside its row is a
+    defect the conformance suite is entitled to catch." `write_back`'s row is
+    `CORPUS_READ_ONLY` and `WRITE_PATH_UNREACHABLE`, and the question the guard
+    answered — has this key a target — is the DECLARED PATH's to answer, through
+    `routes`, whose None the interface already turns into a refusal naming the
+    path. Pre-empting it with a kind the row does not carry is a conformance
+    defect wearing the face of a safety check.
+    """
+    adapter, corpus, _ = _writable(tmp_path,
+                                   _write_path(routes=lambda key: None))
+    foreign = DocumentId(corpus="some-other-corpus", key="notes/nowhere.md")
     with pytest.raises(CorpusRefused) as caught:
-        adapter.write_back(corpus, document, b"proposed", actor="a",
+        adapter.write_back(corpus, foreign, b"proposed", actor="a",
                            basis_revision="r")
-    assert _refusal(caught) == DOCUMENT_UNKNOWN
-    assert dispatched == []
+    assert _refusal(caught) == WRITE_PATH_UNREACHABLE, (
+        "the declared path answered, as its row says it does")
 
 
 def test_a_reference_disagreeing_about_reachability_fails_closed(
