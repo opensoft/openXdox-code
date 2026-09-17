@@ -7,6 +7,25 @@ name: validate
 # Levelled against openDox-code by the OQ-O scaffold-levelling pass
 # (openxFactory#656): same pinned pytest major, same least-privilege
 # `permissions:` block.
+#
+# READ THE HEAD, NOT THE ROLLUP, AND THIS IS NOT A GENERAL CAUTION — it is a
+# thing that happened on the pull request that added the last two entries of
+# the list below, twice. `on: pull_request` does not fire for a push made with
+# a GitHub App token, which is what `copilot-swe-agent[bot]` pushes with when a
+# review is requested on a PR. So a head whose last commit is the bot's can
+# report an aggregate status of SUCCESS while THIS CHECK, the required one,
+# never ran on it at all — the rollup is green because the advisory checks that
+# do fire (SonarCloud) passed, and the missing one is invisible unless you list
+# the contexts:
+#
+#   gh api graphql ... statusCheckRollup { state contexts { ... } }
+#     head a120b79d   rollup SUCCESS
+#       SonarCloud Code Analysis: SUCCESS      <- advisory
+#       (validate absent)                      <- REQUIRED, never ran
+#
+# The remedy is a commit of your own on top, which is a real push and does
+# trigger it. Merging a head in that state is merging something this gate has
+# not measured.
 
 on:
   pull_request:
