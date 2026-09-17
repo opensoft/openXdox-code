@@ -21,13 +21,38 @@ composed install — and the assembly hook is exercised by every probe rather th
 asserted once.
 
 THE ASSEMBLY IS THE PRECONDITION, AND IT IS THE PIN. This leg pins `opendox` by
-commit (`pyproject.toml`), and the pinned commit predates BOTH the view registry
-and the packaging fix that puts `opendox/web/` into a wheel at all
-(openDox-code#20's own first commit). Where the installed `opendox` carries no
-bundle there is nothing to assemble INTO, and every probe SKIPS with that reason
-named — never fails, and never silently passes against a stand-in. They run in
-full the moment the pin bump lands, which is the same bump the three
-materialization assertions in `test_gate_loop_views.py` wait for.
+commit (`pyproject.toml`). When these probes landed with slice S5 that pin was
+`a99eba03`, which predated BOTH the view registry and the packaging fix that
+puts `opendox/web/` into a wheel at all (openDox-code#20's own first commit), so
+this paragraph said the probes "run in full the moment the pin bump lands".
+THE BUMP LANDED — 2026-09-16, `a99eba03` -> `0b4e8bbf` (openDox-code#23, § 3.4
+slice S8 leg B) — and all thirteen of them now RUN: 13 skipped became 13 passed
+under `validate.yml`'s own invocation, in the same act that moved the pin, and
+the three materialization assertions in `test_gate_loop_views.py` that waited on
+the same bump went 3 skipped -> 3 passed beside them.
+
+WHAT A MISSING BUNDLE MEANS NOW, stated precisely — the review rounds on #21
+rewrote this paragraph twice, and both times because it promised an outcome the
+guard does not give. Where the installed `opendox` carries no bundle there is
+nothing to assemble INTO, and `tests/opendox_bundle.py::_absent` chooses by
+READING which openDox is installed:
+
+  * a DIFFERENT commit from the one this leg declares -> SKIP, naming BOTH;
+  * NO recorded provenance, off CI -> SKIP, naming the declared one and saying
+    plainly that the installed one is unrecorded (it cannot name what it could
+    not read, which is why this is a different sentence from the one above);
+  * the DECLARED commit -> FAIL, because THAT is a regression here, and a skip
+    would take these thirteen probes quietly green in a required check;
+  * no recorded provenance UNDER CI -> FAIL TOO, and the review of `f6f1b991` on
+    #21 was right that this line used to file it under the word "regression". It
+    is not one. It is a PROVENANCE ANOMALY: the required run cannot establish
+    which openDox it is testing at all. `validate.yml` installs `-e ".[test]"`
+    against a PEP 508 direct VCS reference and pip records `direct_url.json` for
+    that every time, so failing to read one on the required path is a metadata or
+    install failure — worth stopping for, but never evidence that the bundle
+    regressed.
+
+No outcome ever passes silently against a stand-in.
 
 A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
 (RULED OQ-C), admitted by path in the S5 annotation.
@@ -118,7 +143,15 @@ def _run_node(body: str, bundle: Path) -> dict:
 
 
 def _opendox_bundle() -> Path | None:
-    """The INSTALLED openDox's web bundle, or None where the pin carries none."""
+    """The INSTALLED openDox's web bundle, or None where no bundle was found.
+
+    DISCOVERY ONLY, same contract as `tests/opendox_bundle.py::find` and stale
+    in the same way until the review of `399e2a9` on #21: "where the pin carries
+    none" was the one expected cause before the bump, and the `bundle` fixture
+    below now routes `None` into `_absent()` precisely BECAUSE it is no longer
+    the only one. What the absence means is `_absent()`'s four-row table; this
+    function only reports that the marker is not there.
+    """
     try:
         import opendox
     except ModuleNotFoundError:              # pragma: no cover - no consumer
@@ -132,19 +165,41 @@ def bundle(tmp_path) -> Path:
     """A COMPOSED bundle: openDox's own `web/`, with this column's six modules
     placed into it by the assembly hook RULED Q5 names.
 
-    Skipped — never failed — where the assembled `opendox` carries no bundle:
-    that is this leg's pinned state until the pin bump, and a probe that quietly
-    ran against a stand-in `helpers.js` would measure the stand-in rather than
-    the shipped file.
+    Where the assembled `opendox` carries no bundle, the outcome is
+    `tests/opendox_bundle.py::_absent`'s FOUR-ROW TABLE and this docstring does
+    not restate it — two reviews on #21 caught a two-row paraphrase here, which is
+    what a second copy of a table is for. That this guard survives the pin bump at
+    all is RULED
+    openxFactory#656 comment 5700475319 (Brett Heap, 2026-09-16, by interactive
+    multi-choice), answer (a): keep the guards, correct their reasons.
+
+    That was a plain skip until the 2026-09-16 pin bump, when a missing bundle
+    stopped being the expected state AT THE COMMIT THIS LEG DECLARES and started
+    being a regression THERE — see `tests/opendox_bundle.py::_absent`, which reads
+    both commits before it decides. Only the equal-commit row is a regression: a
+    DIFFERENT installed commit still skips, an unreadable side still skips off CI,
+    and the CI failure for an unreadable side is a comparison anomaly rather than
+    a verdict on the package. The review of `24cd5f2` caught this sentence
+    generalizing the one row to all four, two paragraphs below the table.
+    A probe that quietly ran against a stand-in `helpers.js` would measure the
+    stand-in rather than the shipped file, so a skip is still the right outcome
+    wherever `_absent()` gives one.
     """
     source = _opendox_bundle()
     if source is None:
-        pytest.skip(
-            "the installed `opendox` carries no `web/` bundle: this leg pins a "
-            "commit older than openDox's own packaging fix, so there is nothing "
-            "to assemble into. The pin bump owed at landing makes these probes "
-            "run (the same bump `test_gate_loop_views.py`'s three "
-            "materialization assertions wait for)")
+        # The shared rule in `tests/opendox_bundle.py::_absent`, which READS the
+        # installed distribution's PEP 610 provenance instead of asserting it.
+        # Its four-row table is there, not restated here. Round 1 of the review on
+        # #21 found this file claiming the install "came from somewhere older than
+        # the declared pin" on a check that only tested for a marker. UNDER THAT
+        # CHECK, had `0b4e8bbf` itself ever stopped shipping `web/**`, all thirteen
+        # probes below would have skipped and this required check would have stayed
+        # green over the regression. UNDER THE TABLE THEY OBEY NOW THEY FAIL: the
+        # installed commit equals the declared pin, which is the table's first row
+        # — said here because the review of `9ab8521` read the sentence above as a
+        # claim about the guard that replaced it.
+        import opendox_bundle
+        opendox_bundle._absent("openDox's `web/` bundle", module_level=False)
     target = tmp_path / "web"
     shutil.copytree(source, target)
     web_assets.install_view_modules(target)
@@ -628,3 +683,768 @@ console.log(JSON.stringify({ a, b, sent }));
     assert result["b"]["tag"] == "second", result["b"]
     # and the BODIES were shaped by the right model too, not only the verdicts
     assert result["sent"] == ["first", "second"]
+
+
+# ---------------------------------------------------------------------------
+# THE GUARD ITSELF, TESTED DIRECTLY — Copilot round-2 thread on #21
+# (`PRRT_kwDOUPv7_s6i_iiz`, "the new provenance decision is only exercised
+# indirectly on the normal bundle-present path; there are no tests"). Accurate:
+# the four branches had been proven by hand, by renaming the installed bundle and
+# re-running. That proof is now permanent and runs in `validate`.
+#
+# These live HERE rather than in a new file on purpose: a created file at this leg
+# needs an admission row in openxFactory's `docs/opendox-carve-admissions.yaml`
+# (RULED OQ-C), and adding one is not a pin bump's act. This module is already
+# admitted, already on `validate.yml`'s list, and already owns the fixture whose
+# thirteen probes the decision gates.
+# ---------------------------------------------------------------------------
+
+import opendox_bundle as _ob  # noqa: E402  (a helper import, never OPENDOX_WEB)
+
+_PIN_A = "a" * 40
+_PIN_B = "b" * 40
+
+
+def _decide(monkeypatch, declared, installed, *, ci):
+    monkeypatch.setattr(_ob, "declared_pin", lambda: declared)
+    monkeypatch.setattr(_ob, "installed_commit", lambda: installed)
+    monkeypatch.setenv("CI", "true" if ci else "")
+    return lambda: _ob._absent("the subject under test", module_level=False)
+
+
+def test_the_declared_pin_missing_its_bundle_FAILS(monkeypatch) -> None:
+    """The regression case: what is installed IS what this leg declares."""
+    call = _decide(monkeypatch, _PIN_A, _PIN_A, ci=False)
+    with pytest.raises(pytest.fail.Exception) as raised:
+        call()
+    assert "REGRESSION at the declared pin" in str(raised.value)
+    assert _PIN_A[:8] in str(raised.value)
+
+
+def test_a_different_installed_commit_SKIPS_and_names_both(monkeypatch) -> None:
+    """The lawful case: a consumer assembling at a DIFFERENT commit.
+
+    Not "older": the values are synthetic and `_absent()` compares identities, so
+    nothing here establishes an ordering. Caught at the review of `27a89fd`.
+    """
+    call = _decide(monkeypatch, _PIN_A, _PIN_B, ci=True)
+    with pytest.raises(pytest.skip.Exception) as raised:
+        call()
+    message = str(raised.value)
+    assert _PIN_A[:8] in message
+    assert _PIN_B[:8] in message
+    assert "NOT the declared pin's doing" in message
+
+
+def test_unknown_provenance_FAILS_under_ci(monkeypatch) -> None:
+    """The round-2 finding: on the REQUIRED path, unknown is not neutral.
+
+    The message says the two commits could not be COMPARED and names the side that
+    could not be read — it no longer says "this run cannot say which `opendox` is
+    installed", which was false whenever the unreadable side was `pyproject.toml`
+    (the review of `24cd5f2`, and the assertion below moved with it).
+    """
+    call = _decide(monkeypatch, _PIN_A, None, ci=True)
+    with pytest.raises(pytest.fail.Exception) as raised:
+        call()
+    message = str(raised.value)
+    assert "could not be COMPARED" in message
+    assert "no usable PEP 610 provenance could be read" in message
+
+
+def test_an_unreadable_declared_pin_under_ci_does_not_blame_the_install(
+        monkeypatch) -> None:
+    """THE CI TWIN of the off-CI test below, and the review of `24cd5f2`'s finding.
+
+    `declared_pin()` unreadable with a perfectly good `direct_url.json` used to FAIL
+    saying "this run cannot say which `opendox` is installed" while the very next
+    field printed the installed hash. What is unknown is the COMPARISON, and the
+    message has to say which side went missing — under CI exactly as off it.
+    """
+    call = _decide(monkeypatch, None, _PIN_B, ci=True)
+    with pytest.raises(pytest.fail.Exception) as raised:
+        call()
+    message = str(raised.value)
+    assert "declared pin could not be read" in message
+    assert "no usable PEP 610 provenance" not in message
+    assert _PIN_B in message
+
+
+def test_both_sides_unreadable_says_NEITHER_rather_than_picking_one(
+        monkeypatch) -> None:
+    """The third shape, which the either/or phrasing could only half-report."""
+    call = _decide(monkeypatch, None, None, ci=True)
+    with pytest.raises(pytest.fail.Exception) as raised:
+        call()
+    assert "NEITHER side is usable" in str(raised.value)
+
+
+def test_unknown_provenance_SKIPS_off_ci(monkeypatch) -> None:
+    """...and off it, an editable checkout has no provenance to record."""
+    call = _decide(monkeypatch, _PIN_A, None, ci=False)
+    with pytest.raises(pytest.skip.Exception) as raised:
+        call()
+    message = str(raised.value)
+    assert "no usable PEP 610 provenance could be read" in message
+    assert "NOTHING is claimed here about" in message
+
+
+def test_an_unreadable_declared_pin_says_so_rather_than_blaming_the_install(
+        monkeypatch) -> None:
+    """The INSTALLED side can be perfectly good and the comparison still fail.
+
+    Caught at the review of `27a89fd` on #21: this branch used to report "this
+    installation records no PEP 610 provenance" even when the installation had
+    recorded a valid one and it was `pyproject.toml` that could not be read. The
+    message now names whichever side is actually missing.
+    """
+    call = _decide(monkeypatch, None, _PIN_B, ci=False)
+    with pytest.raises(pytest.skip.Exception) as raised:
+        call()
+    message = str(raised.value)
+    assert "declared pin could not be read" in message
+    assert "no usable PEP 610 provenance" not in message
+
+
+def test_under_ci_reads_the_environment_the_runner_sets(monkeypatch) -> None:
+    """`CI` is read, not guessed: `1`, `true` and `yes` (any case, trimmed) are
+    CI; every other value, and an unset variable, are not. GitHub Actions sets
+    `CI=true`. The docstring used to say "nothing else is treated as CI" while the
+    body below accepted three spellings — caught at the review of `27a89fd`.
+    """
+    for value, expected in (("true", True), ("TRUE", True), ("1", True),
+                            ("yes", True), ("false", False), ("", False)):
+        monkeypatch.setenv("CI", value)
+        assert _ob.under_ci() is expected, value
+    monkeypatch.delenv("CI", raising=False)
+    assert _ob.under_ci() is False
+
+
+def test_the_declared_pin_is_read_from_this_legs_own_pyproject(monkeypatch) -> None:
+    """Not a constant: the guard re-reads the file the bump edits.
+
+    The first half checks the LIVE file, and on its own it proved nothing — a
+    hard-coded return of today's sha would satisfy a substring assertion against
+    the file that contains it (Copilot, review of `0e3922d`). The second half is
+    the proof: with `pyproject.toml` replaced by a synthetic one declaring a
+    DIFFERENT commit, the function must return THAT commit, which only a real read
+    can do.
+    """
+    declared = _ob.declared_pin()
+    assert declared is not None
+    assert len(declared) == 40
+    toml = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(
+        encoding="utf-8")
+    assert f"openDox-code@{declared}" in toml
+    assert _PIN_A != declared
+    _with_pyproject_text(monkeypatch, _pyproject(
+        f"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}"))
+    assert _ob.declared_pin() == _PIN_A
+
+
+def _with_unreadable_pyproject(monkeypatch, exc) -> None:
+    """Make `Path.read_text` raise for `pyproject.toml`, and for nothing else.
+
+    Narrow on purpose: `declared_pin()` is the only reader under test, and a
+    blanket patch would hide which file the branch actually reacted to.
+    """
+    real_read_text = Path.read_text
+
+    def _read_text(self, *args, **kwargs):
+        if self.name == "pyproject.toml":
+            raise exc
+        return real_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(_ob.Path, "read_text", _read_text)
+
+
+def _with_pyproject_text(monkeypatch, text) -> None:
+    """Make `pyproject.toml` READ CLEANLY as `text`, and nothing else change.
+
+    `_with_unreadable_pyproject` above drives the two RAISING branches; this drives
+    the branch where the file is perfectly readable and simply does not declare the
+    pin — the `if match else None` the review of `de7d966` found untested.
+    """
+    real_read_text = Path.read_text
+
+    def _read_text(self, *args, **kwargs):
+        if self.name == "pyproject.toml":
+            return text
+        return real_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(_ob.Path, "read_text", _read_text)
+
+
+def test_declared_pin_is_none_when_pyproject_declares_no_opendox_pin(
+        monkeypatch) -> None:
+    """A READABLE `pyproject.toml` with no `opendox @ git+…@<40-hex>` in it.
+
+    The two tests above make the READ raise; nothing made the REGEX miss. A
+    dependency line that lost its pin — rewritten to a version range, to a branch
+    ref, to a path install, or simply deleted — returns None from the same function
+    and must reach the SAME fail-closed policy, or the required check could go green
+    over a leg that no longer declares which openDox it is built against. Caught at
+    the review of `de7d966` on #21.
+    """
+    _with_pyproject_text(monkeypatch, (
+        "[project]\nname = \"openxdox-code\"\n"
+        "dependencies = [\n"
+        "    \"opendox @ git+https://github.com/opensoft/openDox-code@main\",\n"
+        "    \"pyyaml>=6\",\n"
+        "]\n"))
+    assert _ob.declared_pin() is None
+
+
+def _pyproject(*requirements, extra="") -> str:
+    """A minimal, VALID `pyproject.toml` declaring exactly these requirements.
+
+    The quote is chosen per requirement — a TOML literal string for the usual
+    case, a basic string where the value itself carries a `'` — because two cases
+    below put a quote character INSIDE the requirement on purpose, and a helper
+    that emitted invalid TOML would make `declared_pin()` return None for the
+    wrong reason, passing the test while proving nothing.
+    """
+    body = ""
+    for requirement in requirements:
+        quote = '"' if "'" in requirement else "'"
+        assert quote not in requirement, requirement
+        body += f"    {quote}{requirement}{quote},\n"
+    return ('[project]\nname = "openxdox-code"\n'
+            f"{extra}dependencies = [\n{body}]\n")
+
+
+def test_declared_pin_refuses_anything_but_a_whole_40_hex_direct_pin(
+        monkeypatch) -> None:
+    """A ref that CONTINUES past the sha is not a pin, and every escape is closed.
+
+    Four review rounds walked this one class of bug out of a text search — no
+    terminator at all (`8b9ece1`), a negative lookahead that let `-feature`,
+    `/branch`, `_suffix` and `.1` through (`2dfd669`), a positive terminator set
+    that still let `,` and `'` through INSIDE the quoted URL (`a9264b8`) — and the
+    answer was to stop searching text: `tomllib` hands over the dependency VALUE,
+    and `fullmatch` admits it only if the WHOLE requirement is the pin. Every
+    continuation those rounds named is driven here, on one `assert`.
+    """
+    # `#feature` stays a REFUSAL: a bare `#…` is a ref continuation, not pip's
+    # `key=value` direct-reference fragment, and only the latter is stripped
+    # (review of `e92fb06`).
+    for tail in ("dead", "x", "0", "-feature", "/branch", "_suffix", ".1",
+                 ",feature", "'feature", " feature", "#feature"):
+        for url in (f"git+https://github.com/opensoft/openDox-code@{_PIN_A}",
+                    f"git+ssh://git@github.com/opensoft/openDox-code@{_PIN_A}"):
+            _with_pyproject_text(monkeypatch, _pyproject(f"opendox @ {url}{tail}"))
+            assert _ob.declared_pin() is None, (url, tail)
+
+
+def test_declared_pin_refuses_a_pin_at_a_DIFFERENT_REPOSITORY(monkeypatch) -> None:
+    """A 40-hex pin at another project is not a declaration this guard can read.
+
+    `installed_commit()` compares SHAS ONLY, so a dependency re-pointed at another
+    repository at some other 40-hex commit would have made a missing bundle look
+    like the lawful "different commit" case and SKIP under CI — while this leg was
+    no longer testing openDox-code at all. Copilot's thread on `0e3922d`. Such a
+    pin reads as NO pin, which is the fail-closed path, and a fork or mirror of
+    openDox-code under another account still reads (what is refused is a different
+    PROJECT, not a different host).
+    """
+    for url, expected in (
+            (f"git+https://github.com/opensoft/openDox-code@{_PIN_A}", _PIN_A),
+            (f"git+https://github.com/someone/openDox-code@{_PIN_A}", _PIN_A),
+            (f"git+https://example.invalid/mirrors/opendox-code.git@{_PIN_A}", _PIN_A),
+            (f"git+https://github.com/opensoft/openXdox-code@{_PIN_A}", None),
+            (f"git+https://github.com/opensoft/some-other-project@{_PIN_A}", None),
+    ):
+        _with_pyproject_text(monkeypatch, _pyproject(f"opendox @ {url}"))
+        assert _ob.declared_pin() == expected, url
+
+
+def test_declared_pin_ignores_a_commented_out_dependency(monkeypatch) -> None:
+    """The stale sha in a COMMENT is not what this leg declares.
+
+    Copilot's finding at `a9264b8`: a search over the raw file text reads a sha out
+    of a commented-out old line, so a leg whose real dependency had been changed or
+    removed would still report the commented commit — and `_absent()` would compare
+    against a pin this file no longer declares. `tomllib` never sees comments.
+    """
+    _with_pyproject_text(monkeypatch, _pyproject(
+        "PyYAML>=6.0",
+        extra=(f'# opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}\n'
+               "# (kept as provenance, and not a declaration)\n")))
+    assert _ob.declared_pin() is None
+
+
+def test_declared_pin_reads_the_pin_through_extras_markers_and_position(
+        monkeypatch) -> None:
+    """...and the parse does not cost the pin it protects.
+
+    PEP 508 lets the requirement carry extras and an environment marker, and the
+    list has no required order. A guard too strict to read a legitimate declaration
+    fails closed on a CORRECT file, which is the opposite defect and just as silent.
+    """
+    for requirement in (
+            f"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}",
+            f"opendox[test] @ git+https://github.com/opensoft/openDox-code@{_PIN_A}",
+            # An SSH declaration carries an `@` in the AUTHORITY, and a pattern that
+            # stopped at the first one read NO pin out of a requirement pip installs
+            # happily — the guard would then fail closed under CI on a correct file.
+            # Copilot's review of `52453af`.
+            f"opendox @ git+ssh://git@github.com/opensoft/openDox-code@{_PIN_A}",
+            f'opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A} ; python_version >= "3.11"',
+            # Distribution names are case-insensitive (PEP 503), and this one is
+            # spelled `openDox` half the time in this estate. Copilot, `18e8c12`.
+            f"OpenDox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}",
+            # A SEMICOLON is a legal URI character, and `partition(";")` truncated
+            # the url at it — the guard failing closed on a declaration pip
+            # installs. The PEP 508 parser knows where a marker starts.
+            # Copilot, review of `0e3922d`.
+            f"opendox @ git+https://github.com/opensoft/openDox-code;branch@{_PIN_A}",
+            # ...and a `.git` suffix, which the source check must not refuse.
+            f"opendox @ git+ssh://git@github.com/opensoft/openDox-code.git@{_PIN_A}",
+            # pip's direct-reference FRAGMENT is legal after the pin and says
+            # nothing about which commit is declared. `#subdirectory=…` read as NO
+            # pin until the review of `e92fb06`, failing the guard closed on a
+            # declaration pip installs.
+            f"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}#subdirectory=src",
+            f"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}#egg=opendox&subdirectory=src",
+    ):
+        _with_pyproject_text(monkeypatch, _pyproject(
+            "PyYAML>=6.0", requirement, "jsonschema>=4.18"))
+        assert _ob.declared_pin() == _PIN_A, requirement
+
+
+def test_declared_pin_is_none_for_a_pin_whose_marker_is_FALSE(monkeypatch) -> None:
+    """A conditional requirement is a declaration only where its marker holds.
+
+    With `; python_version < "3.0"` pip installs nothing from that line, so reading
+    the sha as "the commit this leg declares" would compare whatever `opendox`
+    happens to be installed against a pin that is NOT ACTIVE — and the mismatch
+    takes the different-commit SKIP, over a real regression. Copilot's review of
+    `18e8c12`; the marker is evaluated now, and an unevaluable one reads as false.
+    """
+    for marker, expected in (('python_version >= "3.0"', _PIN_A),
+                             ('python_version < "3.0"', None),
+                             # A SYNTACTICALLY VALID marker naming a variable this
+                             # environment has no value for. The case here used to
+                             # be `this is not a marker`, which `Requirement()`
+                             # rejects outright — so it proved the InvalidRequirement
+                             # branch and never reached `_marker_holds()` at all.
+                             # Copilot's review of `9ff630d`.
+                             ('extra == "nothing-declares-this"', None)):
+        _with_pyproject_text(monkeypatch, _pyproject(
+            f"opendox @ git+https://github.com/opensoft/openDox-code@{_PIN_A}"
+            f" ; {marker}"))
+        assert _ob.declared_pin() == expected, marker
+    # ...and the unevaluable path is driven at the function, where a marker that
+    # PARSES but cannot be evaluated here must read as false rather than raise.
+    assert _ob._marker_holds('extra == "x"') is False
+    assert _ob._marker_holds("this is not a marker") is False
+    assert _ob._marker_holds('python_version >= "3.0"') is True
+
+
+def test_declared_pin_is_none_when_pyproject_does_not_parse(monkeypatch) -> None:
+    """A `pyproject.toml` that is not TOML declares nothing, and fails closed.
+
+    The read became a PARSE at `a9264b8`'s review, so `TOMLDecodeError` joined
+    `OSError` and `UnicodeDecodeError` in the same refusal. Without it the guard
+    would raise out of `declared_pin()` and bypass `_absent()`'s policy entirely —
+    the defect the review of `27a89fd` found for `UnicodeDecodeError`, one parser
+    later.
+    """
+    _with_pyproject_text(monkeypatch, "[project\nname = broken")
+    assert _ob.declared_pin() is None
+
+
+def test_an_undeclared_pin_FAILS_under_ci_like_any_other_unreadable_side(
+        monkeypatch) -> None:
+    """...and the outcome is the fail-closed one, driven end to end.
+
+    The test above proves the function returns None; this proves what `_absent()`
+    then does with it — FAIL under CI, naming the declared side as the one it could
+    not read, with the installed commit still printed because that side was fine.
+    """
+    _with_pyproject_text(monkeypatch, "[project]\nname = \"openxdox-code\"\n")
+    monkeypatch.setattr(_ob, "installed_commit", lambda: _PIN_B)
+    monkeypatch.setenv("CI", "true")
+    with pytest.raises(pytest.fail.Exception) as raised:
+        _ob._absent("the subject under test", module_level=False)
+    message = str(raised.value)
+    assert "declared pin could not be read" in message
+    assert _PIN_B in message
+
+
+def test_declared_pin_is_none_when_the_read_raises(monkeypatch) -> None:
+    """The unreadable DECLARED side, produced rather than assumed.
+
+    Copilot's review of `f6f1b991` on #21: the CI fail-closed policy depends on
+    `declared_pin()` returning None when the read raises, and every test of the
+    decision monkeypatches `declared_pin()` itself — so `declared=None` had only
+    ever been supplied as an input, never once produced by the function.
+    """
+    _with_unreadable_pyproject(monkeypatch, OSError("pyproject.toml unreadable"))
+    assert _ob.declared_pin() is None
+
+
+def test_declared_pin_is_none_when_pyproject_is_not_utf_8(monkeypatch) -> None:
+    """The half of that branch that was a REAL BUG until the review of `27a89fd`.
+
+    `UnicodeDecodeError` is a `ValueError`, NOT an `OSError`, so a non-UTF-8
+    `pyproject.toml` raised straight out of `declared_pin()` and past
+    `_absent()`'s unknown-provenance policy — the required check's fail-closed
+    rule bypassed entirely. This case exists so the `except` clause cannot
+    silently narrow back to `OSError` alone.
+    """
+    _with_unreadable_pyproject(
+        monkeypatch,
+        UnicodeDecodeError("utf-8", b"\xff", 0, 1, "invalid start byte"))
+    assert _ob.declared_pin() is None
+
+
+# --- THE PEP 610 PARSER ITSELF, not a monkeypatched stand-in -----------------
+# Copilot round 3 on #21: "all six direct guard tests monkeypatch
+# `installed_commit()` and therefore bypass this code … a parser regression can
+# change the CI decision while the required tests remain green." Accurate — the
+# tests above pin the DECISION, these pin the READING it decides on. A fake
+# distribution is installed over `importlib.metadata.distribution`, which is the
+# exact name `installed_commit()` resolves at call time.
+
+class _FakeDist:
+    """Just enough of `importlib.metadata.Distribution` for `read_text`."""
+
+    def __init__(self, payload):
+        self._payload = payload
+
+    def read_text(self, name):
+        if name != "direct_url.json":        # pragma: no cover - never asked
+            return None
+        if isinstance(self._payload, Exception):
+            raise self._payload
+        return self._payload
+
+
+#: The ONE distribution `installed_commit()` may ask about. Both fakes below assert
+#: it, because neither did until the review of `a0eed16`: they answered to ANY name,
+#: so a regression to `distribution("openxdox")` — or to any other installed package
+#: — would have read a STRANGER's `direct_url.json`, compared that commit against
+#: this leg's declared pin, and left every parser test then standing green while
+#: doing it — all TEN of them then; the eleventh is the one below, which exists
+#: because of this finding. (`grep -c '^def test_installed_commit' <this file>`
+#: -> 13 at this head: the review of `9ab8521` added the two SOURCE cases.)
+_ASKED = "opendox"
+
+
+def _with_dist(monkeypatch, payload):
+    """Install a fake distribution whose `read_text` returns (or raises) `payload`.
+
+    The fake ASSERTS the name it is asked for (see `_ASKED`): the provenance this
+    guard reads is worthless if it is read off the wrong package.
+    """
+    import importlib.metadata as md
+
+    def _lookup(name):
+        assert name == _ASKED, f"installed_commit() asked for {name!r}, not {_ASKED!r}"
+        return _FakeDist(payload)
+    monkeypatch.setattr(md, "distribution", _lookup)
+
+
+def _with_no_dist(monkeypatch, exc):
+    """Make the LOOKUP itself raise — the path `_with_dist` cannot reach.
+
+    Caught at `7c0a3b6`: `_with_dist(PackageNotFoundError(...))` made `read_text`
+    raise, so the test named for an uninstalled package never exercised
+    `distribution("opendox")` failing, which is the call `installed_commit()`
+    actually guards. It asserts the requested name too, for `_with_dist`'s reason.
+    """
+    import importlib.metadata as md
+
+    def _raise(name):
+        assert name == _ASKED, f"installed_commit() asked for {name!r}, not {_ASKED!r}"
+        raise exc
+    monkeypatch.setattr(md, "distribution", _raise)
+
+
+def test_installed_commit_asks_for_the_opendox_distribution_and_no_other(
+        monkeypatch) -> None:
+    """The lookup NAME is the assertion, and nothing else asserted it.
+
+    `_with_dist` answered to any name, so `distribution("openxdox")` would have read
+    a stranger's PEP 610 record and compared ITS commit against this leg's declared
+    pin — a provenance check on the wrong package, with every parser test green.
+    Caught at the review of `a0eed16` on #21.
+    """
+    import importlib.metadata as md
+    asked = []
+
+    def _lookup(name):
+        asked.append(name)
+        return _FakeDist(json.dumps(
+            {"url": "https://github.com/opensoft/openDox-code",
+             "vcs_info": {"vcs": "git", "commit_id": _PIN_B}}))
+    monkeypatch.setattr(md, "distribution", _lookup)
+    assert _ob.installed_commit() == _PIN_B
+    assert asked == ["opendox"]
+
+
+def test_installed_commit_reads_a_real_vcs_record(monkeypatch) -> None:
+    _with_dist(monkeypatch, json.dumps(
+        {"url": "https://github.com/opensoft/openDox-code",
+         "vcs_info": {"vcs": "git", "commit_id": _PIN_B}}))
+    assert _ob.installed_commit() == _PIN_B
+
+
+def test_installed_commit_is_none_when_the_file_is_absent(monkeypatch) -> None:
+    _with_dist(monkeypatch, None)
+    assert _ob.installed_commit() is None
+
+
+def test_installed_commit_is_none_on_malformed_json(monkeypatch) -> None:
+    _with_dist(monkeypatch, "{not json at all")
+    assert _ob.installed_commit() is None
+
+
+def test_installed_commit_is_none_for_a_non_vcs_install(monkeypatch) -> None:
+    """A wheel installed from an archive records `archive_info`, not `vcs_info`."""
+    _with_dist(monkeypatch, json.dumps(
+        {"url": "file:///tmp/opendox-0.0.0-py3-none-any.whl",
+         "archive_info": {"hash": "sha256=abc"}}))
+    assert _ob.installed_commit() is None
+
+
+def test_installed_commit_refuses_a_commit_id_that_is_not_40_hex(monkeypatch) -> None:
+    """A short id is not a commit this guard may compare — round 3's parser case."""
+    _with_dist(monkeypatch, json.dumps(
+        {"vcs_info": {"vcs": "git", "commit_id": "0b4e8bbf"}}))
+    assert _ob.installed_commit() is None
+
+
+def test_installed_commit_refuses_forty_characters_that_are_not_hex(monkeypatch) -> None:
+    """THE SILENT-GREEN PATH THROUGH THE PARSER, caught at `42741fd`.
+
+    `len(commit) == 40` admitted any forty characters, so a malformed record
+    carrying a forty-character non-hex id read as "a different pin" and `_absent()`
+    SKIPPED under CI — the exact outcome this guard exists to prevent, reached
+    through the reading rather than through the decision.
+    """
+    _with_dist(monkeypatch, json.dumps(
+        {"vcs_info": {"vcs": "git", "commit_id": "z" * 40}}))
+    assert _ob.installed_commit() is None
+
+
+def test_installed_commit_normalizes_an_upper_case_commit_id(monkeypatch) -> None:
+    """A lawful record spelled in upper case is compared, not discarded.
+
+    Asked for on #21. It can only ever turn an "unknown" into a real comparison:
+    without it an upper-case id would read as unreadable provenance and FAIL under
+    CI over a formatting difference rather than a regression.
+    """
+    _with_dist(monkeypatch, json.dumps(
+        {"url": "https://github.com/opensoft/openDox-code",
+         "vcs_info": {"vcs": "git", "commit_id": _PIN_B.upper()}}))
+    assert _ob.installed_commit() == _PIN_B
+
+
+def test_installed_commit_refuses_a_record_that_is_not_git(monkeypatch) -> None:
+    """A 40-hex id under a non-git VCS is not an openDox-code commit."""
+    _with_dist(monkeypatch, json.dumps(
+        {"vcs_info": {"vcs": "hg", "commit_id": _PIN_B}}))
+    assert _ob.installed_commit() is None
+
+
+def test_installed_commit_refuses_a_record_from_a_DIFFERENT_PROJECT(monkeypatch) -> None:
+    """A 40-hex git commit OF SOMETHING ELSE is not provenance this leg may compare.
+
+    `installed_commit()` returned `vcs_info.commit_id` and dropped the record's
+    `url`, so an `opendox` built from an unrelated repository at its own commit
+    reached `_absent()` as the lawful DIFFERENT-COMMIT case and SKIPPED the required
+    suite — with nothing installed here coming from openDox-code at all. The
+    DECLARED side got this check at `9ff630d`
+    (`test_declared_pin_refuses_a_pin_at_a_DIFFERENT_REPOSITORY`); Copilot's thread
+    on `9ab8521` asked for it on the side that is actually imported.
+    """
+    for url in ("https://github.com/opensoft/openXdox-code",
+                "https://github.com/opensoft/openDox-spec",
+                "https://github.com/opensoft/openDox-code-mirror",
+                "file:///srv/wheels/opendox"):
+        _with_dist(monkeypatch, json.dumps(
+            {"url": url, "vcs_info": {"vcs": "git", "commit_id": _PIN_B}}))
+        assert _ob.installed_commit() is None, url
+
+
+def test_installed_commit_reads_a_fork_a_mirror_and_an_ssh_record(monkeypatch) -> None:
+    """...and the source check must not fail CLOSED on a lawful install.
+
+    An installed record carries no `@<ref>` — PEP 610 keeps the ref in
+    `requested_revision` — so stripping at the LAST `@` cut
+    `ssh://git@github.com/opensoft/openDox-code` down to `ssh://git` and read a
+    correct install as a different project: the "too strict" half of this defect,
+    which every round of this arc has found paired with the too-loose half. A fork
+    or a mirror under another account reads too, RULED openxFactory#656 comment
+    5700475319: a consumer may pin an openDox of its own choosing; what is refused
+    is a different PROJECT.
+    """
+    for url in ("https://github.com/opensoft/openDox-code",
+                "git+https://github.com/opensoft/openDox-code.git",
+                "ssh://git@github.com/opensoft/openDox-code",
+                "https://github.com/a-fork/openDox-code",
+                "https://git.example.test/mirrors/opendox-code.git",
+                "https://github.com/opensoft/openDox-code#subdirectory=src"):
+        _with_dist(monkeypatch, json.dumps(
+            {"url": url, "vcs_info": {"vcs": "git", "commit_id": _PIN_B}}))
+        assert _ob.installed_commit() == _PIN_B, url
+
+
+def test_installed_commit_is_none_when_the_package_is_not_installed(monkeypatch) -> None:
+    """The LOOKUP fails, not the read — see `_with_no_dist`."""
+    from importlib.metadata import PackageNotFoundError
+    _with_no_dist(monkeypatch, PackageNotFoundError("opendox"))
+    assert _ob.installed_commit() is None
+
+
+def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) -> None:
+    """...and the read failing is its own case, which is what `_with_dist` drives."""
+    _with_dist(monkeypatch, OSError("metadata unreadable"))
+    assert _ob.installed_commit() is None
+
+# WHY THE CASES ABOVE ARE THE CASES: `_absent()` branches on `installed_commit()`'s
+# RETURN VALUE, so every test of the DECISION that monkeypatches that function
+# proves nothing about the READING. TWELVE cases cover the reading of the INSTALLED
+# side — a real VCS record, an absent `direct_url.json`, malformed JSON, a non-VCS
+# (`archive_info`) install, a commit id that is not 40 characters, forty
+# characters that are not hex, an UPPER-CASE 40-hex id (normalized rather than
+# discarded), a 40-hex id under a non-git VCS, a record whose `url` names a
+# DIFFERENT PROJECT, the fork / mirror / SSH / fragment shapes that must still
+# read (the same defect's too-strict half), the distribution LOOKUP raising,
+# and the read raising. The DECLARED side's own reading is covered separately,
+# above, by the `test_declared_pin_is_none_when_…` cases — and THAT count is not
+# written here at all, because it was written as "two" and was five by the time
+# the review of `5285cf2` read it (the readable miss, a false marker, a file that
+# does not parse, the read raising, a non-UTF-8 file). The command is the count:
+#
+#     grep -c '^def test_declared_pin_is_none' tests/test_gate_loop_probes.py
+#
+# THE COUNT IS MEASURED, NOT CARRIED, and this line read "nine" until the review
+# of `f6f1b991` on #21 caught that the upper-case case added at `b177eef` had
+# never reached the inventory:
+#
+#     grep -c '^def test_installed_commit' tests/test_gate_loop_probes.py   -> 13
+#
+# It read 10 until the review of `fd3af6a` caught the lookup-name test the review
+# of `a0eed16` had just asked for — the same staleness, one round later, which is
+# why the command is printed beside the number every time.
+# A DELETED case is not one of the cases above, and this paragraph used to number
+# it as though it were ("a tenth test"). One further test stood here until `7c0a3b6`
+# and is gone rather than repaired: it asserted strings against
+# `inspect.getsource(installed_commit)`, and once the implementation stopped
+# containing `len(commit) == 40` it passed only because an explanatory COMMENT
+# still held that text. A test coupled to source text fails on a harmless rename
+# and catches no behaviour — the cases above already assert the results it was
+# gesturing at.
+
+
+# --- THE CALL SITES, not the decision and not the parser ---------------------
+# Copilot's review of `8b23f6f` on #21, and it is the round-3 finding one level
+# out: the tests above prove what `_absent()` DECIDES and what
+# `installed_commit()` READS, and every one of them either calls `_absent()`
+# directly or monkeypatches the function under it. None of them proves that the
+# three CALLERS still route a missing subject INTO `_absent()`. That review's own
+# sentence: "replacing this call with `pytest.skip` would leave the <N> guard
+# tests green while the `OPENDOX_WEB` importers silently skip under CI" — it said
+# 19, the count at ITS head, and the point does not live in the number, so the
+# number is not carried here. What is true at any head is the command:
+#   git diff main -- tests/test_gate_loop_probes.py | grep -c '^+def test_'
+#   git diff main -- tests/test_gate_loop_views.py  | grep -c '^+def test_'
+# (37 in this file and 6 in the views file at THIS head — 19 decision/read cases,
+# 13 `installed_commit` parser tests and 5 call-site tests here; `validate.yml`'s
+# record block carries the total, 43. The review of `fd3af6a` caught this pair
+# reading 25 and 6, and the review of `de7d966` moved it again by asking for the
+# two undeclared-pin tests: a count written in prose is stale one round later,
+# which is why the commands are printed above it every time.)
+# It is exactly the silent green this whole guard exists to break, reached one
+# level further out each round — and the review of `b22a6fd` caught the quoted
+# count going stale three rounds after the quotation.
+# Two call sites are covered here; the third
+# (`test_gate_loop_views.py::_view_extension_or_skip`) is covered in that file,
+# beside the assertions it gates.
+
+
+def _pin(monkeypatch, declared, installed, *, ci=True):
+    """Fix what the guard will READ, so a call site's OUTCOME is the assertion."""
+    monkeypatch.setattr(_ob, "declared_pin", lambda: declared)
+    monkeypatch.setattr(_ob, "installed_commit", lambda: installed)
+    monkeypatch.setenv("CI", "true" if ci else "")
+
+
+def test_require_FAILS_at_the_declared_pin_when_the_bundle_is_missing(
+        monkeypatch) -> None:
+    """`opendox_bundle.require()`'s own call site, driven with no bundle.
+
+    `_STAGED` is reset because `require()` stages once per process and every
+    other suite in this run has already filled it — without the reset this test
+    would never reach `find()` at all, and would prove nothing.
+    """
+    _pin(monkeypatch, _PIN_A, _PIN_A)
+    monkeypatch.setattr(_ob, "_STAGED", None)
+    monkeypatch.setattr(_ob, "find", lambda: None)
+    with pytest.raises(pytest.fail.Exception) as raised:
+        _ob.require(module_level=False)
+    assert "REGRESSION at the declared pin" in str(raised.value)
+
+
+def test_require_SKIPS_for_a_different_installed_commit(monkeypatch) -> None:
+    """...and the lawful consumer still gets a skip through the same call."""
+    _pin(monkeypatch, _PIN_A, _PIN_B)
+    monkeypatch.setattr(_ob, "_STAGED", None)
+    monkeypatch.setattr(_ob, "find", lambda: None)
+    with pytest.raises(pytest.skip.Exception) as raised:
+        _ob.require(module_level=False)
+    assert "NOT the declared pin's doing" in str(raised.value)
+
+
+def test_require_forwards_its_DEFAULT_module_level_to_the_skip(monkeypatch) -> None:
+    """THE DEFAULT IS THE PATH THE MODULE-SCOPE CALLERS TAKE, and no test drove it.
+
+    Both call-site tests above pass `module_level=False`, because that is what a
+    test function needs. The TWENTY-NINE annotated module-scope sites take the
+    default instead — 26 importing `OPENDOX_WEB`, which PEP 562's `__getattr__`
+    resolves with a bare `require()`, and 3 calling `composed()`, which calls a
+    bare `require()` of its own (the two forms `opendox_bundle.py`'s own annotation
+    note keeps apart, and which the review of `2dfd669` caught being collapsed into
+    one). At module scope a skip must carry `allow_module_level=True` or pytest
+    raises instead of skipping, so a regression that stopped forwarding the default
+    would have left every test above green and broken exactly those callers.
+    Copilot's review of `5285cf2`.
+    """
+    _pin(monkeypatch, _PIN_A, _PIN_B)
+    monkeypatch.setattr(_ob, "_STAGED", None)
+    monkeypatch.setattr(_ob, "find", lambda: None)
+    with pytest.raises(pytest.skip.Exception) as raised:
+        _ob.require()
+    assert raised.value.allow_module_level is True
+    assert "NOT the declared pin's doing" in str(raised.value)
+
+
+def test_the_bundle_fixture_FAILS_at_the_declared_pin(request, monkeypatch) -> None:
+    """The `bundle` fixture's call site, driven through the real fixture.
+
+    `request.getfixturevalue` runs the fixture that the thirteen probes below
+    receive, so what is proven is the branch they actually take — not a copy of
+    it written into the test.
+    """
+    import sys
+    _pin(monkeypatch, _PIN_A, _PIN_A)
+    monkeypatch.setattr(sys.modules[__name__], "_opendox_bundle", lambda: None)
+    with pytest.raises(pytest.fail.Exception) as raised:
+        request.getfixturevalue("bundle")
+    assert "REGRESSION at the declared pin" in str(raised.value)
+
+
+def test_the_bundle_fixture_SKIPS_for_a_different_installed_commit(
+        request, monkeypatch) -> None:
+    """...and skips, naming both commits, for an assembly at another pin."""
+    import sys
+    _pin(monkeypatch, _PIN_A, _PIN_B)
+    monkeypatch.setattr(sys.modules[__name__], "_opendox_bundle", lambda: None)
+    with pytest.raises(pytest.skip.Exception) as raised:
+        request.getfixturevalue("bundle")
+    message = str(raised.value)
+    assert _PIN_A[:8] in message
+    assert _PIN_B[:8] in message
