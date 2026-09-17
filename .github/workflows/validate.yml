@@ -47,6 +47,68 @@ jobs:
       # The same disclosed narrowing openDox-code carries under RULED Q-L5
       # (b′).
       #
+      # THAT PARAGRAPH IS THE 2026-09-10 STATE AND IS NO LONGER THE WHOLE SCOPE
+      # OF THIS CHECK. Copilot's review of `399e2a9` on openXdox-code#21 was
+      # right that a reader who stopped there would take the required job to be
+      # narrower than the list at the bottom of this file actually is; the
+      # correction was already in the file, twenty lines further down
+      # ("§ 3.4 SLICE S8 UN-NARROWS THIS LIST AS FAR AS THE MEASUREMENT
+      # ALLOWS"), and had never been pointed at from up here. MEASURED against
+      # that list rather than asserted — it names FOURTEEN files:
+      #   * THREE never import anything under test (`test_leg_shape.py`,
+      #     `test_dependency_direction.py`, `test_no_hardcoded_status_words.py`
+      #     parse trees with `ast`). Those are the scaffold shape assertions the
+      #     paragraph above is about, and they are all that "only the scaffold's
+      #     shape assertions" ever described.
+      #   * ELEVEN import a runtime module. `test_domain_profile.py` imports
+      #     `openxdox.domain_profile` alone, on the § 4.4 grounds set out below;
+      #     the other TEN RUN here — and calling all ten "carved" was wrong, as
+      #     the review of `e92fb06` said: measured against openxFactory's own two
+      #     registers, only TWO are ARRIVED carve rows
+      #     (`test_doxbench_abstract_store.py`, `test_doxbench_telemetry.py`, each
+      #     with a row in `docs/opendox-carve-manifest.yaml`) and EIGHT are CREATED
+      #     files admitted by name in `docs/opendox-carve-admissions.yaml` — the two
+      #     gate-loop suites of § 3.4 slice S5 and the three evidence/workbench/
+      #     authority pairs. The distinction is not cosmetic: an ARRIVED row's edits
+      #     are declared at openxFactory (which is why
+      #     `test_doxbench_mutation_boundary.py` is dropped rather than repaired,
+      #     and why the 29 importer annotations are left alone), while a CREATED
+      #     file is this leg's to edit. Re-derive with
+      #     `grep -c '<path>' <that repo>/docs/opendox-carve-{manifest,admissions}.yaml`.
+      #     FOUR of the ten reach the PINNED openDox — in TWO DIFFERENT WAYS, which
+      #     this line ran together until the review of `24cd5f2` on #21 measured
+      #     them apart:
+      #       - ONE reads the pinned WEB BUNDLE: `test_gate_loop_probes.py`, whose
+      #         `_opendox_bundle()` finds the marker under the installed `opendox`
+      #         and whose `bundle` fixture composes it. `tests/opendox_bundle.py`'s
+      #         own `find()` / `require()` call site is driven from that file too;
+      #         `test_gate_loop_views.py` never calls `find()`, `require()` or that
+      #         fixture, which this bullet claimed until the review of `a0eed16`;
+      #       - THREE import pinned openDox PYTHON MODULES:
+      #         `test_gate_loop_views.py` takes `opendox.view_extension` through its
+      #         own guarded helper (`_view_extension_or_skip`, which is why it
+      #         imports `opendox_bundle` at all — for `_absent()`, the CLASSIFIER,
+      #         not for the bundle), while `test_doxbench_abstract_store.py:43,45`
+      #         (`from opendox import doxbench_abstract_store`, `doxbench_turns`)
+      #         and `test_doxbench_telemetry.py:21` (`from opendox import
+      #         doxbench_telemetry`) import at module scope with NO guard in the
+      #         path: a regression in the pin reaches those two as an ImportError
+      #         or a failing assertion, loudly and unclassified.
+      #     So `tests/opendox_bundle.py::_absent` decides for TWO of the four —
+      #     the bundle for probes, the view contract for views — and for neither
+      #     doxbench suite. Measured over the fourteen files named below:
+      #       grep -ln 'import opendox_bundle' <the 14>   -> views, probes
+      #       grep -ln 'from opendox import'   <the 14>   -> views, telemetry,
+      #                                                      abstract_store
+      #       grep -n  'opendox_bundle\.' tests/test_gate_loop_views.py
+      #                                                  -> three `_absent()` calls,
+      #                                                     no `find`/`require`
+      # What Q-L8 (b′) still keeps out is the REST of the carved corpus, which
+      # is BUILD-blocked on `doc_health` / `ideation_dashboard` — and
+      # `tests/test_doxbench_mutation_boundary.py` is the one file this act
+      # moves from the running group into that one, for the reason recorded in
+      # the drop block below.
+      #
       # `tests/test_dependency_direction.py` joins it under
       # `split-opendox-two-layer-product` § 4.1 (RULED 5626260214,
       # opensoft/openxFactory#656). It is a SHAPE assertion authored HERE, of
@@ -92,9 +154,17 @@ jobs:
       #
       # `--noconftest` safe and needs no consumer: it imports this package's own
       # modules and reads this package's own files as text. Its three
-      # materialization assertions SKIP — never fail — where the pinned
-      # `opendox` predates the view contract, which is this leg's state until
-      # the pin bump that lands with the openDox half.
+      # materialization assertions used to SKIP — never fail — because the
+      # pinned `opendox` predated the view contract, "which is this leg's state
+      # until the pin bump that lands with the openDox half". THAT BUMP HAS
+      # LANDED: `pyproject.toml` names `0b4e8bbf` (openDox-code#23, § 3.4 slice
+      # S8 leg B) since 2026-09-16, and this file goes 32 passed / 3 skipped ->
+      # 35 passed / 0 skipped under the invocation below. THAT PAIR IS THE
+      # PIN-BUMP-ONLY MEASUREMENT, at `708591b`, and it is labelled because the
+      # review of `a9264b8` read it as the current one: the review rounds then
+      # added six guard tests to this file, so under the same invocation at the
+      # head it is 41 passed / 0 skipped
+      # (`python -m pytest -q tests/test_gate_loop_views.py --noconftest`).
       #
       # `tests/test_gate_loop_probes.py` joins it on the same footing and for
       # the reason the slice exists: slice S4 proved its two new modules by
@@ -105,10 +175,19 @@ jobs:
       # assertion silently breaks a verb. Each probe assembles a COMPOSED bundle
       # — openDox's own `web/` with this column's six modules placed into it by
       # `web_assets.install_view_modules()`, RULED Q5's own hook — so what is
-      # measured is the shipped byte in the shipped position. Where the
-      # installed `opendox` carries no bundle (this leg's pinned state until the
-      # pin bump) every probe SKIPS with that reason named, and where `node` is
-      # absent they skip for that one.
+      # measured is the shipped byte in the shipped position. This block used to
+      # end "where the installed `opendox` carries no bundle (this leg's pinned
+      # state until the pin bump) every probe SKIPS". THE SAME BUMP CLEARED IT:
+      # at `0b4e8bbf` the bundle is in the wheel and this file goes 0 passed /
+      # 13 skipped -> 13 passed / 0 skipped — again the PIN-BUMP-ONLY pair, at
+      # `708591b`; the rounds added thirty-seven guard tests here, so at the head
+      # the same invocation reads 50 passed / 0 skipped
+      # (`python -m pytest -q tests/test_gate_loop_probes.py --noconftest`).
+      # The skip survives for an assembly
+      # that installs a DIFFERENT openDox from the one this leg declares — the
+      # guard compares two commit identities and never asks git which came first,
+      # so "different" is all it can say — and the `node` one for a runner
+      # without node.
       # § 3.4 SLICE S8 UN-NARROWS THIS LIST AS FAR AS THE MEASUREMENT ALLOWS,
       # which is the half of RULED Q-L8 (b′) this slice was scoped to lift.
       # The note's § 5 S8 row says the narrowings "lift FOR THE WEB SUITES", and
@@ -128,12 +207,15 @@ jobs:
       #       both a pre-carve `MODULE_PATH`; the module under test is
       #       openDox's and is read through the PIN, as the bundle now is.
       #   tests/test_doxbench_mutation_boundary.py   1 error     ->  1 skipped
-      #       A WEB SUITE, and the one of the 23 that can be named today: it
-      #       reads only bundle files, so with the path repaired it COLLECTS
-      #       and skips on the stated reason (this leg's `opendox` pin predates
-      #       openDox's `web/**` package-data declaration) instead of erroring
-      #       on a directory that does not exist. That it collects at all is
-      #       § 1.2(d)'s defect closed; the pin bump is what makes it run.
+      #       A WEB SUITE, and the one of the 23 S8 could name: it reads bundle
+      #       files, so with the path repaired it COLLECTED and skipped on the
+      #       stated reason (this leg's `opendox` pin predated openDox's
+      #       `web/**` package-data declaration) instead of erroring on a
+      #       directory that does not exist. That it collects at all is
+      #       § 1.2(d)'s defect closed. S8 then predicted "the pin bump is what
+      #       makes it run". THE PIN BUMP MEASURED IT AND THE PREDICTION WAS
+      #       WRONG — the block below says what actually happens, and the file
+      #       LEAVES this list in the same act that moved the pin.
       #   tests/test_evidence_provenance_surface.py         19 passed
       #   tests/test_evidence_provenance_surface_seam.py     8 passed 2 skipped
       #   tests/test_model_scenario_workbench.py            23 passed
@@ -163,6 +245,139 @@ jobs:
       # named: it is all-skip today, on the same footing openDox-code#23 left
       # its two all-skip suites off ITS list.
       #
+      # ONE FILE LEAVES THIS LIST WITH THE 2026-09-16 PIN BUMP
+      # (`a99eba03` -> `0b4e8bbf`), and the reason is the BUILD arc's, not the
+      # bump's. RULED openxFactory#656 comment 5700475319 (Brett Heap,
+      # 2026-09-16, by interactive multi-choice): the question "drop it, keep it
+      # and accept a red required check, or edit the arrived file" was put to
+      # Brett Heap and answered (a) DROP IT, "with the measurement and both
+      # grounds in the workflow comment; it returns with the BUILD arc beside
+      # test_doxbench_turns.py" — which is what follows.
+      #
+      # `tests/test_doxbench_mutation_boundary.py` was named by S8 on
+      # the measurement quoted above: it COLLECTS, then skips whole at
+      # `tests/opendox_bundle.py`'s module-level skip, which is what happened
+      # while the pinned `opendox` carried no `web/` bundle. At `0b4e8bbf` the
+      # bundle IS in the wheel, so the module-level skip on its line 46 no
+      # longer fires and the module runs on to its line 481 `from openxdox
+      # import gate_console` -> `src/openxdox/gate_console.py:63  from
+      # doc_health import corpus`, the openxFactory-only package named two
+      # paragraphs up. Measured under this exact invocation, in a fresh venv at
+      # the new pin: `ERROR tests/test_doxbench_mutation_boundary.py …
+      # ModuleNotFoundError: No module named 'doc_health'`, a COLLECTION error
+      # that interrupts the whole run.
+      #
+      # It is DROPPED rather than repaired, for the reason
+      # `tests/test_doxbench_turns.py` is not named at all: naming it would put
+      # the required check red for the BUILD arc's defect (split-opendox
+      # § 3.5/3.6, RULED Q-L8 (b′)), and the file is an ARRIVED carve row whose
+      # edits are declared at openxFactory — deferring its `gate_console` import
+      # would be an undeclared edit to a declared surface. It comes back to this
+      # list with the BUILD arc, in the act that makes `doc_health` reachable,
+      # alongside `test_doxbench_turns.py`.
+      #
+      # WITH IT GONE AND THE PIN MOVED, this invocation goes 301 passed /
+      # 23 skipped -> 360 passed / 6 skipped, and BOTH HALVES OF THAT DELTA HAVE
+      # TO BE SAID SEPARATELY, because Copilot's round-3 review of #21 caught this
+      # block conflating them:
+      #
+      #   * SIXTEEN skips became PASSES — the 3 materialization assertions in
+      #     `tests/test_gate_loop_views.py` and the 13 node probes in
+      #     `tests/test_gate_loop_probes.py`. That is the pin bump's own effect,
+      #     and it is the whole point of the act.
+      #   * The seventeenth skip did NOT clear. It was
+      #     `tests/test_doxbench_mutation_boundary.py`'s module-level skip, and at
+      #     the new pin it becomes a COLLECTION ERROR (see the block above); the
+      #     file leaves this list, so that skip is no longer RUN rather than
+      #     cleared. Counting it as cleared would describe a transition that never
+      #     happened.
+      #   * The remaining rise to 360 is NOT the bump: it is the 43 direct tests
+      #     of the provenance guard that Copilot's review rounds asked for, which
+      #     live in `tests/test_gate_loop_probes.py` and
+      #     `tests/test_gate_loop_views.py` and are therefore both on this list.
+      #     The bump alone measured 317. Both counts are re-derived at every head
+      #     rather than carried:
+      #       git diff main -- tests/test_gate_loop_probes.py \
+      #                        tests/test_gate_loop_views.py | grep -c '^+def test_'
+      #     gives 43, and the passing figure has run 317 -> 323 -> 330 -> 332 ->
+      #     333 -> 334 -> 336 -> 343 -> 346 -> 348 -> 349 -> 351 -> 353 -> 355 ->
+      #     356 -> 357 -> 359 -> 360, once per round that added tests — the
+      #     same discipline the block above applies to the skip counts. The review
+      #     of `8b23f6f` asked for the CALL SITES: the tests before it proved what
+      #     the guard decides and what it reads, and none of them proved that the
+      #     three callers still route a missing subject into it, so swapping any
+      #     one call for a bare `pytest.skip` would have left every required test
+      #     green. The review of `24cd5f2` took the last three: the CI branch's
+      #     message had to name WHICH side it could not read (two cases — an
+      #     unreadable `pyproject.toml` beside a good `direct_url.json`, and
+      #     neither side readable), and `_view_extension_or_skip()` had to survive
+      #     a `view_extension` module that carries no `ViewBinding` class, which
+      #     until then left this guard through an `AttributeError`. The review of
+      #     `cb84001` took the two after that: BOTH new caller branches had only
+      #     their declared-pin FAIL driven, so making either an unconditional
+      #     failure would have passed every added test while breaking the consumer
+      #     RULED 5700475319 protects — the assembly that pins an openDox behind
+      #     the view contract. Each is now driven at a DIFFERENT commit too. The
+      #     review of `a0eed16` took the last one, in the PARSER: both fakes for
+      #     `importlib.metadata.distribution` answered to ANY name, so a regression
+      #     to `distribution("openxdox")` would have read a stranger's PEP 610
+      #     record and compared ITS commit against this leg's declared pin with all
+      #     ten parser tests green. Both fakes assert the name now, and one test
+      #     asserts the lookup itself. The review of `de7d966` took the branch under
+      #     THAT one: `declared_pin()`'s regex MISS — a readable `pyproject.toml`
+      #     that declares no `opendox @ git+…@<40-hex>` — had no test at all, so a
+      #     dependency line rewritten to a branch ref or a version range would have
+      #     returned None with nothing proving the fail-closed policy still catches
+      #     it. Two tests: the function returns None, and `_absent()` FAILS under CI
+      #     naming the declared side while still printing the installed commit. The
+      #     review of `8b9ece1` then found the PARSER bug with the widest blast
+      #     radius on this PR: `_PIN_RE` had no delimiter after `{40}`, so a ref that
+      #     merely BEGAN with forty hex characters (`…@<40-hex>dead`) yielded that
+      #     prefix as the declared commit — and the guard would compare a commit this
+      #     leg does NOT declare against what is installed, failing on the wrong
+      #     culprit or skipping over a real regression. A trailing negative
+      #     lookahead over alphanumerics made a continuing ref read as NO pin —
+      #     THE EXPRESSION IS NOT REPRODUCED HERE, at the request of the review of
+      #     `a9264b8`, because a rejected pattern written out in a workflow is a
+      #     pattern somebody copies back; it was still a TEXT SEARCH,
+      #     and the next two rounds walked the same class of hole out of it: a
+      #     positive terminator set still admitted `,` and `'` INSIDE the quoted PEP
+      #     508 URL, and a search over raw text could read a sha out of a
+      #     COMMENTED-OUT dependency line. `declared_pin()` PARSES the file with
+      #     `tomllib` now and `fullmatch`es the dependency VALUE, so a pin is read
+      #     only when the entire declared requirement is
+      #     `opendox @ git+<url>@<40-hex>` — and a comment is not in
+      #     `project.dependencies` at all. Eleven continuations are refused in one
+      #     test — eleven continuations against BOTH url shapes — and NINE
+      #     legitimate declarations are still read in another (plain HTTPS · with
+      #     extras · an SSH url whose AUTHORITY carries an `@` · a `;` path
+      #     parameter · a `.git` suffix · a true environment marker · `OpenDox`
+      #     spelled in mixed case, names being case-insensitive per PEP 503 ·
+      #     a `#subdirectory=src` fragment · an `#egg=…&subdirectory=…` one —
+      #     the two the review of `e92fb06` added, which this inventory still
+      #     counted as seven until the review of `9ab8521` measured it),
+      #     because a guard too strict to read a correct file fails closed just as
+      #     silently. A FALSE marker is the one conditional
+      #     that must NOT read as a pin — pip installs nothing from that line — and
+      #     it is driven beside a true one and an unevaluable one. The reviews of
+      #     `52453af` and `18e8c12` found each of those in turn. The review of
+      #     `0e3922d` ended the arc by taking the splitting away from this code
+      #     altogether: `packaging.requirements` settles the name, the extras, the
+      #     url and where the marker starts — a `;` is legal in a url path, and
+      #     hand-splitting on it truncated a declaration pip installs — and the
+      #     SOURCE is checked, because comparing shas alone let a dependency
+      #     re-pointed at a different PROJECT read as the lawful "different commit"
+      #     skip while this leg was no longer testing openDox-code at all. The
+      #     review of `9ab8521` closed the OTHER HALF of that: the check sat on the
+      #     DECLARED url only, so an `opendox` INSTALLED from an unrelated
+      #     repository still reached that skip — `installed_commit()` reads
+      #     `direct_url.json`'s `url` as well as its `commit_id` now, a fork or a
+      #     mirror of openDox-code passing (RULED 5700475319) and a different
+      #     project failing closed.)
+      #
+      # The 6 skips that remain are the three seam suites' `doc_health` pairs,
+      # which no pin bump touches.
+      #
       # `--noconftest` STAYS, and it is why this list is a list: `tests/
       # conftest.py` imports the carved session fixtures, which reach both
       # absent packages. Every file named here stands on its own under it.
@@ -176,7 +391,6 @@ jobs:
           tests/test_gate_loop_views.py
           tests/test_gate_loop_probes.py
           tests/test_doxbench_abstract_store.py
-          tests/test_doxbench_mutation_boundary.py
           tests/test_doxbench_telemetry.py
           tests/test_evidence_provenance_surface.py
           tests/test_evidence_provenance_surface_seam.py
