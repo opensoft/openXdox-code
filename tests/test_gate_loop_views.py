@@ -659,8 +659,9 @@ def _view_extension_or_skip():
     replaced `importorskip` cannot measure ordering, only identity, so this summary
     stopped borrowing the word — the review of `cb84001` caught it here, the last
     copy left in the file.) If `5c137a90` — the leg this pin names now — lost
-    `view_extension` or the `exports` field, all three assertions below would have
-    gone quietly green in a required check. `tests/opendox_bundle.py::_absent` decides by READING the declared pin
+    `view_extension` or the `exports` field, all three assertions below would
+    have gone quietly green in a required check.
+    `tests/opendox_bundle.py::_absent` decides by READING the declared pin
     out of `pyproject.toml` and the installed commit out of the distribution's
     PEP 610 `direct_url.json`. This docstring said "different (or unrecorded) ->
     SKIP", and Copilot's round-3 review of #21 was right that the parenthesis is
