@@ -157,8 +157,9 @@ jobs:
       # materialization assertions used to SKIP — never fail — because the
       # pinned `opendox` predated the view contract, "which is this leg's state
       # until the pin bump that lands with the openDox half". THAT BUMP HAS
-      # LANDED: `pyproject.toml` names `0b4e8bbf` (openDox-code#23, § 3.4 slice
-      # S8 leg B) since 2026-09-16, and this file goes 32 passed / 3 skipped ->
+      # LANDED: `pyproject.toml` named `0b4e8bbf` (openDox-code#23, § 3.4 slice
+      # S8 leg B) from 2026-09-16 and names `5c137a90` (openDox-code#27, § 3.4
+      # RULED Q7) from 2026-09-17, and this file goes 32 passed / 3 skipped ->
       # 35 passed / 0 skipped under the invocation below. THAT PAIR IS THE
       # PIN-BUMP-ONLY MEASUREMENT, at `708591b`, and it is labelled because the
       # review of `a9264b8` read it as the current one: the review rounds then
