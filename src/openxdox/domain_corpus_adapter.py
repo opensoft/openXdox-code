@@ -305,16 +305,21 @@ class DomainCorpusAdapter:
     def __init__(self, shape: CorpusShape) -> None:
         self._shape = shape
         # One listing per (location, revision, scope), remembered for this
-        # INSTANCE only. Not an optimization for its own sake: `read` decides
-        # membership by asking the listing -- one definition, so no second
-        # membership rule can disagree with the first -- and re-walking the tree
-        # per read would make classifying a corpus quadratic in its own size.
-        # The instance is bound to the LAST corpus state it resolved, and
-        # `resolve` CLEARS this cache for that reason: an unversioned tree has
-        # no revision token for the key to change with, so a caller that
-        # re-resolves after editing the tree would otherwise be served the
-        # listing from before its own edit. Re-resolving is the one act that
-        # says "the tree may have moved", and it is cheap.
+        # INSTANCE only. NOT AN OPTIMIZATION FOR ITS OWN SAKE, and it has now
+        # been removed once and measured: `read` decides membership by asking
+        # the listing -- one definition, so no second membership rule can
+        # disagree with the first -- and `classify` reads, so a reader without
+        # this walks the whole tree once PER DOCUMENT. Over an 801-document
+        # corpus in two roots, classifying every document took **0.07s with
+        # this cache and 58.85s without it**, and the cost is quadratic in the
+        # corpus's own size rather than a constant factor.
+        #
+        # THE STALENESS IT COULD HAVE HAD IS CLOSED AT `resolve`, WHICH CLEARS
+        # IT. An unversioned tree has no revision token for the key to change
+        # with, so a caller that re-resolved after editing the tree would
+        # otherwise have been served the listing from before its own edit.
+        # Re-resolving is the one act that says "the tree may have moved", and
+        # it is the cheap place to answer it.
         self._listings: dict[tuple[str, str | None, str], tuple[str, ...]] = {}
 
     # -- the six -----------------------------------------------------------

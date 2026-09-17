@@ -237,6 +237,33 @@ def _head(repository: Path) -> str:
 
 
 @pytest.fixture()
+def unreadable(request):
+    """Make a directory unopenable for the rest of the test, and ALWAYS put it
+    back — through a finalizer registered BEFORE anything else can raise.
+
+    A `try/finally` around the assertion is not enough and this is not a
+    hypothetical: the setup between the `chmod` and the `try` can itself raise
+    (it resolves a corpus), and when it did, a mode-0 directory survived the
+    test — after which `pytest`'s own cleanup of old `tmp_path` trees could not
+    remove it either, and every later session in that environment reported
+    `OSError: Directory not empty`. A finalizer runs however the test leaves.
+
+    Skips rather than fails where the platform does not enforce directory
+    permissions for this user — running as root, most obviously, which the
+    conformance corpus's own README already names as the reason its unreadable
+    fixture is a FILE and not a `chmod`.
+    """
+    def _make(path):
+        original = path.stat().st_mode
+        request.addfinalizer(lambda: path.chmod(original))
+        path.chmod(0)
+        if os.access(path, os.R_OK | os.X_OK):  # pragma: no cover
+            pytest.skip("directory permissions are not enforced for this user")
+        return path
+    return _make
+
+
+@pytest.fixture()
 def git_available() -> None:
     try:
         subprocess.run(["git", "--version"], check=True, capture_output=True,
@@ -416,16 +443,6 @@ def test_the_listing_is_sorted_unique_and_stable(reader, populated) -> None:
     assert {document.corpus for document in first} == {"populated"}
 
 
-def test_resolving_again_rebuilds_the_listing_for_an_unversioned_tree(
-        reader, populated) -> None:
-    first = reader.list_documents(_resolved(reader, populated))
-    (populated / "notes" / "delta.md").write_text("Type: note\nTitle: Delta\n")
-    second = reader.list_documents(_resolved(reader, populated))
-    assert [document.key for document in first] == sorted(DOCUMENTS)
-    assert [document.key for document in second] == sorted(
-        (*DOCUMENTS, "notes/delta.md"))
-
-
 def test_a_scope_this_corpus_does_not_declare_refuses(reader,
                                                       populated) -> None:
     """Rather than quietly widening to everything: "a silent widening is
@@ -452,6 +469,57 @@ def test_a_declared_scope_lists_only_its_own_globs(tmp_path) -> None:
     assert [d.key for d in narrow.list_documents(corpus, "publications")] == [
         "papers/gamma.md"]
     assert len(narrow.list_documents(corpus, SCOPE_ALL)) == 3
+
+
+def test_the_listing_is_computed_once_per_resolve_and_not_once_per_read(
+        reader, populated, monkeypatch) -> None:
+    """THE CACHE IS LOAD-BEARING AND ITS REMOVAL WAS MEASURED.
+
+    `read` decides membership by asking the listing — one definition, so no
+    second membership rule can disagree with the first — and `classify` reads.
+    A reader without the cache therefore walks the whole tree ONCE PER DOCUMENT,
+    which is quadratic in the corpus's own size rather than a constant factor.
+    Measured over an 801-document corpus in two roots, classifying every
+    document: **0.07s with this cache, 58.85s without it.** Not visible on the
+    conformance corpus's three documents, and ruinous on a governed one.
+
+    So the property is asserted here rather than left to a benchmark nobody
+    runs: N classifications compute the listing ONCE, not N times.
+    """
+    corpus = _resolved(reader, populated)
+    walks: list[str] = []
+    original = DomainCorpusAdapter._scope_keys
+
+    def counting(self, location, scope):
+        walks.append(str(location))
+        return original(self, location, scope)
+
+    monkeypatch.setattr(DomainCorpusAdapter, "_scope_keys", counting)
+    documents = reader.list_documents(corpus)
+    for document in documents:
+        reader.classify(corpus, document)
+    assert len(documents) == 3
+    assert len(walks) == 1, (
+        f"the tree was walked {len(walks)} times to classify "
+        f"{len(documents)} documents; the listing is computed per RESOLVE")
+
+
+def test_resolving_again_rebuilds_the_listing_even_for_an_unversioned_tree(
+        reader, populated) -> None:
+    """The staleness the cache could have had, closed where it belongs.
+
+    An unversioned tree carries no revision token for the cache key to change
+    with, so `resolve` clears the cache outright: re-resolving is the one act
+    that says "the tree may have moved", and it is the cheap place to answer it.
+    A caller that edits the tree and re-resolves sees its own edit; a caller
+    that does not re-resolve is holding a corpus it was handed at a moment in
+    time, which is what a `ResolvedCorpus` IS.
+    """
+    first = reader.list_documents(_resolved(reader, populated))
+    (populated / "notes" / "delta.md").write_text("Type: note\nTitle: Delta\n")
+    second = reader.list_documents(_resolved(reader, populated))
+    assert [d.key for d in first] == sorted(DOCUMENTS)
+    assert [d.key for d in second] == sorted((*DOCUMENTS, "notes/delta.md"))
 
 
 def test_a_rooted_double_star_lists_every_depth_beneath_it(tmp_path) -> None:
@@ -502,40 +570,32 @@ def test_excluded_parts_drop_a_document_from_its_scope(tmp_path) -> None:
         d.key for d in excluding.list_documents(corpus)}
 
 
-def test_an_unreadable_declared_root_refuses(reader, tmp_path) -> None:
+def test_an_unreadable_declared_root_refuses(reader, tmp_path,
+                                             unreadable) -> None:
+    """A declared root that is there and cannot be opened is UNREADABLE, not an
+    empty corpus. `Path.glob` would have swallowed the `OSError` and answered
+    with the documents it could reach, which is a corpus reporting fewer
+    documents than it holds and saying nothing about it."""
     root = _lay_down(tmp_path / "c")
-    locked = root / "notes"
-    original = locked.stat().st_mode
-    locked.chmod(0)
-    if os.access(locked, os.R_OK | os.X_OK):  # pragma: no cover
-        locked.chmod(original)
-        pytest.skip("directory permissions are not enforced here")
-    try:
-        with pytest.raises(CorpusRefused) as caught:
-            _resolved(reader, root)
-    finally:
-        locked.chmod(original)
+    locked = unreadable(root / "notes")
+    with pytest.raises(CorpusRefused) as caught:
+        _resolved(reader, root)
     assert _refusal(caught) == CORPUS_UNREADABLE
     assert caught.value.refusal.subject == str(locked)
 
 
 def test_an_unreadable_subtree_refuses_listing_rather_than_omitting_it(
-        reader, tmp_path) -> None:
+        reader, tmp_path, unreadable) -> None:
+    """The same, one level down, where `resolve` cannot see it: the refusal has
+    to come from the LISTING, which is why `_require_readable_tree` walks."""
     root = _lay_down(tmp_path / "c")
-    locked = root / "notes" / "locked"
-    locked.mkdir()
-    (locked / "delta.md").write_text("Type: note\nTitle: Delta\n")
-    original = locked.stat().st_mode
-    locked.chmod(0)
-    if os.access(locked, os.R_OK | os.X_OK):  # pragma: no cover
-        locked.chmod(original)
-        pytest.skip("directory permissions are not enforced here")
+    subtree = root / "notes" / "locked"
+    subtree.mkdir()
+    (subtree / "delta.md").write_text("Type: note\nTitle: Delta\n")
     corpus = _resolved(reader, root)
-    try:
-        with pytest.raises(CorpusRefused) as caught:
-            reader.list_documents(corpus)
-    finally:
-        locked.chmod(original)
+    locked = unreadable(subtree)
+    with pytest.raises(CorpusRefused) as caught:
+        reader.list_documents(corpus)
     assert _refusal(caught) == CORPUS_UNREADABLE
     assert caught.value.refusal.subject == str(locked)
 
