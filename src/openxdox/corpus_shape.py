@@ -324,7 +324,12 @@ def globs_of(location: str, document_globs: tuple[str, ...]) -> tuple[str, ...]:
     read off the declaration rather than guessed:
 
       * it already NAMES DOCUMENTS -- its last segment carries glob syntax and it
-        does not end in a separator. It is used as written (after placeholder
+        does not end in a separator. EITHER separator: `_segments` above reads
+        `\\` as one, so the single place that inspects the RAW string has to
+        read it the same way or one declaration means two things depending on
+        which slash was typed -- `docs/*.md/` a directory called `*.md`,
+        `docs/*.md\\` a pattern matching Markdown files. Nothing else in this
+        module can tell those apart, because by then the separator is gone. It is used as written (after placeholder
         normalization) and `document_globs` is not consulted: the profile has
         already said which files it means.
       * it names a DIRECTORY -- anything else, trailing separator or not. Each of
@@ -342,7 +347,7 @@ def globs_of(location: str, document_globs: tuple[str, ...]) -> tuple[str, ...]:
         return ()
     normalized = "/".join("*" if _is_placeholder(segment) else segment
                           for segment in segments)
-    names_documents = (not raw.endswith("/")
+    names_documents = (not raw.endswith(("/", "\\"))
                        and any(character in segments[-1]
                                for character in GLOB_METACHARACTERS))
     if names_documents:

@@ -263,8 +263,10 @@ def test_the_scan_root_is_the_first_literal_segment(location: str,
     # a placeholder segment normalizes to one wildcard
     ("ideation/staging/<topic>/",
      ("ideation/staging/*/**/*.md", "ideation/staging/*/**/*.rst")),
-    # a trailing separator makes it a directory even where it carries a glob
+    # a trailing separator makes it a directory even where it carries a glob,
+    # and EITHER separator does, because `_segments` reads both as one
     ("docs/*/", ("docs/*/**/*.md", "docs/*/**/*.rst")),
+    ("docs/*\\", ("docs/*/**/*.md", "docs/*/**/*.rst")),
     ("", ()),
 ])
 def test_a_declared_location_globs_by_the_shape_it_declares(
@@ -273,6 +275,30 @@ def test_a_declared_location_globs_by_the_shape_it_declares(
     caller's `document_globs` decide what a document looks like -- this module
     must not decide that a governed document is a Markdown file."""
     assert globs_of(location, ("**/*.md", "**/*.rst")) == expected
+
+
+@pytest.mark.parametrize("bare", ["docs/*.md", "docs/*", "a/b/*.rst"])
+def test_the_two_separators_never_make_one_declaration_mean_two_things(
+        bare: str) -> None:
+    """`_segments` normalizes `\\` to `/` before anything else looks at a
+    location, so every rule in this module treats the two spellings alike --
+    except the ONE that inspects the raw string, which is the trailing-separator
+    test, and which therefore has to name both or silently disagree with the
+    rest of the module.
+
+    It did. `docs/*.md/` derived a directory called `*.md` and `docs/*.md\\`
+    derived a pattern matching Markdown files: the same declaration, two
+    meanings, decided by which slash was typed. Nothing downstream can tell them
+    apart, because by then the separator has been split away.
+
+    Asserted as an EQUALITY between the two spellings rather than against a
+    literal, because the property is agreement and not any particular answer.
+    """
+    assert globs_of(bare + "/", ("**/*.md",)) == globs_of(
+        bare + "\\", ("**/*.md",))
+    assert globs_of(bare, ("**/*.md",)) == (bare,), (
+        "and without a separator it still names documents, so the fix did not "
+        "simply make every glob-bearing location a directory")
 
 
 def test_the_placeholder_word_is_never_read() -> None:
