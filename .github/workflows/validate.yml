@@ -54,19 +54,19 @@ jobs:
       # correction was already in the file, twenty lines further down
       # ("§ 3.4 SLICE S8 UN-NARROWS THIS LIST AS FAR AS THE MEASUREMENT
       # ALLOWS"), and had never been pointed at from up here. MEASURED against
-      # that list rather than asserted — it names FOURTEEN files:
+      # that list rather than asserted — it names SIXTEEN files:
       #   * THREE never import anything under test (`test_leg_shape.py`,
       #     `test_dependency_direction.py`, `test_no_hardcoded_status_words.py`
       #     parse trees with `ast`). Those are the scaffold shape assertions the
       #     paragraph above is about, and they are all that "only the scaffold's
       #     shape assertions" ever described.
-      #   * ELEVEN import a runtime module. `test_domain_profile.py` imports
+      #   * THIRTEEN import a runtime module. `test_domain_profile.py` imports
       #     `openxdox.domain_profile` alone, on the § 4.4 grounds set out below;
-      #     the other TEN RUN here — and calling all ten "carved" was wrong, as
+      #     the other TWELVE RUN here — and calling all twelve "carved" was wrong, as
       #     the review of `e92fb06` said: measured against openxFactory's own two
       #     registers, only TWO are ARRIVED carve rows
       #     (`test_doxbench_abstract_store.py`, `test_doxbench_telemetry.py`, each
-      #     with a row in `docs/opendox-carve-manifest.yaml`) and EIGHT are CREATED
+      #     with a row in `docs/opendox-carve-manifest.yaml`) and TEN are CREATED
       #     files admitted by name in `docs/opendox-carve-admissions.yaml` — the two
       #     gate-loop suites of § 3.4 slice S5 and the three evidence/workbench/
       #     authority pairs. The distinction is not cosmetic: an ARRIVED row's edits
@@ -75,7 +75,7 @@ jobs:
       #     and why the 29 importer annotations are left alone), while a CREATED
       #     file is this leg's to edit. Re-derive with
       #     `grep -c '<path>' <that repo>/docs/opendox-carve-{manifest,admissions}.yaml`.
-      #     FOUR of the ten reach the PINNED openDox — in TWO DIFFERENT WAYS, which
+      #     FOUR of the twelve reach the PINNED openDox — in TWO DIFFERENT WAYS, which
       #     this line ran together until the review of `24cd5f2` on #21 measured
       #     them apart:
       #       - ONE reads the pinned WEB BUNDLE: `test_gate_loop_probes.py`, whose
@@ -96,9 +96,9 @@ jobs:
       #         or a failing assertion, loudly and unclassified.
       #     So `tests/opendox_bundle.py::_absent` decides for TWO of the four —
       #     the bundle for probes, the view contract for views — and for neither
-      #     doxbench suite. Measured over the fourteen files named below:
-      #       grep -ln 'import opendox_bundle' <the 14>   -> views, probes
-      #       grep -ln 'from opendox import'   <the 14>   -> views, telemetry,
+      #     doxbench suite. Measured over the sixteen files named below:
+      #       grep -ln 'import opendox_bundle' <the 16>   -> views, probes
+      #       grep -ln 'from opendox import'   <the 16>   -> views, telemetry,
       #                                                      abstract_store
       #       grep -n  'opendox_bundle\.' tests/test_gate_loop_views.py
       #                                                  -> three `_absent()` calls,
@@ -399,16 +399,16 @@ jobs:
       #
       #   python -m pytest -q tests/test_corpus_shape.py \
       #                       tests/test_domain_corpus_adapter.py --noconftest
-      #     142 passed  (58 + 84), 0 skipped, 0 errors
+      #     145 passed  (58 + 87), 0 skipped, 0 errors
       #
       # AND THE WHOLE LIST, because a count in this file that stops
       # being true is the stale-claim class this leg already sweeps
-      # for: the invocation below now reads 502 passed / 6 skipped.
+      # for: the invocation below now reads 505 passed / 6 skipped.
       # The “360 passed / 6 skipped” above is NOT corrected and is not
       # wrong — it is the 2026-09-16 pin bump's own measured pair, at
       # the commit that wrote it, and re-pointing it at today's total
-      # would destroy the before/after it exists to record. 452 + 6 of
-      # today's total is the list as this act found it; 142 of it is
+      # would destroy the before/after it exists to record. 360 + 6 of
+      # today's total is the list as this act found it; 145 of it is
       # the two files this act adds; 6 skipped is unchanged, because
       # neither new file skips.
       #
