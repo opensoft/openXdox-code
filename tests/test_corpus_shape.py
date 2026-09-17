@@ -146,7 +146,9 @@ def test_a_one_line_header_window_is_legal() -> None:
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("root", ["..", "../outside", "a/../../outside",
-                                  ".", "./a", "/absolute"])
+                                  ".", "./a", "/absolute",
+                                  "a\\..\\outside", "C:\\outside",
+                                  "C:outside"])
 def test_a_scan_root_that_leaves_the_corpus_is_refused(root: str) -> None:
     """Every declared location is JOINED onto the corpus's own resolved
     location, so `..` walks out of the corpus and an absolute path leaves it in
@@ -156,7 +158,7 @@ def test_a_scan_root_that_leaves_the_corpus_is_refused(root: str) -> None:
     `.`/`..` segment"."""
     with pytest.raises(CorpusShapeInvalid) as caught:
         _shape(scan_roots=(root,))
-    assert root in str(caught.value)
+    assert repr(root) in str(caught.value)
 
 
 @pytest.mark.parametrize("glob", ["../**/*.md", "a/../../*.md", "/etc/*.conf",
@@ -201,6 +203,7 @@ def test_a_double_star_is_not_a_traversal_segment() -> None:
 
 @pytest.mark.parametrize("location,expected", [
     ("docs/**/*.md", "docs"),
+    ("docs\\**\\*.md", "docs"),
     ("ideation/staging/<topic>/", "ideation"),
     ("openspec/changes/<change-id>/", "openspec"),
     ("health/", "health"),
@@ -223,9 +226,11 @@ def test_the_scan_root_is_the_first_literal_segment(location: str,
 @pytest.mark.parametrize("location,expected", [
     # already names documents -- used as written, `document_globs` unconsulted
     ("docs/**/*.md", ("docs/**/*.md",)),
+    ("docs\\**\\*.md", ("docs/**/*.md",)),
     ("notes/*.txt", ("notes/*.txt",)),
     # a directory -- each document glob is appended beneath it
     ("health/", ("health/**/*.md", "health/**/*.rst")),
+    ("health\\", ("health/**/*.md", "health/**/*.rst")),
     ("review", ("review/**/*.md", "review/**/*.rst")),
     # a placeholder segment normalizes to one wildcard
     ("ideation/staging/<topic>/",
