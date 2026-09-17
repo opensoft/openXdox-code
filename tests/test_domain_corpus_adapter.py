@@ -51,6 +51,7 @@ from opendox.corpus_adapter import (
     CorpusRefused,
     DocumentId,
     Finding,
+    ResolvedCorpus,
 )
 
 from openxdox import conformance_corpus
@@ -574,6 +575,49 @@ def test_the_listing_is_computed_once_per_resolve_and_not_once_per_read(
     assert len(walks) == 1, (
         f"the tree was walked {len(walks)} times to classify "
         f"{len(documents)} documents; the listing is computed per RESOLVE")
+
+
+def test_a_hand_built_resolved_corpus_is_cached_like_any_other(
+        reader, populated, monkeypatch) -> None:
+    """THE SAME PROPERTY FOR A HANDLE `resolve` NEVER ISSUED, which the
+    interface explicitly permits: `ResolvedCorpus` is plain frozen data, so a
+    caller CAN build one, and this module's own docstring says so.
+
+    It matters because the obvious way to scope the listing cache to a handle
+    -- a `WeakKeyDictionary` populated only by `resolve` -- answers `None` for
+    such a handle and then guards the write-back on that answer, so the corpus
+    is never cached at all and every `classify` walks the whole tree again.
+    Measured over the same 801-document corpus as the test above:
+    **0.17s against 101.38s.** That is not a new defect class, it is the one
+    this leg already measured and reverted once, reached by a different door.
+
+    So the cache is entered with `setdefault` and the property is asserted here
+    rather than left to a benchmark nobody runs.
+    """
+    corpus = ResolvedCorpus(
+        ref=CorpusRef(name="hand-built", location=str(populated)),
+        location=str(populated.resolve()),
+        revision=None,
+        scopes=(SCOPE_ALL,),
+        write_path=None,
+        write_path_available=False,
+    )
+    walks: list[str] = []
+    original = DomainCorpusAdapter._scope_keys
+
+    def counting(self, location, scope):
+        walks.append(str(location))
+        return original(self, location, scope)
+
+    monkeypatch.setattr(DomainCorpusAdapter, "_scope_keys", counting)
+    documents = reader.list_documents(corpus)
+    for document in documents:
+        reader.classify(corpus, document)
+    assert len(documents) == 3
+    assert len(walks) == 1, (
+        f"the tree was walked {len(walks)} times to classify "
+        f"{len(documents)} documents through a hand-built handle; a corpus "
+        f"the cache will not hold is a corpus walked once per document")
 
 
 def test_resolving_again_rebuilds_the_listing_even_for_an_unversioned_tree(

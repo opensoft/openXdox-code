@@ -305,7 +305,7 @@ class DomainCorpusAdapter:
 
     def __init__(self, shape: CorpusShape) -> None:
         self._shape = shape
-        # One listing per (location, revision, scope), remembered for this
+        # One listing per RESOLVED CORPUS and scope, remembered for this
         # INSTANCE only. NOT AN OPTIMIZATION FOR ITS OWN SAKE, and it has now
         # been removed once and measured: `read` decides membership by asking
         # the listing -- one definition, so no second membership rule can
@@ -315,13 +315,36 @@ class DomainCorpusAdapter:
         # this cache and 58.85s without it**, and the cost is quadratic in the
         # corpus's own size rather than a constant factor.
         #
-        # THE STALENESS IT COULD HAVE HAD IS CLOSED AT `resolve`, WHICH CLEARS
-        # IT. An unversioned tree has no revision token for the key to change
-        # with, so a caller that re-resolved after editing the tree would
-        # otherwise have been served the listing from before its own edit.
-        # Re-resolving is the one act that says "the tree may have moved", and
-        # it is the cheap place to answer it.
-        self._listings: dict[tuple[str, str | None, str], tuple[str, ...]] = {}
+        # THE STALENESS IT COULD HAVE HAD IS CLOSED AT `resolve`, FOR THE
+        # CORPUS BEING RESOLVED AND FOR NO OTHER. An unversioned tree has no
+        # revision token for the key to change with, so a caller that
+        # re-resolved after editing the tree would otherwise have been served
+        # the listing from before its own edit. Re-resolving is the one act
+        # that says "the tree may have moved", and it is the cheap place to
+        # answer it -- but it says that about ONE corpus, so `resolve` empties
+        # that corpus's own entry instead of the whole map.
+        #
+        # THE KEY IS THE `ResolvedCorpus` ITSELF and the map is an ORDINARY
+        # dict, both deliberately. The pinned interface declares that type
+        # `@dataclass(frozen=True)` with `eq=True`, so it hashes BY VALUE: two
+        # handles describing the same corpus are already the same key, and
+        # keying on the handle costs nothing over keying on its location while
+        # separating two handles that genuinely differ. A `WeakKeyDictionary`
+        # was tried here and is NOT used, for two measured reasons. It would
+        # make this module depend on `ResolvedCorpus` being weak-referenceable
+        # -- true today only because that dataclass is declared `slots=False,
+        # weakref_slot=False`, an undeclared property of a PINNED interface
+        # this leg does not own, and `@dataclass(slots=True)` there would turn
+        # every `resolve` into `TypeError: cannot create weak reference`. And
+        # it silently drops the cache for a handle `resolve` never inserted --
+        # which the interface explicitly permits a caller to build, "plain
+        # frozen data, so it can" -- putting that caller straight back on the
+        # once-per-document walk: **0.17s against 101.38s** over the same
+        # 801-document corpus. `setdefault` below is what keeps that path
+        # cached; the map grows by one small entry per distinct corpus an
+        # adapter instance is pointed at, which for the reader this leg ships
+        # is four.
+        self._listings: dict[ResolvedCorpus, dict[str, tuple[str, ...]]] = {}
         #: Which declared roots were PRESENT when a location last resolved.
         #:
         #: A corpus is resolved once and listed many times, and a root can be
@@ -332,7 +355,7 @@ class DomainCorpusAdapter:
         #: size. A resolution is a statement about a tree at a moment; this is
         #: what that statement was, so the listing can refuse rather than
         #: quietly answer for a different corpus.
-        self._resolved_roots: dict[str, tuple[str, ...]] = {}
+        self._resolved_roots: dict[ResolvedCorpus, tuple[str, ...]] = {}
 
     # -- the six -----------------------------------------------------------
 
@@ -382,27 +405,9 @@ class DomainCorpusAdapter:
                 f"declared over ({', '.join(self._shape.scan_roots)})")
 
         resolved = location.resolve()
-        # INVALIDATION IS SCOPED TO THE CORPUS BEING RESOLVED, and the scope is
-        # the whole point. An unversioned tree carries no revision token for the
-        # cache key to change with, so re-resolving is the one act that says
-        # "this tree may have moved" and the cheap place to answer it. Clearing
-        # the WHOLE cache answered it for one corpus by breaking every other:
-        # this reader is built to be pointed at several locations in one run
-        # (the conformance corpus points it at four), and a caller holding a
-        # `ResolvedCorpus` for A had A's listing dropped merely because it went
-        # on to resolve B -- so A's next listing re-walked and could serve
-        # post-resolution contents through a handle that promised a moment in
-        # time. Nothing about resolving B is news about A. Dropping only this
-        # location's entries answers the staleness and tells no other corpus
-        # anything.
-        key = str(resolved)
-        self._listings = {entry: listed
-                          for entry, listed in self._listings.items()
-                          if entry[0] != key}
-        self._resolved_roots[key] = tuple(present_roots)
         revision = self._revision(resolved, ref.revision)
         write_path = self._shape.write_path
-        return ResolvedCorpus(
+        corpus = ResolvedCorpus(
             ref=ref,
             location=str(resolved),
             revision=revision,
@@ -415,6 +420,18 @@ class DomainCorpusAdapter:
             write_path=None if write_path is None else write_path.name,
             write_path_available=bool(write_path and write_path.available),
         )
+        # INVALIDATION IS SCOPED TO THE CORPUS BEING RESOLVED, and the scope is
+        # the whole point. Clearing the WHOLE map answered the staleness above
+        # for one corpus by breaking every other: this reader is built to be
+        # pointed at several locations in one run (the conformance corpus
+        # points it at four), and a caller holding a `ResolvedCorpus` for A had
+        # A's listing dropped merely because it went on to resolve B -- so A's
+        # next listing re-walked and could serve post-resolution contents
+        # through a handle that promised a moment in time. Nothing about
+        # resolving B is news about A.
+        self._listings[corpus] = {}
+        self._resolved_roots[corpus] = tuple(present_roots)
+        return corpus
 
     def list_documents(self, corpus: ResolvedCorpus,
                        scope: str = SCOPE_ALL) -> tuple[DocumentId, ...]:
@@ -681,15 +698,18 @@ class DomainCorpusAdapter:
         return (completed.stdout or "").strip() or None
 
     def _keys(self, corpus: ResolvedCorpus, scope: str) -> tuple[str, ...]:
-        cached = self._listings.get((corpus.location, corpus.revision, scope))
-        if cached is not None:
-            return cached
+        # `setdefault` AND NOT `get`: a handle `resolve` never inserted is a
+        # corpus the interface permits a caller to build by hand, and leaving
+        # it uncached puts it back on the once-per-document walk.
+        cached = self._listings.setdefault(corpus, {})
+        if scope in cached:
+            return cached[scope]
         location = Path(corpus.location)
         # ONCE PER LISTING, not once per scope: `SCOPE_ALL` unions every
         # declared scope, and a profile-derived shape declares one per artifact
         # kind, so walking the roots inside `_scope_keys` walked the whole tree
         # once per kind for a single `list_documents`.
-        self._require_readable_tree(location)
+        self._require_readable_tree(corpus, location)
         names = sorted(self._shape.scopes) if scope == SCOPE_ALL else [scope]
         # ONE WALK PER DISTINCT (pattern, exclusions) PAIR, not one per scope.
         # A profile-derived shape declares a scope per artifact kind and those
@@ -710,7 +730,7 @@ class DomainCorpusAdapter:
             keys.update(self._scope_keys(
                 location, Scope(globs=globs, excluded_parts=excluded)))
         listed = tuple(sorted(keys))
-        self._listings[(corpus.location, corpus.revision, scope)] = listed
+        cached[scope] = listed
         return listed
 
     def _scope_keys(self, location: Path, scope: Scope) -> set[str]:
@@ -840,7 +860,8 @@ class DomainCorpusAdapter:
                 "outside the corpus. A declared root is part of the corpus's "
                 "layout, not a tunnel to some other tree") from exc
 
-    def _require_readable_tree(self, location: Path) -> None:
+    def _require_readable_tree(self, corpus: ResolvedCorpus,
+                               location: Path) -> None:
         """Refuse a declared root, or anything under one, that cannot be opened.
 
         Detection only: it yields no keys and applies no pattern, so the
@@ -855,7 +876,7 @@ class DomainCorpusAdapter:
         # reader resolved; otherwise every declared root, which is the honest
         # answer for a `ResolvedCorpus` a caller built by hand and never put
         # through `resolve` (plain frozen data, so it can).
-        expected = self._resolved_roots.get(str(location))
+        expected = self._resolved_roots.get(corpus)
         for root_name in self._shape.scan_roots:
             root = location / root_name
             # `_stat` AND NOT `Path.is_dir()`, for the reason `_stat`'s own
