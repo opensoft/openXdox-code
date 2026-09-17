@@ -581,8 +581,7 @@ def test_resolving_again_rebuilds_the_listing_even_for_an_unversioned_tree(
     """The staleness the cache could have had, closed where it belongs.
 
     An unversioned tree carries no revision token for the cache key to change
-    with, so `resolve` clears the cache outright: re-resolving is the one act
-    that says "the tree may have moved", and it is the cheap place to answer it.
+    with, so re-resolving the SAME corpus must build a fresh listing of its own.
     A caller that edits the tree and re-resolves sees its own edit; a caller
     that does not re-resolve is holding a corpus it was handed at a moment in
     time, which is what a `ResolvedCorpus` IS.
@@ -592,6 +591,25 @@ def test_resolving_again_rebuilds_the_listing_even_for_an_unversioned_tree(
     second = reader.list_documents(_resolved(reader, populated))
     assert [d.key for d in first] == sorted(DOCUMENTS)
     assert [d.key for d in second] == sorted((*DOCUMENTS, "notes/delta.md"))
+
+
+def test_resolving_another_corpus_does_not_invalidate_an_earlier_snapshot(
+        reader, tmp_path) -> None:
+    """A second resolution must not move the first one's "moment in time".
+
+    The stale-answer fix for an unversioned tree belongs to re-resolving THAT
+    corpus. Clearing one adapter-wide cache at every `resolve` let corpus B's
+    resolution invalidate corpus A's listing, so listing A after editing its
+    tree answered with post-resolution contents that A never re-resolved for.
+    """
+    first_root = _lay_down(tmp_path / "first")
+    second_root = _lay_down(tmp_path / "second")
+    first = _resolved(reader, first_root, name="first")
+    before = [d.key for d in reader.list_documents(first)]
+    (first_root / "notes" / "delta.md").write_text("Type: note\nTitle: Delta\n")
+    second = _resolved(reader, second_root, name="second")
+    assert [d.key for d in reader.list_documents(second)] == sorted(DOCUMENTS)
+    assert [d.key for d in reader.list_documents(first)] == before
 
 
 def test_a_rooted_double_star_lists_every_depth_beneath_it(tmp_path) -> None:

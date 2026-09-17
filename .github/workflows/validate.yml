@@ -399,11 +399,11 @@ jobs:
       #
       #   python -m pytest -q tests/test_corpus_shape.py \
       #                       tests/test_domain_corpus_adapter.py --noconftest
-      #     149 passed  (58 + 91), 0 skipped, 0 errors
+      #     150 passed  (58 + 92), 0 skipped, 0 errors
       #
       # AND THE WHOLE LIST, because a count in this file that stops
       # being true is the stale-claim class this leg already sweeps
-      # for: the invocation below now reads 509 passed / 6 skipped.
+      # for: the invocation below now reads 510 passed / 6 skipped.
       # The “360 passed / 6 skipped” above is NOT corrected and is not
       # wrong — it is the 2026-09-16 pin bump's own measured pair, at
       # the commit that wrote it, and re-pointing it at today's total
@@ -412,7 +412,7 @@ jobs:
       # hiding: no test file has been added to this list between that
       # bump and this act, so the pin bump's total and the list as this
       # act found it are the same measurement taken twice — 360 + 6.
-      # 149 of today's 509 is the two files this act adds; 6 skipped is
+      # 150 of today's 510 is the two files this act adds; 6 skipped is
       # unchanged, because neither new file skips.
       #
       # NO SKIP GUARD IS NEEDED and none is added, which is the difference
@@ -422,23 +422,24 @@ jobs:
       # different axis entirely — the git-backed revision assertions skip
       # where `git` is not on PATH, which on this runner it always is.
       #
-      # EVERY ASSERTION IN BOTH FILES IS MUTATION-PROVED. A sweep of 59
+      # EVERY ASSERTION IN BOTH FILES IS MUTATION-PROVED. A sweep of 61
       # deliberate defects in `corpus_shape.py` and `domain_corpus_adapter.py`
       # — the file-location refusal answering `corpus-unclassifiable`, the
       # declared write path becoming a module constant, `read` falling back to
       # a revision nobody asked for, an undeclared scope widening silently,
       # `write_back` writing the tree, the line rule breaking on exotic
-      # separators, the reader adopting an enclosing repository, and thirty
-      # more — was applied one at a time and run against this list. ALL 59
+      # separators, the reader adopting an enclosing repository, and thirty-two
+      # more — was applied one at a time and run against this list. ALL 61
       # WERE CAUGHT; the sweep and its per-mutation output are in the pull
-      # request that introduced these two files. FOUR of the forty-two guard
-      # a review round's own proposals: the listing matcher going back to
+      # request that introduced these two files. The review-round guards here
+      # include the listing matcher going back to
       # `PurePath.match` (which has no recursive `**` and silently dropped
       # every document below depth one of a rooted pattern — the ordinary
       # shape `corpus_shape.from_profile` emits), an unreadable directory
-      # being omitted rather than refused, `resolve` not clearing the listing
-      # cache, and a `DocumentId` naming another corpus being accepted.
-      # A fifth guards the listing cache, whose removal took classifying an
+      # being omitted rather than refused, one resolved corpus invalidating
+      # another one's listing snapshot, and a `DocumentId` naming another
+      # corpus being accepted.
+      # Another guards the listing cache, whose removal took classifying an
       # 801-document corpus from 0.07s to 58.85s (quadratic, not a constant
       # factor). Five more guard the confinement findings the same rounds
       # raised and this leg accepted: a declared location carrying `..` or an
