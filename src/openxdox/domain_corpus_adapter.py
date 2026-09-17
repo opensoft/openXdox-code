@@ -322,6 +322,17 @@ class DomainCorpusAdapter:
         # Re-resolving is the one act that says "the tree may have moved", and
         # it is the cheap place to answer it.
         self._listings: dict[tuple[str, str | None, str], tuple[str, ...]] = {}
+        #: Which declared roots were PRESENT when a location last resolved.
+        #:
+        #: A corpus is resolved once and listed many times, and a root can be
+        #: removed in between. `_stat` then answers None, the loop skipped it,
+        #: and the listing came back holding the other roots' documents alone
+        #: -- a partial corpus, or an empty one where the last root went, and
+        #: neither distinguishable from a corpus that is legitimately that
+        #: size. A resolution is a statement about a tree at a moment; this is
+        #: what that statement was, so the listing can refuse rather than
+        #: quietly answer for a different corpus.
+        self._resolved_roots: dict[str, tuple[str, ...]] = {}
 
     # -- the six -----------------------------------------------------------
 
@@ -344,7 +355,7 @@ class DomainCorpusAdapter:
         if not self._is_directory(location, absent_refuses=True):
             raise _refuse(CORPUS_UNREADABLE, str(location),
                           "the path is not a directory")
-        roots_present = False
+        present_roots: list[str] = []
         for root in self._shape.scan_roots:
             declared = location / root
             present = self._stat(declared)
@@ -363,8 +374,8 @@ class DomainCorpusAdapter:
                     "would report a partial corpus as a whole one")
             self._require_confined_root(location, declared)
             self._require_traversable(declared)
-            roots_present = True
-        if not roots_present:
+            present_roots.append(root)
+        if not present_roots:
             raise _refuse(
                 CORPUS_UNCLASSIFIABLE, str(location),
                 "the directory holds none of the roots this corpus is "
@@ -372,6 +383,7 @@ class DomainCorpusAdapter:
 
         self._listings.clear()
         resolved = location.resolve()
+        self._resolved_roots[str(resolved)] = tuple(present_roots)
         revision = self._revision(resolved, ref.revision)
         write_path = self._shape.write_path
         return ResolvedCorpus(
@@ -663,9 +675,24 @@ class DomainCorpusAdapter:
         # once per kind for a single `list_documents`.
         self._require_readable_tree(location)
         names = sorted(self._shape.scopes) if scope == SCOPE_ALL else [scope]
-        keys: set[str] = set()
+        # ONE WALK PER DISTINCT (pattern, exclusions) PAIR, not one per scope.
+        # A profile-derived shape declares a scope per artifact kind and those
+        # kinds share patterns and roots freely -- the vendored engineering
+        # profile's six kinds declare eleven locations over five roots, several
+        # of them the same glob -- so globbing per SCOPE walked the same tree
+        # once per kind and again per repeated pattern. The scopes still decide
+        # MEMBERSHIP exactly as before; what is de-duplicated is the work, and
+        # `SCOPE_ALL` is by definition their union so no scope can lose a
+        # document to it.
+        work: dict[tuple[tuple[str, ...], frozenset], None] = {}
         for name in names:
-            keys.update(self._scope_keys(location, self._shape.scopes[name]))
+            declared = self._shape.scopes[name]
+            for pattern in declared.globs:
+                work[((pattern,), declared.excluded_parts)] = None
+        keys: set[str] = set()
+        for globs, excluded in work:
+            keys.update(self._scope_keys(
+                location, Scope(globs=globs, excluded_parts=excluded)))
         listed = tuple(sorted(keys))
         self._listings[(corpus.location, corpus.revision, scope)] = listed
         return listed
@@ -706,19 +733,29 @@ class DomainCorpusAdapter:
                 # that is a LINK to nothing, or to somewhere outside, is not a
                 # file -- so `is_file()` dropped it and the listing came back
                 # quietly one document short, which is the same lie as a
-                # quietly unreadable directory. A link is now answered for as a
-                # link; only after that is a plain directory skipped as the
-                # ordinary non-document it is.
-                if match.is_symlink():
-                    self._require_confined(location, match, rel)
-                    if not match.is_file():
+                # quietly unreadable directory.
+                #
+                # AND IT IS DECIDED FOR EVERY MATCH, NOT ONLY FOR THE ONES THAT
+                # ARE THEMSELVES LINKS. A path escapes the corpus when ANY
+                # component of it does, and only the last component is the one
+                # `is_symlink()` asks about: `notes/elsewhere/x.md`, where
+                # `elsewhere` is a link out of the corpus, is a perfectly
+                # ordinary regular file whose real target is somebody else's.
+                # `**` does not descend through a link, but a single-star
+                # segment does -- and `from_profile` emits those for every
+                # placeholder a domain profile declares
+                # (`ideation/staging/<topic>/`), so this is the ordinary shape
+                # rather than a corner. `resolve()` answers for the whole path,
+                # which is why the check reads it and not the last name in it.
+                self._require_confined(location, match, rel)
+                if not match.is_file():
+                    if match.is_symlink():
                         raise _refuse(
                             CORPUS_UNREADABLE, rel.as_posix(),
                             "this path is a link that does not resolve to a "
                             "file, so it matches a document pattern and is not "
                             "a document; omitting it would report a corpus "
                             "shorter than it is")
-                elif not match.is_file():
                     continue
                 keys.add(rel.as_posix())
         return keys
@@ -798,6 +835,11 @@ class DomainCorpusAdapter:
                 CORPUS_UNREADABLE, exc.filename or str(location),
                 f"the path could not be read ({exc.strerror or exc})") from exc
 
+        # The roots THIS corpus resolved with, where the location is one this
+        # reader resolved; otherwise every declared root, which is the honest
+        # answer for a `ResolvedCorpus` a caller built by hand and never put
+        # through `resolve` (plain frozen data, so it can).
+        expected = self._resolved_roots.get(str(location))
         for root_name in self._shape.scan_roots:
             root = location / root_name
             # `_stat` AND NOT `Path.is_dir()`, for the reason `_stat`'s own
@@ -808,6 +850,12 @@ class DomainCorpusAdapter:
             # a legitimate answer.
             info = self._stat(root)
             if info is None:
+                if expected is not None and root_name in expected:
+                    raise _refuse(
+                        CORPUS_UNREADABLE, str(root),
+                        "this root was there when the corpus resolved and is "
+                        "gone now, so a listing would answer for a corpus this "
+                        "reader never resolved; resolve it again")
                 continue
             if not stat.S_ISDIR(info.st_mode):
                 raise _refuse(

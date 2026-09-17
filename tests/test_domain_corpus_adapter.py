@@ -812,6 +812,105 @@ def test_a_root_that_cannot_be_stat_ed_refuses_rather_than_being_skipped(
     assert caught.value.refusal.subject == str(notes)
 
 
+def test_a_regular_file_below_a_linked_directory_is_still_outside(
+        reader, tmp_path) -> None:
+    """A path escapes the corpus when ANY component of it does, and only the
+    LAST component is the one `is_symlink()` asks about.
+
+    `notes/elsewhere/x.md`, where `elsewhere` is a link out of the corpus, is a
+    perfectly ordinary regular file whose real target is somebody else's.
+    `**` does not descend through a link, but a single-star segment does — and
+    `corpus_shape.from_profile` emits those for every placeholder a domain
+    profile declares (`ideation/staging/<topic>/`), so this is the ordinary
+    shape rather than a corner.
+    """
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "theirs.md").write_text("Type: note\nTitle: Theirs\n")
+    root = _lay_down(tmp_path / "c")
+    (root / "notes" / "elsewhere").symlink_to(outside)
+
+    starred = DomainCorpusAdapter(CorpusShape(
+        scan_roots=("notes", "papers"),
+        scopes={SCOPE_ALL: Scope(globs=("notes/*/*.md",))},
+        header_scan_lines=6))
+    corpus = starred.resolve(CorpusRef(name="populated", location=str(root)))
+    with pytest.raises(CorpusRefused) as caught:
+        starred.list_documents(corpus)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+    assert caught.value.refusal.subject == "notes/elsewhere/theirs.md"
+
+
+def test_a_root_that_vanishes_between_resolve_and_listing_refuses(
+        reader, tmp_path) -> None:
+    """A resolution is a statement about a tree at a moment. A root that was
+    there when the corpus resolved and is gone at listing used to be skipped,
+    so the listing came back holding the other roots' documents alone — a
+    partial corpus, and where the last root went, an EMPTY one, neither
+    distinguishable from a corpus that is legitimately that size."""
+    root = _lay_down(tmp_path / "c")
+    corpus = _resolved(reader, root)
+    assert len(reader.list_documents(corpus)) == 3, "the control, before"
+
+    notes = root / "notes"
+    for child in notes.iterdir():
+        child.unlink()
+    notes.rmdir()
+
+    reader._listings.clear()
+    with pytest.raises(CorpusRefused) as caught:
+        reader.list_documents(corpus)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+    assert "gone now" in caught.value.refusal.detail
+
+
+def test_a_root_never_present_at_resolution_is_not_missed_later(
+        tmp_path) -> None:
+    """The refusal is about a root that WAS there and went, not about one this
+    corpus never had. A shape may declare roots a given corpus does not use, and
+    a corpus holding only one of them is a legitimate corpus."""
+    root = tmp_path / "c"
+    (root / "papers").mkdir(parents=True)
+    (root / "papers" / "gamma.md").write_text(DOCUMENTS["papers/gamma.md"])
+    reader = DomainCorpusAdapter(SHAPE)
+    corpus = reader.resolve(CorpusRef(name="populated", location=str(root)))
+    assert [d.key for d in reader.list_documents(corpus)] == ["papers/gamma.md"]
+
+
+def test_the_all_scope_walks_each_distinct_pattern_once(tmp_path,
+                                                        monkeypatch) -> None:
+    """A profile-derived shape declares a scope per artifact kind, and kinds
+    share patterns and roots freely, so globbing per SCOPE walked the same tree
+    once per kind and again per repeated pattern. The scopes still decide
+    membership; what is de-duplicated is the work."""
+    # Three scopes, TWO distinct patterns, and no two scopes carrying the same
+    # tuple — so de-duplicating by whole scope would still walk three times and
+    # only de-duplicating by PATTERN walks two.
+    many = DomainCorpusAdapter(CorpusShape(
+        scan_roots=("notes", "papers"),
+        scopes={"kind-a": Scope(globs=("notes/**/*.md",)),
+                "kind-b": Scope(globs=("notes/**/*.md", "papers/**/*.md")),
+                "kind-c": Scope(globs=("papers/**/*.md",))},
+        header_scan_lines=6))
+    corpus = many.resolve(CorpusRef(name="populated",
+                                    location=str(_lay_down(tmp_path / "c"))))
+    calls: list[tuple[str, ...]] = []
+    original = DomainCorpusAdapter._scope_keys
+
+    def counting(self, location, scope):
+        calls.append(scope.globs)
+        return original(self, location, scope)
+
+    monkeypatch.setattr(DomainCorpusAdapter, "_scope_keys", counting)
+    listed = many.list_documents(corpus)
+    assert [d.key for d in listed] == sorted(DOCUMENTS), (
+        "the union is unchanged — three kinds, two distinct patterns, three "
+        "documents")
+    assert len(calls) == 2, (
+        f"three declared scopes carrying two DISTINCT patterns walked "
+        f"{len(calls)} times; each distinct pattern is walked once")
+
+
 def test_a_symlink_that_stays_inside_the_corpus_is_an_ordinary_document(
         reader, tmp_path) -> None:
     """The confinement check refuses an ESCAPE and not a link: a corpus is
