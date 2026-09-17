@@ -658,9 +658,10 @@ def _view_extension_or_skip():
     first of those may skip. (That review said "an older assembly"; the guard that
     replaced `importorskip` cannot measure ordering, only identity, so this summary
     stopped borrowing the word — the review of `cb84001` caught it here, the last
-    copy left in the file.) If `0b4e8bbf` lost `view_extension` or the `exports`
-    field, all three assertions below would have gone quietly green in a required
-    check. `tests/opendox_bundle.py::_absent` decides by READING the declared pin
+    copy left in the file.) If `5c137a90` — the leg this pin names now — lost
+    `view_extension` or the `exports` field, all three assertions below would
+    have gone quietly green in a required check.
+    `tests/opendox_bundle.py::_absent` decides by READING the declared pin
     out of `pyproject.toml` and the installed commit out of the distribution's
     PEP 610 `direct_url.json`. This docstring said "different (or unrecorded) ->
     SKIP", and Copilot's round-3 review of #21 was right that the parenthesis is
@@ -676,8 +677,9 @@ def _view_extension_or_skip():
     except ImportError:
         # FAIL at the declared pin, SKIP only for a different one. `importorskip`
         # could not tell those apart, and after the pin bump that difference is
-        # the whole point: a packaging or API regression at `0b4e8bbf` would have
-        # taken all three assertions below quietly green in a required check.
+        # the whole point: a packaging or API regression at the DECLARED leg —
+        # `5c137a90` today — would have taken all three assertions below quietly
+        # green in a required check.
         opendox_bundle._absent(
             "`opendox.view_extension` (§ 3.4 slice S3's view registry)",
             module_level=False)

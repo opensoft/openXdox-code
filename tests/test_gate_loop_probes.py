@@ -192,7 +192,8 @@ def bundle(tmp_path) -> Path:
         # Its four-row table is there, not restated here. Round 1 of the review on
         # #21 found this file claiming the install "came from somewhere older than
         # the declared pin" on a check that only tested for a marker. UNDER THAT
-        # CHECK, had `0b4e8bbf` itself ever stopped shipping `web/**`, all thirteen
+        # CHECK, had the DECLARED leg (`0b4e8bbf` then, `5c137a90` now) itself ever
+        # stopped shipping `web/**`, all thirteen
         # probes below would have skipped and this required check would have stayed
         # green over the regression. UNDER THE TABLE THEY OBEY NOW THEY FAIL: the
         # installed commit equals the declared pin, which is the table's first row
