@@ -478,6 +478,40 @@ def test_an_unreadable_subtree_refuses_listing_rather_than_omitting_it(
     assert caught.value.refusal.subject == str(locked)
 
 
+def test_a_second_listing_answers_the_live_tree_after_it_changes(
+        reader, tmp_path) -> None:
+    root = _lay_down(tmp_path / "c")
+    corpus = _resolved(reader, root)
+    assert [d.key for d in reader.list_documents(corpus)] == [
+        "notes/alpha.md", "notes/beta.md", "papers/gamma.md"]
+    (root / "notes" / "delta.md").write_text(
+        "Type: note\nTitle: Delta\n\n# Delta\n", encoding="utf-8")
+    assert [d.key for d in reader.list_documents(corpus)] == [
+        "notes/alpha.md", "notes/beta.md", "notes/delta.md", "papers/gamma.md"]
+
+
+def test_a_second_listing_rechecks_the_live_tree_for_unreadable_subtrees(
+        reader, tmp_path) -> None:
+    root = _lay_down(tmp_path / "c")
+    locked = root / "notes" / "locked"
+    locked.mkdir()
+    (locked / "delta.md").write_text("Type: note\nTitle: Delta\n")
+    corpus = _resolved(reader, root)
+    assert len(reader.list_documents(corpus)) == 4
+    original = locked.stat().st_mode
+    locked.chmod(0)
+    if os.access(locked, os.R_OK | os.X_OK):  # pragma: no cover
+        locked.chmod(original)
+        pytest.skip("directory permissions are not enforced here")
+    try:
+        with pytest.raises(CorpusRefused) as caught:
+            reader.list_documents(corpus)
+    finally:
+        locked.chmod(original)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+    assert caught.value.refusal.subject == str(locked)
+
+
 def test_read_returns_the_bytes_and_the_resolved_revision(reader,
                                                           populated) -> None:
     corpus = _resolved(reader, populated)
@@ -872,6 +906,21 @@ def test_write_back_refuses_a_foreign_document_identity_before_dispatch(
         tmp_path, _write_path(dispatch=lambda request, proposal:
                               dispatched.append((request, proposal))))
     document = DocumentId(corpus="some-other-corpus", key="notes/alpha.md")
+    with pytest.raises(CorpusRefused) as caught:
+        adapter.write_back(corpus, document, b"proposed", actor="a",
+                           basis_revision="r")
+    assert _refusal(caught) == DOCUMENT_UNKNOWN
+    assert dispatched == []
+
+
+def test_write_back_refuses_a_document_the_live_tree_no_longer_lists(
+        tmp_path) -> None:
+    dispatched: list[tuple] = []
+    adapter, corpus, root = _writable(
+        tmp_path, _write_path(dispatch=lambda request, proposal:
+                              dispatched.append((request, proposal))))
+    document = adapter.list_documents(corpus)[0]
+    (root / document.key).unlink()
     with pytest.raises(CorpusRefused) as caught:
         adapter.write_back(corpus, document, b"proposed", actor="a",
                            basis_revision="r")

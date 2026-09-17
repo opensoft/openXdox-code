@@ -304,16 +304,6 @@ class DomainCorpusAdapter:
 
     def __init__(self, shape: CorpusShape) -> None:
         self._shape = shape
-        # One listing per (location, revision, scope), remembered for this
-        # INSTANCE only. Not an optimization for its own sake: `read` decides
-        # membership by asking the listing -- one definition, so no second
-        # membership rule can disagree with the first -- and re-walking the tree
-        # per read would make classifying a corpus quadratic in its own size.
-        # The instance is bound to the LAST corpus state it resolved. Re-resolving
-        # therefore clears the cache, because an unversioned tree has no revision
-        # token to key a changed listing by and a dirty git tree is now refused
-        # rather than being stamped with `HEAD`.
-        self._listings: dict[tuple[str, str | None, str], tuple[str, ...]] = {}
 
     # -- the six -----------------------------------------------------------
 
@@ -357,7 +347,6 @@ class DomainCorpusAdapter:
                 CORPUS_UNREADABLE, str(location),
                 f"the path could not be read ({exc.strerror or exc})") from exc
 
-        self._listings.clear()
         resolved = location.resolve()
         revision = self._revision(resolved, ref.revision)
         write_path = self._shape.write_path
@@ -623,17 +612,12 @@ class DomainCorpusAdapter:
         return (completed.stdout or "").strip()
 
     def _keys(self, corpus: ResolvedCorpus, scope: str) -> tuple[str, ...]:
-        cached = self._listings.get((corpus.location, corpus.revision, scope))
-        if cached is not None:
-            return cached
         location = Path(corpus.location)
         names = sorted(self._shape.scopes) if scope == SCOPE_ALL else [scope]
         keys: set[str] = set()
         for name in names:
             keys.update(self._scope_keys(location, self._shape.scopes[name]))
-        listed = tuple(sorted(keys))
-        self._listings[(corpus.location, corpus.revision, scope)] = listed
-        return listed
+        return tuple(sorted(keys))
 
     def _scope_keys(self, location: Path, scope: Scope) -> set[str]:
         keys: set[str] = set()
