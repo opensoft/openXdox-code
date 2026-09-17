@@ -188,6 +188,34 @@ def test_a_profile_location_that_leaves_the_corpus_is_refused_by_name(
     assert "governance-document" in str(caught.value)
 
 
+@pytest.mark.parametrize("root", ["a\\..\\b", "..\\outside"])
+def test_a_backslash_traversal_is_refused_too(root: str) -> None:
+    """These values are joined with `pathlib`. A guard that split on `/` alone
+    would be right only on the platform it was written on."""
+    with pytest.raises(CorpusShapeInvalid):
+        _shape(scan_roots=(root,))
+
+
+def test_a_padded_profile_location_derives_one_consistent_root_and_glob(
+        engineering) -> None:
+    """`DomainProfile` accepts a non-empty string without trimming it, and the
+    two derivations used to disagree about the padding: `globs_of` stripped and
+    `scan_root_of` did not, so `" docs/**/*.md "` produced the scan root
+    `" docs"` — a directory no corpus has — against a glob rooted at `docs`, and
+    every real corpus then refused `corpus-unclassifiable`."""
+    kinds = list(engineering.artifact_kinds)
+    kinds[0] = type(kinds[0])(id=kinds[0].id, label=kinds[0].label,
+                              description=kinds[0].description,
+                              locations=("  docs/**/*.md  ",))
+    padded = type(engineering)(**{**engineering.__dict__,
+                                  "artifact_kinds": tuple(kinds)})
+    shape = from_profile(padded, document_globs=("**/*.md",),
+                         header_scan_lines=6)
+    assert "docs" in shape.scan_roots
+    assert not any(root != root.strip() for root in shape.scan_roots)
+    assert "docs/**/*.md" in shape.scopes[kinds[0].id].globs
+
+
 def test_a_double_star_is_not_a_traversal_segment() -> None:
     """The refusal is on `.` and `..` exactly, and `**` is glob syntax that
     stays inside the corpus. A guard that refused it would refuse every shape

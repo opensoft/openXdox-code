@@ -132,7 +132,11 @@ def _reject_traversal(value: str, where: str) -> None:
             "declared location is joined onto the corpus's own resolved "
             "location, so an absolute one leaves the corpus in a single step "
             "and this reader would answer for a tree nobody pointed it at")
-    for segment in value.split("/"):
+    # BOTH SEPARATORS, and it is not Windows courtesy: these values are joined
+    # with `pathlib`, and a check that split on `/` alone would pass `a\\..\\b`
+    # to a path library that may read it as a traversal. A guard that is right
+    # only on the platform it was written on is a guard nobody can move.
+    for segment in value.replace("\\", "/").split("/"):
         if segment in TRAVERSAL_SEGMENTS:
             raise CorpusShapeInvalid(
                 f"{where} declares {value!r}, which carries a {segment!r} "
@@ -379,9 +383,16 @@ def from_profile(profile: DomainProfile, *,
     union: list[str] = []
     for kind in profile.artifact_kinds:
         globs: list[str] = []
-        for location in kind.locations:
+        for declared in kind.locations:
+            # STRIPPED ONCE, HERE, AND BOTH DERIVATIONS READ THE SAME VALUE.
+            # `DomainProfile` accepts a non-empty string without trimming it, and
+            # `globs_of` used to strip while `scan_root_of` did not -- so a
+            # location written `" docs/**/*.md "` produced the scan root
+            # `" docs"` (a directory no corpus has) against a glob rooted at
+            # `docs`, and every real corpus then refused `corpus-unclassifiable`.
+            location = declared.strip()
             _reject_traversal(
-                location.strip(),
+                location,
                 f"domain profile {profile.mapping_id!r}, artifact kind "
                 f"{kind.id!r}")
             root = scan_root_of(location)

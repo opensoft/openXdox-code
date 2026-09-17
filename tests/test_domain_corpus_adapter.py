@@ -703,6 +703,96 @@ def test_a_link_retargeted_after_listing_is_refused_at_read(
     assert "outside the corpus" in caught.value.refusal.detail
 
 
+def test_a_declared_root_that_links_outside_the_corpus_refuses(
+        reader, tmp_path) -> None:
+    """A scan root is a path like any other, and `stat()` follows a link. A
+    corpus whose `notes` is a symlink to somebody else's directory would
+    otherwise resolve, list that directory's documents, and serve them under
+    this corpus's identity."""
+    elsewhere = tmp_path / "elsewhere"
+    (elsewhere / "secret.md").parent.mkdir(parents=True)
+    (elsewhere / "secret.md").write_text("Type: note\nTitle: Theirs\n")
+    root = tmp_path / "c"
+    (root / "papers").mkdir(parents=True)
+    (root / "papers" / "gamma.md").write_text(DOCUMENTS["papers/gamma.md"])
+    (root / "notes").symlink_to(elsewhere)
+    with pytest.raises(CorpusRefused) as caught:
+        _resolved(reader, root)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+
+
+def test_a_link_to_nothing_refuses_rather_than_shortening_the_listing(
+        reader, tmp_path) -> None:
+    """A matched entry that is a LINK to nothing is not a file, so the
+    `is_file()` filter used to drop it and the listing came back quietly one
+    document short — the same lie as a quietly unreadable directory. A link is
+    answered for as a link, before anything is skipped."""
+    root = _lay_down(tmp_path / "c")
+    (root / "notes" / "dangling.md").symlink_to(root / "notes" / "gone.md")
+    corpus = _resolved(reader, root)
+    with pytest.raises(CorpusRefused) as caught:
+        reader.list_documents(corpus)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+    assert caught.value.refusal.subject == "notes/dangling.md"
+
+
+def test_a_plain_directory_matching_a_document_glob_is_still_skipped(
+        reader, tmp_path) -> None:
+    """The refusal above is about LINKS. An ordinary directory whose name
+    happens to match the pattern is the ordinary non-document it looks like."""
+    root = _lay_down(tmp_path / "c")
+    (root / "notes" / "a-directory.md").mkdir()
+    corpus = _resolved(reader, root)
+    assert [d.key for d in reader.list_documents(corpus)] == sorted(DOCUMENTS)
+
+
+def test_a_root_that_becomes_unreadable_after_resolve_refuses_the_listing(
+        reader, tmp_path, unreadable) -> None:
+    """A declared root that became unopenable AFTER `resolve` is a refusal at
+    LISTING time, not a shorter corpus."""
+    root = _lay_down(tmp_path / "c")
+    corpus = _resolved(reader, root)
+    unreadable(root / "notes")
+    with pytest.raises(CorpusRefused) as caught:
+        reader.list_documents(corpus)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+
+
+def test_a_root_that_cannot_be_stat_ed_refuses_rather_than_being_skipped(
+        reader, tmp_path) -> None:
+    """THE CASE THAT SEPARATES `Path.is_dir()` FROM `_stat`, and it needs a
+    stat that RAISES rather than a directory that merely cannot be opened.
+
+    A self-referential symlink is one: `is_dir()` answers **False** for it
+    (measured — `OSError` suppressed, errno 40, ELOOP) while `stat()` raises. On
+    `is_dir()` the root was therefore SKIPPED, `papers/` alone was listed, and a
+    three-document corpus came back holding one — a partial listing with nothing
+    anywhere reporting a loss. `_stat` turns the same `OSError` into a named
+    refusal.
+
+    The loop is created AFTER `resolve`, because `resolve` applies the same
+    probe and would refuse there first; this test is about the listing.
+    """
+    root = _lay_down(tmp_path / "c")
+    corpus = _resolved(reader, root)
+    assert len(reader.list_documents(corpus)) == 3, "the control, before"
+
+    notes = root / "notes"
+    for child in notes.iterdir():
+        child.unlink()
+    notes.rmdir()
+    notes.symlink_to(notes)
+    assert notes.is_dir() is False, (
+        "the control: `is_dir()` suppresses the OSError and says 'not a "
+        "directory', which is how the root came to be skipped")
+
+    reader._listings.clear()
+    with pytest.raises(CorpusRefused) as caught:
+        reader.list_documents(corpus)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+    assert caught.value.refusal.subject == str(notes)
+
+
 def test_a_symlink_that_stays_inside_the_corpus_is_an_ordinary_document(
         reader, tmp_path) -> None:
     """The confinement check refuses an ESCAPE and not a link: a corpus is

@@ -361,6 +361,7 @@ class DomainCorpusAdapter:
                     "this declared root is present and is not a directory, so "
                     "the corpus cannot be read under it; resolving anyway "
                     "would report a partial corpus as a whole one")
+            self._require_confined(location, declared, Path(root))
             self._require_traversable(declared)
             roots_present = True
         if not roots_present:
@@ -697,12 +698,28 @@ class DomainCorpusAdapter:
         keys: set[str] = set()
         for pattern in scope.globs:
             for match in location.glob(pattern):
-                if not match.is_file():
-                    continue
                 rel = match.relative_to(location)
                 if any(part in scope.excluded_parts for part in rel.parts):
                     continue
-                self._require_confined(location, match, rel)
+                # CONFINEMENT IS DECIDED BEFORE "is this a file", because the
+                # order used to hide the case it exists for. A matched entry
+                # that is a LINK to nothing, or to somewhere outside, is not a
+                # file -- so `is_file()` dropped it and the listing came back
+                # quietly one document short, which is the same lie as a
+                # quietly unreadable directory. A link is now answered for as a
+                # link; only after that is a plain directory skipped as the
+                # ordinary non-document it is.
+                if match.is_symlink():
+                    self._require_confined(location, match, rel)
+                    if not match.is_file():
+                        raise _refuse(
+                            CORPUS_UNREADABLE, rel.as_posix(),
+                            "this path is a link that does not resolve to a "
+                            "file, so it matches a document pattern and is not "
+                            "a document; omitting it would report a corpus "
+                            "shorter than it is")
+                elif not match.is_file():
+                    continue
                 keys.add(rel.as_posix())
         return keys
 
@@ -757,8 +774,21 @@ class DomainCorpusAdapter:
 
         for root_name in self._shape.scan_roots:
             root = location / root_name
-            if not root.is_dir():
+            # `_stat` AND NOT `Path.is_dir()`, for the reason `_stat`'s own
+            # docstring gives: `is_dir()` answers False for every `OSError`, so
+            # a declared root that became inaccessible AFTER `resolve` was
+            # silently skipped here -- a partial listing where another root is
+            # present, and an empty one where it is not. Both read exactly like
+            # a legitimate answer.
+            info = self._stat(root)
+            if info is None:
                 continue
+            if not stat.S_ISDIR(info.st_mode):
+                raise _refuse(
+                    CORPUS_UNREADABLE, str(root),
+                    "this declared root is present and is not a directory, so "
+                    "the corpus cannot be listed under it")
+            self._require_confined(location, root, Path(root_name))
             self._require_traversable(root)
             for _dirpath, _dirnames, _filenames in os.walk(root,
                                                            onerror=_onerror):
