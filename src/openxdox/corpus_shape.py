@@ -400,6 +400,24 @@ def from_profile(profile: DomainProfile, *,
     roots: set[str] = set()
     union: list[str] = []
     for kind in profile.artifact_kinds:
+        # BEFORE THE LOCATIONS AND NOT AFTER THEM. This refusal is about the
+        # kind's ID, which is known here, and it used to sit below
+        # `if not globs: continue` -- so a kind named `all` WITH NO LOCATIONS
+        # was skipped by that `continue` and never reached it. `locations`
+        # defaults to an empty tuple, so that profile is writable, and the
+        # docstring above promises this refusal unconditionally. A malformed
+        # profile that validates because its malformed part was empty is the
+        # worst of both: the guarantee reads as absolute and holds only where
+        # something else already objected.
+        if kind.id == SCOPE_ALL:
+            raise CorpusShapeInvalid(
+                f"domain profile {profile.mapping_id!r} declares an artifact "
+                f"kind whose id is {SCOPE_ALL!r}, which is the one scope name "
+                "every implementation of the corpus-adapter interface SHALL "
+                "accept and which means 'every declared scope'. A scope of that "
+                "name carrying one kind's globs would answer a listing for that "
+                "kind with the whole corpus, and a silent widening is "
+                "indistinguishable from a correct answer. Rename the kind")
         globs: list[str] = []
         for declared in kind.locations:
             # STRIPPED ONCE, HERE, AND BOTH DERIVATIONS READ THE SAME VALUE.
@@ -423,15 +441,6 @@ def from_profile(profile: DomainProfile, *,
                     union.append(pattern)
         if not globs:
             continue
-        if kind.id == SCOPE_ALL:
-            raise CorpusShapeInvalid(
-                f"domain profile {profile.mapping_id!r} declares an artifact "
-                f"kind whose id is {SCOPE_ALL!r}, which is the one scope name "
-                "every implementation of the corpus-adapter interface SHALL "
-                "accept and which means 'every declared scope'. A scope of that "
-                "name carrying one kind's globs would answer a listing for that "
-                "kind with the whole corpus, and a silent widening is "
-                "indistinguishable from a correct answer. Rename the kind")
         per_kind[kind.id] = Scope(globs=tuple(globs),
                                   excluded_parts=excluded_parts)
     if not per_kind:

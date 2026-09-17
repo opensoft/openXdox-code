@@ -1028,6 +1028,49 @@ def test_a_root_never_present_at_resolution_is_not_missed_later(
     assert [d.key for d in reader.list_documents(corpus)] == ["papers/gamma.md"]
 
 
+def test_a_root_that_appears_after_resolution_refuses_rather_than_widening(
+        tmp_path) -> None:
+    """THE SYMMETRIC HALF, and the more dangerous direction of the two.
+
+    Losing a declared root after resolution refuses, because the listing would
+    otherwise answer for a corpus this reader never resolved. GAINING one did
+    not: the loop stat-ed the new root, found it present, walked it, and its
+    documents entered the listing indistinguishable from members — for a handle
+    resolved when that root did not exist. Same broken statement, opposite
+    sign, and harder to notice because nothing is missing.
+
+    It refuses rather than dropping the new root, which would be the silent
+    narrowing this module refuses everywhere else. What is stale is the
+    RESOLUTION, so the caller is sent back to it — and the test asserts the
+    recovery too, since a refusal with no way out would be worse than the bug.
+
+    THE ROOT APPEARS BEFORE THE FIRST LISTING, which is the reachable shape of
+    this and not a convenience: the guard runs where the listing is COMPUTED,
+    and a memoized listing is not recomputed. A caller that already listed
+    holds the memo until something re-resolves that corpus, so the window this
+    closes is exactly resolve-then-list — which is also the ordinary order.
+    """
+    root = tmp_path / "c"
+    (root / "papers").mkdir(parents=True)
+    (root / "papers" / "gamma.md").write_text(DOCUMENTS["papers/gamma.md"])
+    reader = DomainCorpusAdapter(SHAPE)
+    corpus = reader.resolve(CorpusRef(name="populated", location=str(root)))
+
+    notes = root / "notes"
+    notes.mkdir()
+    (notes / "alpha.md").write_text(DOCUMENTS["notes/alpha.md"])
+
+    with pytest.raises(CorpusRefused) as caught:
+        reader.list_documents(corpus)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+    assert "was not there when the corpus resolved" in caught.value.refusal.detail
+
+    # And the way out the refusal names actually works.
+    again = reader.resolve(CorpusRef(name="populated", location=str(root)))
+    assert [d.key for d in reader.list_documents(again)] == [
+        "notes/alpha.md", "papers/gamma.md"]
+
+
 def test_the_all_scope_walks_each_distinct_pattern_once(tmp_path,
                                                         monkeypatch) -> None:
     """A profile-derived shape declares a scope per artifact kind, and kinds
@@ -1475,12 +1518,58 @@ def test_write_back_raises_only_the_kinds_its_row_of_the_interface_names(
     """
     adapter, corpus, _ = _writable(tmp_path,
                                    _write_path(routes=lambda key: None))
-    foreign = DocumentId(corpus="some-other-corpus", key="notes/nowhere.md")
+    # THIS CORPUS'S OWN identity, deliberately: the document must reach
+    # `routes` for `routes` to be what answers. An identity from another corpus
+    # is now refused one guard earlier (with the same kind, for its own
+    # reasons), so using one here would have quietly stopped measuring the
+    # thing this test is named after.
+    unrouted = DocumentId(corpus=corpus.ref.name, key="notes/nowhere.md")
     with pytest.raises(CorpusRefused) as caught:
-        adapter.write_back(corpus, foreign, b"proposed", actor="a",
+        adapter.write_back(corpus, unrouted, b"proposed", actor="a",
                            basis_revision="r")
     assert _refusal(caught) == WRITE_PATH_UNREACHABLE, (
         "the declared path answered, as its row says it does")
+    assert "no target on the declared write path" in caught.value.refusal.detail
+
+
+def test_write_back_refuses_a_document_identity_from_another_corpus(
+        tmp_path) -> None:
+    """THE ONE ROUTE IN THIS CLASS THAT ACTED ON AN IDENTITY IT NEVER LISTED.
+
+    `read` and `classify` both put a `DocumentId` through
+    `_require_own_identity` and then through the listing. `write_back` did
+    neither: it went straight to `routes`, so a `DocumentId` belonging to
+    ANOTHER corpus, whose key happens to have a target on this path, was built
+    into a `WriteProposal` and dispatched under THIS corpus. The write path
+    sees a well-formed proposal and has no way to know the document was never
+    this corpus's.
+
+    The refusal kind is `WRITE_PATH_UNREACHABLE` and not `DOCUMENT_UNKNOWN`,
+    which is the whole reason this guard is written out rather than delegated
+    to `_require_own_identity`: this operation's row of the interface is
+    exactly `CORPUS_READ_ONLY` and `WRITE_PATH_UNREACHABLE`, a round of review
+    already proposed widening that row, and it was reverted. The test above
+    holds that line; this one holds the hole the line left.
+    """
+    dispatched: list[tuple] = []
+    adapter, corpus, root = _writable(
+        tmp_path, _write_path(dispatch=lambda request, proposal:
+                              dispatched.append((request, proposal))))
+    before = {f: f.read_bytes() for f in sorted(root.rglob("*")) if f.is_file()}
+    mine = adapter.list_documents(corpus)[0]
+    foreign = DocumentId(corpus="some-other-corpus", key=mine.key)
+
+    with pytest.raises(CorpusRefused) as caught:
+        adapter.write_back(corpus, foreign, b"proposed", actor="a",
+                           basis_revision="r")
+
+    assert _refusal(caught) == WRITE_PATH_UNREACHABLE, (
+        "the kinds this operation may raise are its row's, and "
+        "DOCUMENT_UNKNOWN is not one of them")
+    assert "another corpus's document identity" in caught.value.refusal.detail
+    assert dispatched == [], "the proposal must not have been dispatched"
+    assert {f: f.read_bytes()
+            for f in sorted(root.rglob("*")) if f.is_file()} == before
 
 
 def test_a_reference_disagreeing_about_reachability_fails_closed(

@@ -427,6 +427,36 @@ def test_a_kind_named_all_is_refused_rather_than_absorbed(engineering) -> None:
     assert "widening" in str(caught.value)
 
 
+def test_a_kind_named_all_is_refused_even_with_no_locations_of_its_own(
+        engineering) -> None:
+    """THE GUARANTEE ABOVE IS UNCONDITIONAL, AND IT USED NOT TO BE.
+
+    `ArtifactKind.locations` defaults to an empty tuple, so a kind named `all`
+    with no locations is a profile somebody can write. That kind produced no
+    globs, `if not globs: continue` skipped it, and the reserved-id refusal --
+    which sat BELOW that line -- was never reached. With other kinds present
+    the shape was built and returned, so a profile carrying the one id this
+    module refuses by name validated, silently, because the malformed part of
+    it was empty.
+
+    The refusal is about the kind's ID, which is known before its locations are
+    looked at, so that is where it is asked now. A guarantee that holds only
+    when something else already objected is not the guarantee the docstring
+    makes.
+    """
+    kinds = list(engineering.artifact_kinds)
+    assert len(kinds) > 1, "the other kinds are what made the shape still build"
+    kinds[0] = type(kinds[0])(id=SCOPE_ALL, label=kinds[0].label,
+                              description=kinds[0].description,
+                              locations=())
+    collides = type(engineering)(
+        **{**engineering.__dict__, "artifact_kinds": tuple(kinds)})
+    with pytest.raises(CorpusShapeInvalid) as caught:
+        from_profile(collides, document_globs=("**/*.md",),
+                     header_scan_lines=6)
+    assert SCOPE_ALL in str(caught.value)
+
+
 def test_a_profile_declaring_no_locations_is_refused(engineering) -> None:
     """A reader built from it would list nothing over every corpus, which reads
     exactly like an empty corpus and is not one."""

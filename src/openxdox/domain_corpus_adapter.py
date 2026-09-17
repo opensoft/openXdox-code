@@ -601,6 +601,25 @@ class DomainCorpusAdapter:
                 "the reference this write was made against reports the declared "
                 "path unavailable, and a write is not the place to resolve that "
                 "disagreement -- resolve the corpus again")
+        # THE IDENTITY GUARD, AND THE KIND IT REFUSES WITH IS THE POINT.
+        # Without it a `DocumentId` belonging to ANOTHER corpus, whose key
+        # happens to have a target on this path, was built into a
+        # `WriteProposal` and dispatched under THIS corpus -- the one route in
+        # this class that acts on a document identity it never listed.
+        # `_require_own_identity` is deliberately NOT reused: it raises
+        # `DOCUMENT_UNKNOWN`, and this operation's row of the interface is
+        # exactly `CORPUS_READ_ONLY` and `WRITE_PATH_UNREACHABLE`. A round of
+        # review already proposed widening that row and it was reverted, so
+        # the guard is written here with a kind the row names -- which is also
+        # the honest statement, and the same one the `routes` refusal below
+        # makes: this path is not reachable FOR THIS DOCUMENT.
+        if document.corpus != corpus.ref.name:
+            raise _refuse(
+                WRITE_PATH_UNREACHABLE, write_path.name,
+                f"{document.corpus!r} does not name {corpus.ref.name!r}, so "
+                "this is another corpus's document identity and this reader "
+                "will not dispatch it through this corpus's write path; the "
+                "document remains unsaved")
         target = write_path.routes(document.key)
         if target is None:
             raise _refuse(
@@ -912,6 +931,22 @@ class DomainCorpusAdapter:
                         "gone now, so a listing would answer for a corpus this "
                         "reader never resolved; resolve it again")
                 continue
+            if expected is not None and root_name not in expected:
+                # THE SYMMETRIC HALF OF THE GUARD ABOVE. Losing a root after
+                # resolution refuses; GAINING one silently widened the listing
+                # with documents from a root that was not part of the corpus
+                # when it resolved -- the same "answers for a corpus this
+                # reader never resolved" in the other direction, and the more
+                # dangerous one, because the extra documents look exactly like
+                # members. Dropping the new root instead would be the silent
+                # narrowing this module refuses everywhere else; the resolution
+                # is what is stale, so the resolution is what the caller is
+                # sent back to.
+                raise _refuse(
+                    CORPUS_UNREADABLE, str(root),
+                    "this root was not there when the corpus resolved and is "
+                    "now, so a listing would answer for a corpus this reader "
+                    "never resolved; resolve it again")
             if not stat.S_ISDIR(info.st_mode):
                 raise _refuse(
                     CORPUS_UNREADABLE, str(root),
