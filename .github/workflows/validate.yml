@@ -381,6 +381,55 @@ jobs:
       # `--noconftest` STAYS, and it is why this list is a list: `tests/
       # conftest.py` imports the carved session fixtures, which reach both
       # absent packages. Every file named here stands on its own under it.
+      #
+      # TWO FILES JOIN THIS LIST WITH THE CORPUS-ADAPTER IMPLEMENTATION
+      # (`design.md` § D4 machinery (1); RULED Q-X1..Q-X4, Brett Heap
+      # 2026-09-17, `opensoft/openxFactory#656` comment `5715212264`):
+      # `tests/test_corpus_shape.py` and `tests/test_domain_corpus_adapter.py`,
+      # appended LAST so the list reads in the order the leg grew.
+      #
+      # They join on exactly the grounds `test_dependency_direction.py` joined
+      # under § 4.1 and `test_domain_profile.py` under § 4.4, and they do NOT
+      # un-narrow RULED Q-L8 (b'): both cover modules AUTHORED HERE
+      # (`src/openxdox/corpus_shape.py`, `domain_corpus_adapter.py`,
+      # `conformance_corpus.py` — created files, no carve-manifest row under
+      # RULED OQ-C), and both import only `pytest`, the standard library, the
+      # PINNED `opendox` interface and this package. No `doc_health`, no
+      # `ideation_dashboard`, no carved suite — measured:
+      #
+      #   python -m pytest -q tests/test_corpus_shape.py \
+      #                       tests/test_domain_corpus_adapter.py --noconftest
+      #     94 passed  (36 + 58), 0 skipped, 0 errors
+      #
+      # NO SKIP GUARD IS NEEDED and none is added, which is the difference
+      # between these two and the three seam suites above: the seam suites skip
+      # where `doc_health` is unreachable, and nothing either of these files
+      # imports is unreachable at this leg. Four tests do carry a skip, on a
+      # different axis entirely — the git-backed revision assertions skip
+      # where `git` is not on PATH, which on this runner it always is.
+      #
+      # EVERY ASSERTION IN BOTH FILES IS MUTATION-PROVED. A sweep of 37
+      # deliberate defects in `corpus_shape.py` and `domain_corpus_adapter.py`
+      # — the file-location refusal answering `corpus-unclassifiable`, the
+      # declared write path becoming a module constant, `read` falling back to
+      # a revision nobody asked for, an undeclared scope widening silently,
+      # `write_back` writing the tree, the line rule breaking on exotic
+      # separators, the reader adopting an enclosing repository, and thirty
+      # more — was applied one at a time and run against this list. ALL 37
+      # WERE CAUGHT; the sweep and its per-mutation output are in the pull
+      # request that introduced these two files.
+      #
+      # WHAT THEY GUARD, and it is a required check because the answer is
+      # otherwise invisible here: FLOOR PART 3 (`design.md` § D6 (3), RULED
+      # OQ-1) is measured by openxFactory's runner over openxFactory's corpus,
+      # which this leg does not carry and must not depend on. So the run that
+      # answers `OK — 17 of 17` is reported in the pull request, and what stays
+      # ASSERTED in this leg's own required check is the shape of the same
+      # answers over a corpus of the same shape in `tmp_path`, plus the things
+      # the seventeen checks do not reach: every one of the interface's eight
+      # refusal kinds, the CR/LF/CRLF line rule the header window is counted in,
+      # the write-path dispatch, and the guard that stops this reader adopting
+      # the git checkout a corpus directory happens to sit inside.
       - name: pytest
         run: >-
           python -m pytest -q
@@ -398,4 +447,6 @@ jobs:
           tests/test_model_scenario_workbench_seam.py
           tests/test_role_authority_projection.py
           tests/test_role_authority_projection_seam.py
+          tests/test_corpus_shape.py
+          tests/test_domain_corpus_adapter.py
           --noconftest

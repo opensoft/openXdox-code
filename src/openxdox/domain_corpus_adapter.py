@@ -88,6 +88,7 @@ landlord.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -127,6 +128,28 @@ DEFAULT_REF = "HEAD"
 #: How long git is given to answer. A hung subprocess inside a reader would look
 #: exactly like a corpus that is merely large.
 GIT_TIMEOUT_SECONDS = 30
+
+#: The ambient git variables this reader REMOVES from its subprocess environment.
+#:
+#: They are the second door into the defect `_revision`'s docstring is about, and
+#: it is not exotic: git sets `GIT_DIR` and `GIT_WORK_TREE` for every hook it
+#: runs and for `git rebase --exec`, so a projection built from inside a hook
+#: inherits them. With them set, `git -C <the corpus> rev-parse HEAD` answers
+#: with the AMBIENT repository's commit and not the corpus's -- measured: a
+#: corpus at its own commit `128660da` answers `dd09f3df`, the enclosing
+#: repository's, purely because the environment said so.
+#:
+#: A path this reader was handed is the corpus. Whatever repository the calling
+#: process happens to be operating on is a different question, and answering the
+#: first with the second is the same error as walking up the tree, arriving by a
+#: different door. So the variables are dropped for the call, and `_revision`'s
+#: cross-check against git's own reported work tree stays as the fail-closed
+#: guard for anything that still disagrees.
+AMBIENT_GIT_VARIABLES = (
+    "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CEILING_DIRECTORIES", "GIT_PREFIX",
+)
 
 #: THE LINE RULE. CR, LF and CRLF separate lines -- and nothing else does.
 #:
@@ -530,15 +553,23 @@ class DomainCorpusAdapter:
         into a named refusal, because a reader that cannot answer must say so
         rather than guess.
 
+        THE AMBIENT GIT ENVIRONMENT IS DROPPED, and that is the other half of
+        "one directory" (see `AMBIENT_GIT_VARIABLES`). `-C` alone is not enough:
+        `GIT_DIR` and `GIT_WORK_TREE` override it, git exports both to every
+        hook it runs, and a reader inheriting them answers about the caller's
+        repository while looking as if it answered about the corpus.
+
         Deliberately NOT `record_binding.repository_root`, which exists to walk
         UP to the enclosing work tree; see `_revision` for why that is the one
         thing this operation must not do.
         """
+        environment = {name: value for name, value in os.environ.items()
+                       if name not in AMBIENT_GIT_VARIABLES}
         try:
             completed = subprocess.run(
                 ["git", "-C", str(cwd), *args],
                 capture_output=True, text=True, timeout=GIT_TIMEOUT_SECONDS,
-                check=False)
+                check=False, env=environment)
         except (OSError, subprocess.SubprocessError):
             return None
         if completed.returncode != 0:
