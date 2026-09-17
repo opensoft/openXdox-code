@@ -24,10 +24,21 @@ WHY THE BINDINGS ARE DECLARED AS DATA AND MATERIALIZED LATE. This leg pins
 registry itself — `opendox.view_extension` does not exist there, and the
 `exports` field RULED Q2 adds is newer still". THAT IS NO LONGER TRUE, and the
 old wording is quoted here as provenance rather than deleted: the pin now names
-openDox-code#23 (`0b4e8bbf`, § 3.4 slice S8 leg B), where `view_extension` is
+openDox-code#27 (`5c137a90`, § 3.4 RULED Q7), where `view_extension` is
 importable and `ViewBinding` takes `exports` — measured, and the three
 materialization assertions in `tests/test_gate_loop_views.py` run and pass
-against it instead of skipping.
+against it instead of skipping. It first became true one pin earlier, at
+`0b4e8bbf` (openDox-code#23, § 3.4 slice S8 leg B), which is where that wording
+was corrected; the pin has since crossed `0e65b5f8` (#24) to `5c137a90`, whose
+`ViewBinding` also carries a `styles` field — absent at `0b4e8bbf`, present
+here, measured by `dataclasses.fields()` in a venv at each pin. NOTHING IN
+THIS FILE READS THAT FIELD YET, and the review of `ea6991b` was right to
+check: `views()` below materializes `VIEW_BINDING_SPECS` unchanged, no spec
+names `styles`, and no branch here asks whether the installed `ViewBinding`
+has it. The feature detection is openXdox-code#22's `specs_for()`, which
+reads `dataclasses.fields(binding_cls)` and drops `styles` for an assembly
+whose pin is behind Q7; that pull request is READY and this bump is the one
+thing it waits on. So the field is carried here as AVAILABLE, not as used.
 
 THE LATENESS STAYS, for the reason that outlives any one pin: an ASSEMBLY
 chooses the `opendox` this module runs under, not this file, and a consumer
