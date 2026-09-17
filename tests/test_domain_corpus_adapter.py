@@ -620,6 +620,41 @@ def test_a_hand_built_resolved_corpus_is_cached_like_any_other(
         f"the cache will not hold is a corpus walked once per document")
 
 
+def test_two_equal_handles_for_one_corpus_never_disagree(
+        reader, populated) -> None:
+    """THE MEMO IS KEYED BY VALUE, AND THIS IS WHAT THAT BUYS.
+
+    `ResolvedCorpus` is frozen value data, so two handles for the same corpus
+    compare equal and hash alike -- indistinguishable to `==`, to `hash`, to
+    `dict` and to `set`. An identity-keyed cache was proposed so that each
+    handle could keep a listing frozen against a LATER re-resolution. It is
+    not done, and this test is the reason: it would make two handles a caller
+    cannot tell apart answer `list_documents` differently, so the caller has
+    no way to predict which answer it gets.
+
+    What this reader guarantees instead is the interface's own `list-stable`
+    property plus one invalidation rule: repeated listings of a corpus agree
+    until something re-resolves THAT corpus. A caller who wants a listing
+    frozen against its own later re-resolve already has one -- the tuple
+    `list_documents` returned, which is immutable.
+    """
+    first = _resolved(reader, populated)
+    assert first == _resolved(reader, populated), (
+        "the pinned interface declares this frozen value data; if that ever "
+        "stops being true, every claim below is about a different type")
+
+    before = [d.key for d in reader.list_documents(first)]
+    (populated / "notes" / "delta.md").write_text("Type: note\nTitle: Delta\n")
+    after = _resolved(reader, populated)
+
+    assert before == sorted(DOCUMENTS)
+    assert [d.key for d in reader.list_documents(first)] == [
+        d.key for d in reader.list_documents(after)], (
+        "two handles that compare EQUAL gave different listings for one "
+        "corpus at one moment, which is a value type behaving like a "
+        "reference type")
+
+
 def test_resolving_again_rebuilds_the_listing_even_for_an_unversioned_tree(
         reader, populated) -> None:
     """The staleness the cache could have had, closed where it belongs.

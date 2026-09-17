@@ -426,9 +426,27 @@ class DomainCorpusAdapter:
         # pointed at several locations in one run (the conformance corpus
         # points it at four), and a caller holding a `ResolvedCorpus` for A had
         # A's listing dropped merely because it went on to resolve B -- so A's
-        # next listing re-walked and could serve post-resolution contents
-        # through a handle that promised a moment in time. Nothing about
-        # resolving B is news about A.
+        # next listing re-walked and answered for a tree A never resolved
+        # against. Nothing about resolving B is news about A.
+        #
+        # WHAT THIS MAP IS, EXACTLY, BECAUSE THE PRECISE CLAIM IS THE WHOLE
+        # VALUE OF IT: a MEMO WITH AN INVALIDATION RULE, and not a per-handle
+        # snapshot. The rule is "re-resolving a corpus invalidates that
+        # corpus's memo", and the key is the handle's VALUE, so two handles
+        # that compare equal share one memo and cannot disagree.
+        #
+        # KEYING ON OBJECT IDENTITY WAS PROPOSED AND IS DELIBERATELY NOT DONE.
+        # `ResolvedCorpus` is frozen value data: two equal handles are
+        # indistinguishable to every tool a caller has -- `==`, `hash`, `dict`,
+        # `set` -- so making them answer `list_documents` differently would
+        # make a value type behave like a reference type and hand the caller
+        # two answers with no way to predict which it gets. The narrower
+        # guarantee this map does make is the one the interface's own
+        # `list-stable` check measures: for one corpus, repeated listings agree
+        # until something re-resolves it. A caller that needs the stronger
+        # thing -- a listing frozen against its own later re-resolution -- can
+        # hold the tuple `list_documents` already returned, which is immutable
+        # and is the snapshot.
         self._listings[corpus] = {}
         self._resolved_roots[corpus] = tuple(present_roots)
         return corpus
