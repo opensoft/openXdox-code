@@ -139,9 +139,13 @@ class ViewModuleRoutesExtension:
     Deliberately a SECOND extension rather than more bindings on
     `serve_gate.GateRoutesExtension`: that one contributes the gate VERBS, a
     POST prefix the whole estate reasons about as "the gate column's routes",
-    and folding six static GETs into it would make `contributed_routes` — which
-    openDox's registry checks every view binding's ownership against — read as
-    though the gate column had claimed the shell's view directory.
+    and folding this column's static GETs into it would make
+    `contributed_routes` — which openDox's registry checks every view binding's
+    ownership against — read as though the gate column had claimed the shell's
+    view directory. This paragraph said "six static GETs" and the module
+    docstring's own rule is why it no longer does: the count is
+    `web_assets.VIEW_ASSET_NAMES`' (ten since RULED Q7) and a number written
+    down twice is a number that goes stale.
 
     NOT REGISTERED BY DEFAULT. An assembly that ran the copy hook must NOT also
     register this extension: the modules are already in the bundle, and two

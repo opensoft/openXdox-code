@@ -1188,6 +1188,44 @@ def test_the_facet_conforms_to_the_view_extension_protocol() -> None:
         assert binding.requires == spec["requires"]
 
 
+def test_the_pinned_binding_class_answers_for_the_sheets_or_for_none() -> None:
+    """THE DECLARED PIN'S OWN ANSWER about `styles`, asserted (Copilot round 10).
+
+    The two stub tests above drive `GateLoopViews.views()` through `ViewBinding`
+    shapes this file defines, which is how BOTH pins are asserted from either —
+    but until this one, nothing read the sheet off a binding the DECLARED PIN
+    constructed. The live materialization assertions around it read region,
+    routes, exports, requires and the manifest ids and never the SHEET, so a pin
+    that stopped carrying the field, or a `specs_for()` that stopped handing it
+    over, would leave all four contributed sheets inert with every test green.
+
+    BOTH BRANCHES ASSERT, because the point is to refuse a quiet green: where
+    the installed `ViewBinding` takes `styles` the values must be this column's
+    declared sheets, and where it does not the materialized bindings must carry
+    no such attribute at all — the degrade `specs_for()` exists to produce. The
+    branch is chosen by the same `dataclasses.fields()` reading the module makes,
+    never by a version.
+    """
+    view_extension = _view_extension_or_skip()
+    fields = {f.name for f in dataclasses.fields(view_extension.ViewBinding)}
+    bindings = view_extensions.GateLoopViews().views()
+    assert [b.id for b in bindings] == [spec["id"] for spec in SPECS]
+    if "styles" in fields:
+        assert [b.styles for b in bindings] == [
+            "./views/gate.css", "", "./views/gate-projects.css",
+            "./views/dispose.css", "./views/swb.css", "./views/swb.css"], (
+                "the pinned `ViewBinding` takes `styles`, so every binding that "
+                "owns selectors must reach this column's own sheet")
+        assert [b.styles for b in bindings] == [
+            spec.get("styles", "") for spec in SPECS]
+        named = {b.styles[len("./views/"):] for b in bindings if b.styles}
+        assert named == set(web_assets.VIEW_SHEET_NAMES)
+    else:
+        assert not any(hasattr(b, "styles") for b in bindings), (
+            "the pinned `ViewBinding` cannot express `styles`, so `specs_for()` "
+            "must have dropped it and the column must mount unstyled")
+
+
 def test_the_column_collects_through_openDox_beside_its_own_routes() -> None:
     """The whole contribution, assembled the way `serve.build_server()` does it:
     this column's bindings collected against this column's contributed ROUTES.
@@ -1209,6 +1247,16 @@ def test_the_column_collects_through_openDox_beside_its_own_routes() -> None:
     assert manifest["kind"] == view_extension.MANIFEST_KIND
     assert [entry["id"] for entry in manifest["views"]] == \
         [spec["id"] for spec in SPECS]
+    # AND THE SHEETS CROSS IT (Copilot round 10). The manifest is the JSON
+    # openDox's registry injects the `<link>` elements from, so a `styles` that
+    # reaches the binding and not the manifest is four inert sheets with every
+    # other assertion green. Both branches assert, for the reason the sibling
+    # test above gives.
+    if "styles" in {f.name for f in dataclasses.fields(view_extension.ViewBinding)}:
+        assert [entry.get("styles", "") for entry in manifest["views"]] == \
+            [spec.get("styles", "") for spec in SPECS]
+    else:
+        assert all("styles" not in entry for entry in manifest["views"])
 
 
 def test_every_region_this_column_names_is_a_declared_shell_region() -> None:

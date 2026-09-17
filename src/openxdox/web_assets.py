@@ -226,9 +226,11 @@ def install_view_modules(web_dir: str | Path, *,
             "is not the bundle these modules were declared against")
     # EVERY COLLISION BEFORE ANY COPY (Copilot review, round 1). Checking each
     # destination immediately before copying it left a half-assembled bundle
-    # whenever a LATER module collided: some of this column's six placed, the
+    # whenever a LATER asset collided: some of this column's ASSETS placed, the
     # rest not, and an assembly that refused after mutating the tree it was
-    # refusing to mutate. `overwrite=False` exists for an installer that wants
+    # refusing to mutate. This read "a LATER module ... this column's six" while
+    # the loop below read `VIEW_MODULE_NAMES`; it reads `VIEW_ASSET_NAMES` now,
+    # which is the six modules and RULED Q7's four sheets. `overwrite=False` exists for an installer that wants
     # to know the bundle was clean, so the answer has to come before the first
     # write.
     if not overwrite:
@@ -247,9 +249,10 @@ def install_view_modules(web_dir: str | Path, *,
     # (Copilot, round 2). `module_path()` raises `ViewAssetError` for a declared
     # module the installed package does not carry — a wheel built without the
     # package-data line, a partial install — and resolving it INSIDE the copy
-    # loop meant a later missing module refused only after the earlier ones had
-    # already been written: a bundle carrying three of this column's six
-    # modules, which an installer may serve or retry over. Both preconditions
+    # loop meant a later missing asset refused only after the earlier ones had
+    # already been written: a bundle carrying PART of this column's assets,
+    # which an installer may serve or retry over (this said "three of this
+    # column's six modules" when the loop read modules alone). Both preconditions
     # this function can answer without touching the tree are now answered
     # before the first write. What stays inside the loop is the I/O the
     # filesystem decides, which no amount of pre-checking can foresee.
