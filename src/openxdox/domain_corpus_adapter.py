@@ -361,7 +361,7 @@ class DomainCorpusAdapter:
                     "this declared root is present and is not a directory, so "
                     "the corpus cannot be read under it; resolving anyway "
                     "would report a partial corpus as a whole one")
-            self._require_confined(location, declared, Path(root))
+            self._require_confined_root(location, declared)
             self._require_traversable(declared)
             roots_present = True
         if not roots_present:
@@ -761,6 +761,32 @@ class DomainCorpusAdapter:
                 "sit in, and serving its bytes under this corpus's identity "
                 "would answer for a tree nobody pointed this reader at") from exc
 
+    @staticmethod
+    def _require_confined_root(location: Path, root: Path) -> None:
+        """A declared root's real target must lie inside the corpus.
+
+        The same symlink escape exists one level higher than a matched document:
+        a declared root can itself be a symlink to some other directory, and if
+        that directory happens to hold no matching files the document-level
+        confinement check never runs. The corpus would then resolve and report
+        an empty scope for a tree outside itself, which is the same false answer
+        in smaller numbers.
+        """
+        try:
+            target = root.resolve()
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise _refuse(
+                CORPUS_UNREADABLE, str(root),
+                f"the declared root's target could not be resolved ({exc})") from exc
+        try:
+            target.relative_to(location.resolve())
+        except ValueError as exc:
+            raise _refuse(
+                CORPUS_UNREADABLE, str(root),
+                f"this declared root resolves to {str(target)!r}, which is "
+                "outside the corpus. A declared root is part of the corpus's "
+                "layout, not a tunnel to some other tree") from exc
+
     def _require_readable_tree(self, location: Path) -> None:
         """Refuse a declared root, or anything under one, that cannot be opened.
 
@@ -788,7 +814,7 @@ class DomainCorpusAdapter:
                     CORPUS_UNREADABLE, str(root),
                     "this declared root is present and is not a directory, so "
                     "the corpus cannot be listed under it")
-            self._require_confined(location, root, Path(root_name))
+            self._require_confined_root(location, root)
             self._require_traversable(root)
             for _dirpath, _dirnames, _filenames in os.walk(root,
                                                            onerror=_onerror):

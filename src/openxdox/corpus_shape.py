@@ -52,6 +52,7 @@ was ruled to be. A sixth profile axis is the registered successor, not this act.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import PureWindowsPath
 from typing import Callable, Mapping
 
 from opendox.corpus_adapter import SCOPE_ALL, Finding, ResolvedCorpus
@@ -126,6 +127,12 @@ def _reject_traversal(value: str, where: str) -> None:
     root, a scope's glob, or an artifact kind's location in a profile -- because
     the operator who has to fix it is reading a profile, not this module.
     """
+    if PureWindowsPath(value).drive:
+        raise CorpusShapeInvalid(
+            f"{where} declares {value!r}, which is DRIVE-QUALIFIED. Every "
+            "declared location is joined onto the corpus's own resolved "
+            "location, so a drive-qualified one answers for some other tree and "
+            "this reader would serve bytes from a place nobody pointed it at")
     if value.startswith("/") or value.startswith("\\"):
         raise CorpusShapeInvalid(
             f"{where} declares {value!r}, which is an ABSOLUTE path. Every "
@@ -136,7 +143,12 @@ def _reject_traversal(value: str, where: str) -> None:
     # with `pathlib`, and a check that split on `/` alone would pass `a\\..\\b`
     # to a path library that may read it as a traversal. A guard that is right
     # only on the platform it was written on is a guard nobody can move.
-    for segment in value.replace("\\", "/").split("/"):
+    #
+    # THROUGH `_segments`, which is the same splitter the derivation itself
+    # uses, so the guard and the code it guards can never disagree about where
+    # a segment boundary is -- the class of divergence that makes a check pass
+    # over a value the consumer then reads differently.
+    for segment in _segments(value):
         if segment in TRAVERSAL_SEGMENTS:
             raise CorpusShapeInvalid(
                 f"{where} declares {value!r}, which carries a {segment!r} "
@@ -273,7 +285,8 @@ class CorpusShape:
 # --------------------------------------------------------------------------
 
 def _segments(location: str) -> list[str]:
-    return [segment for segment in location.split("/") if segment]
+    return [segment for segment in location.replace("\\", "/").split("/")
+            if segment]
 
 
 def _is_placeholder(segment: str) -> bool:

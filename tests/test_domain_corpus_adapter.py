@@ -649,6 +649,25 @@ def test_an_unreadable_subtree_refuses_listing_rather_than_omitting_it(
     assert caught.value.refusal.subject == str(locked)
 
 
+def test_a_declared_root_symlinked_outside_the_corpus_refuses_at_resolution(
+        reader, tmp_path) -> None:
+    """The root itself can be the tunnel out. If it resolves outside the corpus
+    and happens to hold no matching files, document-level confinement never
+    runs, so `resolve` has to refuse it by the declared root's path."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "not-a-document.txt").write_text("still not this corpus\n")
+    root = tmp_path / "c"
+    root.mkdir()
+    (root / "notes").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(CorpusRefused) as caught:
+        _resolved(reader, root)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+    assert caught.value.refusal.subject == str(root / "notes")
+    assert "outside the corpus" in caught.value.refusal.detail
+
+
 def test_a_symlink_pointing_out_of_the_corpus_refuses_rather_than_listing(
         reader, tmp_path) -> None:
     """THE ONE WAY A PATH UNDER THE CORPUS IS NOT OF IT.
