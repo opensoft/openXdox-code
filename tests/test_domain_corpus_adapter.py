@@ -29,6 +29,7 @@ runs, and it imports nothing beyond `pytest`, the standard library, the PINNED
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -222,6 +223,19 @@ def _git(cwd: Path, *args: str) -> None:
                    capture_output=True, text=True, timeout=30)
 
 
+def _head(repository: Path) -> str:
+    """One repository's own HEAD, read with no ambient git variables set.
+
+    The test that uses this deliberately SETS those variables afterwards, so
+    reading the two commits first — and from an environment scrubbed the same
+    way the reader scrubs it — is what makes the comparison mean anything.
+    """
+    clean = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+    return subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD"],
+                          capture_output=True, text=True, timeout=30,
+                          check=True, env=clean).stdout.strip()
+
+
 @pytest.fixture()
 def git_available() -> None:
     try:
@@ -319,21 +333,18 @@ def test_the_ambient_git_environment_does_not_answer_for_this_corpus(
     _git(corpus_tree, "add", "-A")
     _git(corpus_tree, "commit", "-q", "-m", "the corpus")
 
+    own = _head(corpus_tree)
+    theirs = _head(ambient)
+    assert own != theirs, "the control: the two repositories are at different commits"
+
     monkeypatch.setenv("GIT_DIR", str(ambient / ".git"))
     monkeypatch.setenv("GIT_WORK_TREE", str(ambient))
     corpus = _resolved(reader, corpus_tree)
 
-    own = subprocess.run(["git", "-C", str(corpus_tree), "rev-parse", "HEAD"],
-                         capture_output=True, text=True, timeout=30,
-                         env={k: v for k, v in __import__("os").environ.items()
-                              if not k.startswith("GIT_")}).stdout.strip()
-    theirs = subprocess.run(["git", "-C", str(ambient), "rev-parse", "HEAD"],
-                            capture_output=True, text=True, timeout=30,
-                            env={k: v for k, v in __import__("os").environ.items()
-                                 if not k.startswith("GIT_")}).stdout.strip()
-    assert own != theirs, "the control: the two repositories are at different commits"
     assert corpus.revision == own
-    assert corpus.revision != theirs
+    assert corpus.revision != theirs, (
+        "the reader answered with the AMBIENT repository's commit, which is a "
+        "different corpus's answer wearing this corpus's path")
 
 
 def test_a_work_tree_git_does_not_agree_is_this_corpus_refuses(
