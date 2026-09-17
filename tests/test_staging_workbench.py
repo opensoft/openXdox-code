@@ -1833,195 +1833,6 @@ def test_the_create_body_carries_the_continuation_answer(tmp_path):
 
 # ---- T088's finding: the ENDING's report must survive its own re-render -------
 
-# The DOM the mount actually needs, and nothing else: `helpers.el` (createElement
-# + className + textContent), `append`/`appendChild`/`insertBefore`, `setAttribute`,
-# the literal `innerHTML = ""` clears, `addEventListener`, and dispose.js's
-# `querySelector(".refusalpanel-list")` on the panel it builds in `document.body`.
-# Modelled after `test_bullseye_widget.py`'s SVG-only DOM — the same instrument,
-# widened to the HTML surface this module touches.
-_DOM_SHIM = r"""
-class Node {
-  constructor(tag) {
-    this.tagName = String(tag).toUpperCase();
-    this.children = []; this.attributes = {}; this.listeners = {};
-    this.className = ''; this._text = '';
-  }
-  get textContent() {
-    return this._text + this.children.map((c) => c.textContent).join('');
-  }
-  set textContent(value) { this.children = []; this._text = String(value); }
-  set innerHTML(value) {
-    if (String(value) !== '') throw new Error('only literal "" clears are allowed');
-    this.children = []; this._text = '';
-  }
-  appendChild(child) { this.children.push(child); return child; }
-  append(...kids) { for (const k of kids) this.appendChild(k); }
-  insertBefore(child, ref) {
-    const at = this.children.indexOf(ref);
-    this.children.splice(at < 0 ? 0 : at, 0, child);
-    return child;
-  }
-  contains(node) {
-    return this === node || this.children.some((c) => c.contains(node));
-  }
-  setAttribute(name, value) { this.attributes[name] = String(value); }
-  addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); }
-  querySelector(selector) {
-    const cls = selector.replace(/^\./, '');
-    return this.walk().find((n) => String(n.className).split(' ').includes(cls))
-      || null;
-  }
-  walk() {
-    return this.children.reduce((all, c) => all.concat(c.walk()), [this]);
-  }
-}
-globalThis.document = {
-  createElement: (tag) => new Node(tag),
-  createTextNode: (text) => { const n = new Node('#text'); n._text = String(text);
-    return n; },
-  body: new Node('body'),
-};
-function byClass(root, cls) {
-  return root.walk().filter((n) => String(n.className).split(' ').includes(cls));
-}
-function byText(root, text) {
-  return root.walk().filter((n) => n.textContent.includes(text));
-}
-async function click(node) {
-  for (const fn of node.listeners.click || []) await fn({});
-}
-"""
-
-# The BEHAVIOURAL harness for T088's replay: mount, act, let the ending re-render,
-# and look for the engine's report in the freshly built slot. Nothing here reads
-# the module's SOURCE — that is the entire point (finding B13).
-# § 3.4 SLICE S5 MOVED TWO THINGS THIS HARNESS PASSES (Copilot review of
-# openXdox-code#18, round 2). RULED Q3 (`openxFactory#656` comment `5648044785`)
-# makes the mount signature `mount(host, snapshot, ctx)` — the session context
-# travels under `ctx.session`, not as the second positional argument — and RULED
-# counterpart Q6 (`5649094228`) makes openDox's model reach a contributed module
-# through `ctx.model` rather than through an import of its own. A harness still
-# calling `mountSessionAffordances(host, ctx, opts)` hands `opts` in as the
-# SNAPSHOT and the mount then sees no `session` and no `model`, so it takes the
-# refusal path and never renders a session button: the replay would fail before
-# it exercised the ending behaviour it exists to measure.
-_ENDING_REPLAY_HARNESS = _DOM_SHIM + """
-import { mountSessionAffordances, sessionEndingReport } from './swb-session.js';
-import * as workbenchModel from './staging-workbench-model.js';
-
-const BRANCH = 'draft/demo-topic';
-const session = {
-  scope: { kind: 'staged', id: 'demo-topic' },
-  posture: { live: true, branch: BRANCH, ownTile: true, draft: true,
-             repository: 'openxFactory', activeRef: BRANCH },
-  documents: ['ideation/staging/demo-topic/note.md'],
-};
-const caps = { actions: { gate: true, session: true } };
-// RULED Q3's ctx: the session context under `session`, the model under `model`,
-// and the seams beside them — the shell's own shape (openDox-code
-// `views/staging-workbench.js`).
-const RESULT = {
-  ok: true, ref: BRANCH, reason: 'the spike answered its question',
-  torn_down: ['worktree', 'registry-entry', 'notebook'], branch_retained: true,
-  record: 'ideation/dashboard/gate-records/draft-demo-topic/abandon.yaml',
-};
-const fetcher = async () => ({ status: 200, json: async () => RESULT });
-
-let host = new Node('div');
-let rerenders = 0;
-let resetFinished = false;
-let rerenderSawReset = false;
-const ctx = {
-  session, model: workbenchModel,
-  caps, actor: 'brett', fetcher,
-  onSessionEnded: async () => {
-    await Promise.resolve();
-    resetFinished = true;
-  },
-  onRerender: () => { rerenders += 1; host = new Node('div');
-                      rerenderSawReset = resetFinished;
-                      mountSessionAffordances(host, null, ctx); },
-};
-mountSessionAffordances(host, null, ctx);
-
-// the human ends the session: open the abandon form, fill the reason, submit
-const abandon = byClass(host, 'swb-sessionbtn')
-  .find((b) => b.textContent.toLowerCase().includes('abandon'));
-await click(abandon);
-const reason = host.walk().find((n) => n.attributes['aria-label'] === 'Reason');
-reason.value = RESULT.reason;
-const submit = byClass(host, 'cbtn').find((b) => b.textContent === 'abandon-session');
-await click(submit);
-
-// `host` is now the object the ending's own re-render built
-const landed = byClass(host, 'swb-clanded');
-console.log(JSON.stringify({
-  rerenders,
-  rerenderSawReset,
-  replayedBoxes: landed.length,
-  replayText: landed.map((b) => b.textContent).join(' | '),
-  namesTheRecord: byText(host, RESULT.record).length > 0,
-  namesTheTeardown: byText(host, 'worktree, registry-entry, notebook').length > 0,
-  reportForTheBranch: !!sessionEndingReport(BRANCH),
-  buttonsDisabled: byClass(host, 'swb-sessionbtn').every((b) => b.disabled === true),
-}));
-"""
-
-
-def _run_ending_replay(tmp_path):
-    """Drive the REAL `swb-session.js` (and its real imports) under node against a
-    minimal DOM. Views are copied as-is with a `type: module` package.json, so no
-    import specifier is rewritten and the module graph under test is production's."""
-    if NODE is None:
-        pytest.skip("node not available for the DOM-driven session probe")
-    views = tmp_path / "views"
-    views.mkdir()
-    (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
-    # `intent-feed.js` rides along because dispose.js imports it
-    # (add-ideation-intent-plane task 4.4). This probe drives the session
-    # ending replay, which touches only dispose.js's refusal panel — the
-    # module is present purely to make the import resolve.
-    for name in ("swb-session.js", "helpers.js", "dispose.js",
-                 "staging-workbench-model.js", "intent-feed.js"):
-        shutil.copy(WEB / "views" / name, views / name)
-    harness = views / "ending-replay.js"
-    harness.write_text(_ENDING_REPLAY_HARNESS, encoding="utf-8")
-    proc = subprocess.run([NODE, str(harness)], capture_output=True, text=True,
-                          timeout=60)
-    assert proc.returncode == 0, f"node harness failed:\n{proc.stderr}"
-    return json.loads(proc.stdout)
-
-
-def test_the_ending_report_really_reaches_the_slot_the_re_render_rebuilt(tmp_path):
-    """PR #49 second-review tail B13: the BEHAVIOUR T088 is named for, asserted.
-
-    The pin below is shape-only — it requires the module's source to contain
-    `endedReports.get(`, which is satisfied by ANY key. Mutation-proven: replacing
-    the lookup with `endedReports.get("a key nothing ever sets")` left that pin and
-    all 103 tests of this module plus `test_session_confinement.py` PASSING, so the
-    most consequential moment of a session's life could silently stop reporting
-    with a green suite. The invariant is an AGREEMENT between two keys — the one
-    `renderOutcome` writes (`String(result.ref)`) and the one the mount reads
-    (`String(ctx.posture.branch)`) — and an agreement cannot be pinned by quoting
-    one side.
-
-    So this drives the real module: mount, abandon, let the ENDING's own
-    `onRerender` rebuild the row, and require the engine's report to be present in
-    the rebuilt slot, naming the teardown and the record verbatim (FR-044)."""
-    out = _run_ending_replay(tmp_path)
-
-    assert out["rerenders"] == 1, "the ending must re-render the affordance row"
-    assert out["rerenderSawReset"] is True, (
-        "the main-view handoff must finish before the ending re-renders")
-    assert out["replayedBoxes"] == 1, out
-    assert out["reportForTheBranch"] is True
-    assert out["namesTheRecord"] is True, out["replayText"]
-    assert out["namesTheTeardown"] is True, out["replayText"]
-    assert "the session ENDED (abandoned)" in out["replayText"]
-    # and the row that came back offers no verb a session that is over could take
-    assert out["buttonsDisabled"] is True
-
-
 def test_the_ending_report_survives_the_re_render_the_ending_triggers():
     """T088 (found by the Playwright smoke, not by any pure test): an ENDING
     re-renders the affordance row (Phase 9 note 6 — a session that is over must
@@ -2042,9 +1853,35 @@ def test_the_ending_report_survives_the_re_render_the_ending_triggers():
     see is source structure: one `landedBox` definition, the write literal, the
     T077 write-site arithmetic. It CANNOT see whether the two keys agree — the
     review replaced the lookup key with a string nothing ever sets and every
-    assertion here still passed. The behaviour is owned by
-    `test_the_ending_report_really_reaches_the_slot_the_re_render_rebuilt`, which
-    drives the real module under node."""
+    assertion here still passed.
+
+    AND SINCE RULED 5656343213 NOTHING AT THIS LEG CAN. The behavioural probe
+    that owned the agreement —
+    `test_the_ending_report_really_reaches_the_slot_the_re_render_rebuilt`, and
+    the `_DOM_SHIM` / `_ENDING_REPLAY_HARNESS` / `_run_ending_replay` it drove —
+    was REMOVED here (openxFactory#656 comment 5656343213, Brett Heap
+    2026-09-13, citing RULED OQ-F): its node harness copied
+    `views/intent-feed.js` out of the bundle, and that file STAYED at
+    openxFactory and arrived at NEITHER leg, so the replay could not run here
+    at all.
+
+    AND IT IS AN ORDINARY DECLARED EDIT, NOT A `retired:` ROW — a distinction
+    this docstring blurred and a later reader would have had no way to recover
+    (Copilot review of openXdox-code#20). The ruling retires THREE suites: two
+    are whole files at openDox-code, and those rows DO carry `retired:` blocks
+    in openxFactory's carve manifest. This one is a BLOCK INSIDE a file whose
+    other tests drive surfaces this leg has, so this file's row goes on
+    arriving, the arrival verifier goes on asking for it, and what the manifest
+    records is the removed LINES under `edits[]` — checked by
+    `arrival-undeclared-edit` like every other declared edit (openxFactory's
+    cutover runbook § 5.8, "What the form CANNOT express, stated because the
+    first act to use it hit it"). Nothing here is omitted from a run, and
+    nothing here is retired in the manifest's sense of the word.
+
+    The removal is not a claim that the invariant stopped mattering. The gap is
+    stated here rather than closed here: re-proving the key agreement needs a
+    harness built on the views this leg HAS, which is its own act under its own
+    ruling."""
     body = SESSION_JS.read_text(encoding="utf-8")
     # the report is remembered per branch, beside the ending it belongs to
     assert "const endedReports = new Map();" in body
