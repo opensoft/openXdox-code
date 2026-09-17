@@ -163,8 +163,11 @@ jobs:
       # 35 passed / 0 skipped under the invocation below. THAT PAIR IS THE
       # PIN-BUMP-ONLY MEASUREMENT, at `708591b`, and it is labelled because the
       # review of `a9264b8` read it as the current one: the review rounds then
-      # added six guard tests to this file, so under the same invocation at the
-      # head it is 41 passed / 0 skipped
+      # added six guard tests to this file, so under the same invocation it is
+      # 41 passed / 0 skipped at MAIN's head — and 53 passed / 0 skipped at
+      # THIS branch's, where RULED Q7's twelve sheet assertions join it. Both
+      # numbers are named because the same sentence carried one of them across
+      # two pin bumps and a merge
       # (`python -m pytest -q tests/test_gate_loop_views.py --noconftest`).
       #
       # `tests/test_gate_loop_probes.py` joins it on the same footing and for
