@@ -326,23 +326,26 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 #: head of that slice and from the 13 / 19 over six modules that the census
 #: RULED 5626260214 called "the 13-line openDox->openXdox inversion" stood at.
 #:
-#: THE PIN HAS MOVED TWICE SINCE — two bumps of THIS file's own declaration,
-#: `0f1f2e59` -> `a99eba03` (openXdox-code#15) and `a99eba03` -> `0b4e8bbf`
-#: (this act) — AND THE TABLE HAS NOT. Measured, not assumed. (Two pin bumps,
-#: three upstream landings: they are different counts of different things, and
-#: both are stated here so neither can be read as the other.)
+#: THE PIN HAS MOVED THREE TIMES SINCE — three bumps of THIS file's own
+#: declaration, `0f1f2e59` -> `a99eba03` (openXdox-code#15), `a99eba03` ->
+#: `0b4e8bbf` (openXdox-code#21) and `0b4e8bbf` -> `5c137a90` (this act) — AND
+#: THE TABLE HAS NOT. Measured, not assumed. (Three pin bumps, five upstream
+#: landings: they are different counts of different things, and both are stated
+#: here so neither can be read as the other.)
 #: This note used to say slice 2b's merge was the commit "this file's pin now
 #: names"; that stopped being true at openXdox-code#15 (`0f1f2e59` ->
 #: `a99eba03`) and the sentence was not followed, which is the stale-claim class
-#: this repository has since had to sweep for. The pin names `0b4e8bbf`
-#: (openDox-code#23, § 3.4 slice S8 leg B) as of 2026-09-16, and
+#: this repository has since had to sweep for. The pin names `5c137a90`
+#: (openDox-code#27, § 3.4 RULED Q7) as of 2026-09-17, and
 #: `_back_import_census()` recomputed against THAT tree returns exactly the five
-#: rows below. THE RANGE THAT COVERS IS THREE openDox-code LANDINGS, not two, and
-#: naming them is the correction Copilot's round-1 review of openXdox-code#21
-#: asked for: from `a99eba03` (#11, § 4.3) this pin crosses `8efb3cf5` (#20,
-#: § 3.4 slice S5 leg B), `1e469713` (#21, § 3.4 slice S7) and `0b4e8bbf` (#23,
-#: § 3.4 slice S8 leg B). The ratchet neither fell nor rose across any of them,
-#: and the numbers here are that measurement, not a carried-forward memory.
+#: rows below. THE RANGE THAT COVERS IS FIVE openDox-code LANDINGS, and naming
+#: them is the correction Copilot's round-1 review of openXdox-code#21 asked
+#: for: from `a99eba03` (#11, § 4.3) this pin crosses `8efb3cf5` (#20, § 3.4
+#: slice S5 leg B), `1e469713` (#21, § 3.4 slice S7), `0b4e8bbf` (#23, § 3.4
+#: slice S8 leg B), `0e65b5f8` (#24, the two intent-feed DOM suites retired at
+#: that leg) and `5c137a90` (#27, RULED Q7's contributed stylesheets). The
+#: ratchet neither fell nor rose across any of them, and the numbers here are
+#: that measurement, not a carried-forward memory.
 #:
 #: THE WHOLE OF THE INVERSION IS GONE, which is worth stating plainly because
 #: this table has never been able to say it before: no module of the pinned

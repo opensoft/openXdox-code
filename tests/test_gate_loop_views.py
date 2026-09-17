@@ -944,14 +944,21 @@ def test_a_pin_that_carries_styles_materializes_the_declared_sheets(
     """THE NEW-PIN BRANCH, EXECUTED (Copilot review, round 3).
 
     `GateLoopViews.views()` is where `specs_for()`'s answer becomes real
-    bindings, and nothing drove it with a `ViewBinding` that HAS `styles`: the
-    live materialization test skips on this leg's old pin, and the `specs_for`
-    test drives the filter and not the constructor. So a regression between the
-    two — a spec the filter kept that the constructor drops — would leave the
-    sheets inert with every test green.
+    bindings, and nothing ELSE drives it with a `ViewBinding` that HAS
+    `styles`: the three live materialization assertions below read region,
+    routes, exports, requires and the manifest ids — never the SHEET — and the
+    `specs_for` test drives the filter and not the constructor. So a regression
+    between the two — a spec the filter kept that the constructor drops — would
+    leave the sheets inert with every test green.
 
-    Driven through a STUB `opendox.view_extension`, because the pin bump that
-    brings the real one is a later act and this assertion must not wait for it.
+    Driven through a STUB `opendox.view_extension`. This paragraph read
+    "because the pin bump that brings the real one is a later act and this
+    assertion must not wait for it", and that bump has since landed
+    (`0b4e8bbf` -> `5c137a90`, openXdox-code#24, openDox-code#27's field). THE
+    STUB STAYS: what it holds is the constructor's behaviour for a binding that
+    CARRIES the field, and an ASSEMBLY chooses the `opendox` this column runs
+    under — so both shapes must be driven from either pin, which is the same
+    reason `test_an_old_pin_materializes_without_the_field` below is a stub too.
     """
     import types
 
@@ -1016,12 +1023,16 @@ def test_an_old_pin_materializes_without_the_field(monkeypatch) -> None:
 
 
 def test_the_styles_field_is_dropped_for_a_pin_that_cannot_express_it() -> None:
-    """RULED Q7's field is NEWER THAN THIS LEG'S PIN, and the column still runs.
+    """RULED Q7's field REACHED THIS LEG'S PIN, and the drop path still runs.
 
     Driven against two stub `ViewBinding` shapes rather than against whatever
     `opendox` happens to be installed, so the behaviour is asserted at BOTH
-    pins from either — the one this leg pins today, which has no `styles`, and
-    the one the bump after openDox-code's Q7 leg brings.
+    shapes from either pin — the one this leg pinned until openXdox-code#24
+    (`0b4e8bbf`, no `styles`), which an assembly is still free to install, and
+    the one it pins today (`5c137a90`, openDox-code#27), which carries it.
+    This summary read "is NEWER THAN THIS LEG'S PIN" while that was true; it is
+    corrected rather than quoted as provenance, because it was a claim about
+    what is installed TODAY and the paragraph below carries the history.
     """
     @dataclasses.dataclass(frozen=True)
     class Old:
@@ -1118,9 +1129,10 @@ def _view_extension_or_skip():
     first of those may skip. (That review said "an older assembly"; the guard that
     replaced `importorskip` cannot measure ordering, only identity, so this summary
     stopped borrowing the word — the review of `cb84001` caught it here, the last
-    copy left in the file.) If `0b4e8bbf` lost `view_extension` or the `exports`
-    field, all three assertions below would have gone quietly green in a required
-    check. `tests/opendox_bundle.py::_absent` decides by READING the declared pin
+    copy left in the file.) If `5c137a90` — the leg this pin names now — lost
+    `view_extension` or the `exports` field, all three assertions below would
+    have gone quietly green in a required check.
+    `tests/opendox_bundle.py::_absent` decides by READING the declared pin
     out of `pyproject.toml` and the installed commit out of the distribution's
     PEP 610 `direct_url.json`. This docstring said "different (or unrecorded) ->
     SKIP", and Copilot's round-3 review of #21 was right that the parenthesis is
@@ -1136,8 +1148,9 @@ def _view_extension_or_skip():
     except ImportError:
         # FAIL at the declared pin, SKIP only for a different one. `importorskip`
         # could not tell those apart, and after the pin bump that difference is
-        # the whole point: a packaging or API regression at `0b4e8bbf` would have
-        # taken all three assertions below quietly green in a required check.
+        # the whole point: a packaging or API regression at the DECLARED leg —
+        # `5c137a90` today — would have taken all three assertions below quietly
+        # green in a required check.
         opendox_bundle._absent(
             "`opendox.view_extension` (§ 3.4 slice S3's view registry)",
             module_level=False)

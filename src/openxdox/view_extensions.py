@@ -24,14 +24,32 @@ WHY THE BINDINGS ARE DECLARED AS DATA AND MATERIALIZED LATE. This leg pins
 registry itself — `opendox.view_extension` does not exist there, and the
 `exports` field RULED Q2 adds is newer still". THAT IS NO LONGER TRUE, and the
 old wording is quoted here as provenance rather than deleted: the pin now names
-openDox-code#23 (`0b4e8bbf`, § 3.4 slice S8 leg B), where `view_extension` is
+openDox-code#27 (`5c137a90`, § 3.4 RULED Q7), where `view_extension` is
 importable and `ViewBinding` takes `exports` — measured, and the three
 materialization assertions in `tests/test_gate_loop_views.py` run and pass
-against it instead of skipping. THE `styles` FIELD RULED Q7 ADDS IS NEWER
-STILL: it lands in openDox-code's own Q7 leg (`#27`), which this pin does
-not yet name, which is why `views()` below FEATURE-DETECTS it rather than
-declaring it unconditionally — the same lateness one field later, and the
-reason the four contributed sheets are INERT until the pin advances again.
+against it instead of skipping. It first became true one pin earlier, at
+`0b4e8bbf` (openDox-code#23, § 3.4 slice S8 leg B), which is where that wording
+was corrected; the pin has since crossed `0e65b5f8` (#24) to `5c137a90`, whose
+`ViewBinding` also carries a `styles` field — absent at `0b4e8bbf`, present
+here, measured by `dataclasses.fields()` in a venv at each pin. THE BUMP ITSELF
+READ NOTHING, and the review of `ea6991b` was right to check that: it
+materialized `VIEW_BINDING_SPECS` unchanged and asked nothing about the
+installed `ViewBinding`. THE READING IS THIS ACT'S, and this act is the pull
+request that bump named as waiting on it: `specs_for()` below reads
+`dataclasses.fields(binding_cls)` and drops `styles` where the installed
+dataclass has no such field. MEASURED IN A VENV AT THIS PIN: it has one, so
+nothing is dropped, every binding that owns selectors declares its sheet, and
+the four contributed stylesheets are LIVE rather than inert — which is what
+this bump was the one thing they waited on.
+
+THE FEATURE DETECTION STAYS ALL THE SAME, and keeping it costs nothing here
+because at this pin it IS the plain path: same code, same behaviour, one
+branch not taken. Its reason is the lateness below — an ASSEMBLY chooses the
+`opendox` this module runs under, and a consumer may pin BEHIND the view
+contract — so at such a pin `styles` is dropped and the sheets go quiet again,
+with no import-time reach and no red `validate` for a reason that has nothing
+to do with this column. Reading the DATACLASS rather than a version is what
+makes that one code path instead of two.
 
 THE LATENESS STAYS, for the reason that outlives any one pin: an ASSEMBLY
 chooses the `opendox` this module runs under, not this file, and a consumer
@@ -473,21 +491,29 @@ VIEW_BINDING_SPECS: tuple[dict[str, Any], ...] = (
 def specs_for(binding_cls: Any) -> tuple[dict[str, Any], ...]:
     """The declared specs, ADAPTED to the `ViewBinding` an assembly installed.
 
-    RULED Q7's `styles` FIELD IS NEWER THAN THE PIN, and this is slice S5's
-    posture applied in the other direction. `styles` lands in openDox-code's own
-    Q7 leg; until this leg pins an `opendox` that carries it, handing it to the
-    constructor raises the same `TypeError` `ViewContractUnsupported` names for
-    `exports` — and refusing the WHOLE COLUMN because its panels would be
-    unstyled is the "a declaration deleting the surface it was meant to
-    describe" defect `gate.dispose`'s own `requires` note argues against at
-    length. Unstyled panels are degraded; absent panels are deleted.
+    RULED Q7's `styles` FIELD REACHED THE PIN WHILE THIS BRANCH WAS OPEN
+    (`0b4e8bbf` -> `5c137a90`, openXdox-code#24 carrying openDox-code#27), and
+    this is still slice S5's posture applied in the other direction — because
+    the declared pin is not the only `opendox` this module runs under. Where
+    the installed class does not take `styles` — an ASSEMBLY is free to pin
+    behind Q7 — handing it to the constructor raises the same `TypeError`
+    `ViewContractUnsupported` names for `exports`, and refusing the WHOLE
+    COLUMN because its panels would be unstyled is the "a declaration deleting
+    the surface it was meant to describe" defect `gate.dispose`'s own
+    `requires` note argues against at length. Unstyled panels are degraded;
+    absent panels are deleted.
 
-    So the field is DROPPED where the installed class does not take it, the
-    column mounts, and the pin bump that follows openDox-code's Q7 leg turns
-    the sheets on with no edit here. `exports` is NOT treated this way and must
-    not be: an undeclared reach is a refusal RULED Q2 asks for, so a pin that
-    cannot express it is a pin this column cannot run on, which is what
-    `ViewContractUnsupported` says.
+    So the field is DROPPED where the installed class does not take it and the
+    column mounts unstyled. AT THE PIN THIS LEG DECLARES TODAY THE DETECTION IS
+    THE PLAIN PATH, not a fallback: `dataclasses.fields()` finds `styles` on
+    `5c137a90`'s `ViewBinding`, every spec crosses whole, and the four
+    contributed sheets are LIVE — same code, same behaviour, one branch not
+    taken. This paragraph read "the pin bump that follows openDox-code's Q7 leg
+    turns the sheets on with no edit here"; that bump landed, and that is what
+    it did. `exports` is NOT treated this way and must not be: an undeclared
+    reach is a refusal RULED Q2 asks for, so a pin that cannot express it is a
+    pin this column cannot run on, which is what `ViewContractUnsupported`
+    says.
 
     A FIELD SET, never a `try`/`except TypeError` retry: the retry cannot tell
     "this class has no `styles`" from "this spec is malformed", and swallowing
