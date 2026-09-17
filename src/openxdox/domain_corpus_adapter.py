@@ -495,18 +495,26 @@ class DomainCorpusAdapter:
         # retargeted before it is read, and the boundary this reader documents
         # would then hold only at the moment nobody was looking.
         #
-        # WHAT THIS DOES NOT CLAIM, because the honest version is the useful
-        # one: the window is narrowed to the gap between this check and the
-        # `open` below, not closed. Closing it needs an `openat`/`O_NOFOLLOW`
-        # descriptor dance the standard library does not offer portably, and a
-        # claim of atomicity here would be the kind of overstatement this
-        # module has already had to correct once (`_git`'s isolation). What is
-        # guaranteed is that a link retargeted between listing and read is
-        # refused rather than served.
-        self._require_confined(Path(corpus.location), path,
-                               Path(document.key))
+        # WHAT THIS CLAIMS AND WHAT IT DOES NOT, because the honest version is
+        # the useful one. Confinement resolves a PATHNAME and the open below
+        # opens a PATHNAME: they are separate operations, and anything that can
+        # write this tree can retarget a link between them. That race is NOT
+        # prevented -- `O_NOFOLLOW` would refuse the final component outright,
+        # and with it the in-corpus links this reader deliberately allows, and
+        # a per-component `openat` walk is not portable. It is DETECTED: the
+        # descriptor is opened first, `fstat` then names exactly the file whose
+        # bytes are about to be read, and it is compared with the target that
+        # passed the boundary WHILE THE BYTES ARE STILL UNREAD. So the
+        # guarantee is not atomicity, and not the weaker disclaimer this
+        # comment used to carry either -- it is that the bytes this method
+        # returns came from the file that passed confinement, or it refuses.
+        target = self._require_confined(Path(corpus.location), path,
+                                        Path(document.key))
         try:
-            content = path.read_bytes()
+            with open(path, "rb") as handle:
+                self._require_opened_what_was_checked(
+                    os.fstat(handle.fileno()), target, document.key)
+                content = handle.read()
         except OSError as exc:
             raise _refuse(
                 CORPUS_UNREADABLE, document.key,
@@ -834,7 +842,7 @@ class DomainCorpusAdapter:
         return keys
 
     @staticmethod
-    def _require_confined(location: Path, match: Path, rel: Path) -> None:
+    def _require_confined(location: Path, match: Path, rel: Path) -> Path:
         """A listed document's real target must lie inside the corpus.
 
         A SYMLINK IS THE ONE WAY A PATH UNDER THE CORPUS IS NOT OF IT.
@@ -870,6 +878,50 @@ class DomainCorpusAdapter:
                 "corpus. A link is not a document of the corpus it happens to "
                 "sit in, and serving its bytes under this corpus's identity "
                 "would answer for a tree nobody pointed this reader at") from exc
+        # HANDED BACK so a caller about to serve bytes can prove it opened THIS
+        # file and not whatever took its place afterwards. See `read`.
+        return target
+
+    @staticmethod
+    def _require_opened_what_was_checked(opened: os.stat_result, target: Path,
+                                         key: str) -> None:
+        """The bytes served must come from the file confinement passed.
+
+        Confinement resolves a PATHNAME and the read opens a PATHNAME, and the
+        two are separate operations: between them, anything that can write the
+        corpus tree can retarget a link so the open lands somewhere else. The
+        race cannot be prevented with what the standard library offers
+        portably -- `O_NOFOLLOW` refuses the final component outright, which
+        would also refuse the in-corpus links this reader deliberately allows,
+        and a per-component `openat` walk is not portable.
+
+        It can be DETECTED, which is worth more than the disclaimer it
+        replaces. The descriptor is already open, so `fstat` names exactly the
+        file whose bytes are about to be read; comparing it with the checked
+        target's `(st_dev, st_ino)` answers "is this still the file that passed
+        the boundary" with the bytes still unread. If it is not, nothing is
+        served.
+
+        Where a filesystem numbers no files (`st_ino` 0, which Windows shares
+        can report) there is nothing to compare and this yields rather than
+        refusing every read on it -- a guard that cannot see must not pretend
+        it did.
+        """
+        try:
+            checked = target.stat()
+        except OSError as exc:
+            raise _refuse(
+                CORPUS_UNREADABLE, key,
+                "the path that passed confinement could not be examined again "
+                f"before its bytes were served ({exc.strerror or exc})") from exc
+        if not opened.st_ino or not checked.st_ino:
+            return
+        if (opened.st_dev, opened.st_ino) != (checked.st_dev, checked.st_ino):
+            raise _refuse(
+                CORPUS_UNREADABLE, key,
+                "the file this read opened is not the file that passed "
+                "confinement, so the path was replaced between the two; the "
+                "bytes are not served")
 
     @staticmethod
     def _require_confined_root(location: Path, root: Path) -> None:

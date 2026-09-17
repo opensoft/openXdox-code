@@ -418,11 +418,11 @@ jobs:
       #
       #   python -m pytest -q tests/test_corpus_shape.py \
       #                       tests/test_domain_corpus_adapter.py --noconftest
-      #     159 passed  (63 + 96), 0 skipped, 0 errors
+      #     160 passed  (63 + 97), 0 skipped, 0 errors
       #
       # AND THE WHOLE LIST, because a count in this file that stops
       # being true is the stale-claim class this leg already sweeps
-      # for: the invocation below now reads 519 passed / 6 skipped.
+      # for: the invocation below now reads 520 passed / 6 skipped.
       # The “360 passed / 6 skipped” above is NOT corrected and is not
       # wrong — it is the 2026-09-16 pin bump's own measured pair, at
       # the commit that wrote it, and re-pointing it at today's total
@@ -431,7 +431,7 @@ jobs:
       # hiding: no test file has been added to this list between that
       # bump and this act, so the pin bump's total and the list as this
       # act found it are the same measurement taken twice — 360 + 6.
-      # 159 of today's 519 is the two files this act adds; 6 skipped is
+      # 160 of today's 520 is the two files this act adds; 6 skipped is
       # unchanged, because neither new file skips.
       #
       # NO SKIP GUARD IS NEEDED and none is added, which is the difference
@@ -441,14 +441,14 @@ jobs:
       # different axis entirely — the git-backed revision assertions skip
       # where `git` is not on PATH, which on this runner it always is.
       #
-      # EVERY ASSERTION IN BOTH FILES IS MUTATION-PROVED. A sweep of 68
+      # EVERY ASSERTION IN BOTH FILES IS MUTATION-PROVED. A sweep of 69
       # deliberate defects in `corpus_shape.py` and `domain_corpus_adapter.py`
       # — the file-location refusal answering `corpus-unclassifiable`, the
       # declared write path becoming a module constant, `read` falling back to
       # a revision nobody asked for, an undeclared scope widening silently,
       # `write_back` writing the tree, the line rule breaking on exotic
-      # separators, the reader adopting an enclosing repository, and sixty-one
-      # more — was applied one at a time and run against this list. ALL 68
+      # separators, the reader adopting an enclosing repository, and sixty-two
+      # more — was applied one at a time and run against this list. ALL 69
       # WERE CAUGHT; the sweep and its per-mutation output are in the pull
       # request that introduced these two files. The review-round guards here
       # include the listing matcher going back to

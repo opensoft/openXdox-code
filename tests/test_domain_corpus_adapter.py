@@ -856,6 +856,58 @@ def test_a_link_retargeted_after_listing_is_refused_at_read(
     assert "outside the corpus" in caught.value.refusal.detail
 
 
+def test_a_link_retargeted_after_confinement_is_caught_before_bytes_are_served(
+        reader, tmp_path, monkeypatch) -> None:
+    """THE RACE THE TEST ABOVE CANNOT REACH, WON DELIBERATELY BY THE ATTACKER.
+
+    Confinement resolves a PATHNAME and the read opens a PATHNAME. Those are
+    two operations, so anything that can write this tree can retarget the link
+    in between and the open lands somewhere else. The window is microseconds
+    and nothing in a test suite hits it by chance, so this test simply lets the
+    attacker win: it wraps the confinement check and swaps the link the instant
+    the check has passed. That is the worst case, not an approximation of it.
+
+    The race is NOT prevented -- `O_NOFOLLOW` refuses the final component
+    outright and would refuse the in-corpus links this reader deliberately
+    allows, and a per-component `openat` walk is not portable. It is DETECTED:
+    the descriptor is opened first, `fstat` names exactly the file about to be
+    read, and it is compared with the target that passed the boundary while the
+    bytes are still unread. So what is asserted here is the guarantee in its
+    honest form -- the bytes this method returns came from the file that passed
+    confinement, or it refuses -- and the last assertion is the one that
+    matters: the outside file's content never reaches the caller.
+    """
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    theirs = outside / "not-this-corpus.md"
+    theirs.write_text("Type: note\nTitle: Theirs\n")
+    root = _lay_down(tmp_path / "c")
+    link = root / "notes" / "linked.md"
+    link.symlink_to(root / "notes" / "alpha.md")
+
+    corpus = _resolved(reader, root)
+    document = DocumentId(corpus="populated", key="notes/linked.md")
+    assert reader.read(corpus, document).content == DOCUMENTS[
+        "notes/alpha.md"].encode(), "the control: confined, and served"
+
+    original = DomainCorpusAdapter._require_confined
+
+    def racing(location, match, rel):
+        target = original(location, match, rel)
+        link.unlink()
+        link.symlink_to(theirs)          # the attacker wins, every time
+        return target
+
+    monkeypatch.setattr(DomainCorpusAdapter, "_require_confined",
+                        staticmethod(racing))
+    with pytest.raises(CorpusRefused) as caught:
+        reader.read(corpus, document)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+    assert "not the file that passed confinement" in caught.value.refusal.detail
+    assert "Theirs" not in str(caught.value), (
+        "and the refusal does not leak the bytes it declined to serve")
+
+
 def test_a_declared_root_that_links_outside_the_corpus_refuses(
         reader, tmp_path) -> None:
     """A scan root is a path like any other, and `stat()` follows a link. A
