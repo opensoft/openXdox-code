@@ -381,9 +381,25 @@ class DomainCorpusAdapter:
                 "the directory holds none of the roots this corpus is "
                 f"declared over ({', '.join(self._shape.scan_roots)})")
 
-        self._listings.clear()
         resolved = location.resolve()
-        self._resolved_roots[str(resolved)] = tuple(present_roots)
+        # INVALIDATION IS SCOPED TO THE CORPUS BEING RESOLVED, and the scope is
+        # the whole point. An unversioned tree carries no revision token for the
+        # cache key to change with, so re-resolving is the one act that says
+        # "this tree may have moved" and the cheap place to answer it. Clearing
+        # the WHOLE cache answered it for one corpus by breaking every other:
+        # this reader is built to be pointed at several locations in one run
+        # (the conformance corpus points it at four), and a caller holding a
+        # `ResolvedCorpus` for A had A's listing dropped merely because it went
+        # on to resolve B -- so A's next listing re-walked and could serve
+        # post-resolution contents through a handle that promised a moment in
+        # time. Nothing about resolving B is news about A. Dropping only this
+        # location's entries answers the staleness and tells no other corpus
+        # anything.
+        key = str(resolved)
+        self._listings = {entry: listed
+                          for entry, listed in self._listings.items()
+                          if entry[0] != key}
+        self._resolved_roots[key] = tuple(present_roots)
         revision = self._revision(resolved, ref.revision)
         write_path = self._shape.write_path
         return ResolvedCorpus(

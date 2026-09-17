@@ -594,6 +594,38 @@ def test_resolving_again_rebuilds_the_listing_even_for_an_unversioned_tree(
     assert [d.key for d in second] == sorted((*DOCUMENTS, "notes/delta.md"))
 
 
+def test_resolving_another_corpus_leaves_this_ones_listing_alone(
+        reader, populated, tmp_path) -> None:
+    """THE OTHER HALF OF THE TEST ABOVE, and the two together fix the scope.
+
+    Re-resolving is news about THIS corpus. Resolving a DIFFERENT one is news
+    about nothing here, and this reader is built to be pointed at several
+    locations in one run -- the neutral conformance corpus points it at four,
+    which is the property `conformance_corpus.reader` exists to demonstrate.
+    An invalidation that cleared the whole cache answered the staleness above
+    by breaking that: a caller holding a `ResolvedCorpus` for A had A's
+    listing dropped merely because it went on to resolve B, so A's next
+    listing re-walked the tree and served POST-RESOLUTION contents through a
+    handle whose whole meaning is a moment in time.
+
+    The edit below is exactly that exposure, and the assertion is that the
+    handle does not see it.
+    """
+    corpus = _resolved(reader, populated)
+    first = reader.list_documents(corpus)
+    (populated / "notes" / "delta.md").write_text("Type: note\nTitle: Delta\n")
+    other = _lay_down(tmp_path / "other")
+    other_corpus = reader.resolve(CorpusRef(name="other", location=str(other)))
+    second = reader.list_documents(corpus)
+
+    assert [d.key for d in first] == sorted(DOCUMENTS)
+    assert [d.key for d in second] == sorted(DOCUMENTS), (
+        "resolving another corpus dropped this one's cached listing, so a "
+        "handle resolved BEFORE the edit served contents from after it")
+    assert [d.key for d in reader.list_documents(other_corpus)] == sorted(
+        DOCUMENTS), "and the other corpus still lists its own documents"
+
+
 def test_a_rooted_double_star_lists_every_depth_beneath_it(tmp_path) -> None:
     """THE REGRESSION GUARD FOR A MATCHER THAT WAS TRIED AND MEASURED WRONG.
 
