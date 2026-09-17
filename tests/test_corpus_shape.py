@@ -142,6 +142,60 @@ def test_a_one_line_header_window_is_legal() -> None:
 
 
 # --------------------------------------------------------------------------
+# confinement: a declared location may not leave the corpus
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("root", ["..", "../outside", "a/../../outside",
+                                  ".", "./a", "/absolute"])
+def test_a_scan_root_that_leaves_the_corpus_is_refused(root: str) -> None:
+    """Every declared location is JOINED onto the corpus's own resolved
+    location, so `..` walks out of the corpus and an absolute path leaves it in
+    one step -- and the reader would then answer for a tree nobody pointed it
+    at. This estate refuses the same shape one layer up, in the admissions
+    file's own words: a declared path is "never absolute, never carrying a
+    `.`/`..` segment"."""
+    with pytest.raises(CorpusShapeInvalid) as caught:
+        _shape(scan_roots=(root,))
+    assert root in str(caught.value)
+
+
+@pytest.mark.parametrize("glob", ["../**/*.md", "a/../../*.md", "/etc/*.conf",
+                                  "./*.md"])
+def test_a_scope_glob_that_leaves_the_corpus_is_refused(glob: str) -> None:
+    with pytest.raises(CorpusShapeInvalid):
+        _shape(scopes={SCOPE_ALL: Scope(globs=(glob,))})
+
+
+def test_an_obliged_prefix_that_leaves_the_corpus_is_refused() -> None:
+    with pytest.raises(CorpusShapeInvalid):
+        _shape(obliged_prefixes=("../elsewhere/",))
+
+
+def test_a_profile_location_that_leaves_the_corpus_is_refused_by_name(
+        engineering) -> None:
+    """Named by profile AND artifact kind, because the operator who has to fix
+    it is reading a domain profile and not this module."""
+    kinds = list(engineering.artifact_kinds)
+    kinds[0] = type(kinds[0])(id=kinds[0].id, label=kinds[0].label,
+                              description=kinds[0].description,
+                              locations=("../outside/**/*.md",))
+    escaping = type(engineering)(**{**engineering.__dict__,
+                                    "artifact_kinds": tuple(kinds)})
+    with pytest.raises(CorpusShapeInvalid) as caught:
+        from_profile(escaping, document_globs=("**/*.md",),
+                     header_scan_lines=6)
+    assert "openxfactory-engineering" in str(caught.value)
+    assert "governance-document" in str(caught.value)
+
+
+def test_a_double_star_is_not_a_traversal_segment() -> None:
+    """The refusal is on `.` and `..` exactly, and `**` is glob syntax that
+    stays inside the corpus. A guard that refused it would refuse every shape
+    `from_profile` builds."""
+    assert _shape(scopes={SCOPE_ALL: Scope(globs=("**/*.md", "a/**/b/*.md"))})
+
+
+# --------------------------------------------------------------------------
 # reading a declared location: where its literal root ends, and what it globs
 # --------------------------------------------------------------------------
 

@@ -203,6 +203,40 @@ def test_a_directory_holding_none_of_the_roots_refuses_unclassifiable(
         assert declared in caught.value.refusal.detail
 
 
+def test_a_declared_root_that_is_present_and_is_a_file_refuses(
+        reader, tmp_path) -> None:
+    """NOT skipped as absent. A corpus whose `notes` is a FILE and whose
+    `papers/` is a directory would otherwise resolve on the second root and then
+    list nothing from the first — a partial corpus reported as a whole one,
+    which is the degradation this interface exists to refuse."""
+    root = tmp_path / "c"
+    (root / "papers").mkdir(parents=True)
+    (root / "papers" / "gamma.md").write_text(DOCUMENTS["papers/gamma.md"])
+    (root / "notes").write_text("a file where a declared root is expected\n")
+    with pytest.raises(CorpusRefused) as caught:
+        _resolved(reader, root)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+    assert caught.value.refusal.subject == str(root / "notes")
+    assert "present and is not a directory" in caught.value.refusal.detail, (
+        "and by THAT refusal rather than by the traversability probe tripping "
+        "over the same file: an operator told 'the path could not be read' "
+        "goes looking for a permission, and the defect is a layout")
+
+
+def test_a_corpus_inside_an_unopenable_parent_is_unreadable_not_absent(
+        reader, tmp_path, unreadable) -> None:
+    """`Path.exists()` answers False for EVERY `OSError`, so an inaccessible
+    corpus used to come back as `corpus-absent` — "the checkout is not there" —
+    when the truth was that it is there and could not be read. Those send an
+    operator to two different places."""
+    parent = tmp_path / "parent"
+    corpus = _lay_down(parent / "c")
+    unreadable(parent)
+    with pytest.raises(CorpusRefused) as caught:
+        _resolved(reader, corpus)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+
+
 def test_an_empty_corpus_resolves_and_lists_nothing(reader, tmp_path) -> None:
     """An empty corpus is an ANSWER, distinguishable from a refusal. "A
     projection built over the first is correct and a projection built over the
@@ -598,6 +632,44 @@ def test_an_unreadable_subtree_refuses_listing_rather_than_omitting_it(
         reader.list_documents(corpus)
     assert _refusal(caught) == CORPUS_UNREADABLE
     assert caught.value.refusal.subject == str(locked)
+
+
+def test_a_symlink_pointing_out_of_the_corpus_refuses_rather_than_listing(
+        reader, tmp_path) -> None:
+    """THE ONE WAY A PATH UNDER THE CORPUS IS NOT OF IT.
+
+    `Path.glob` matches a symlinked file by its name in the tree and `read`
+    opens it by that name, so a link named `notes/payroll.md` pointing outside
+    the corpus would be LISTED as this corpus's document and READ as its
+    content: the key is relative, the parent is inside the corpus, and the bytes
+    come back. Nothing else in this reader catches it. This leg already holds a
+    path to the same rule — `doxbench_scope` refuses a candidate that "resolves
+    outside the selected root" — and this is that rule at the corpus seam.
+    """
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    secret = outside / "not-this-corpus.md"
+    secret.write_text("Type: note\nTitle: Somebody else's\n")
+    root = _lay_down(tmp_path / "c")
+    (root / "notes" / "linked.md").symlink_to(secret)
+
+    corpus = _resolved(reader, root)
+    with pytest.raises(CorpusRefused) as caught:
+        reader.list_documents(corpus)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+    assert caught.value.refusal.subject == "notes/linked.md"
+    assert "outside the corpus" in caught.value.refusal.detail
+
+
+def test_a_symlink_that_stays_inside_the_corpus_is_an_ordinary_document(
+        reader, tmp_path) -> None:
+    """The confinement check refuses an ESCAPE and not a link: a corpus is
+    entitled to lay its own documents out with links inside itself."""
+    root = _lay_down(tmp_path / "c")
+    (root / "papers" / "also-alpha.md").symlink_to(root / "notes" / "alpha.md")
+    corpus = _resolved(reader, root)
+    assert "papers/also-alpha.md" in {d.key for d in
+                                      reader.list_documents(corpus)}
 
 
 def test_read_returns_the_bytes_and_the_resolved_revision(reader,

@@ -90,6 +90,7 @@ from __future__ import annotations
 
 import os
 import re
+import stat
 import subprocess
 from pathlib import Path
 
@@ -340,29 +341,33 @@ class DomainCorpusAdapter:
         would send them all to the same wrong place.
         """
         location = Path(ref.location)
-        try:
-            if not location.exists():
-                raise _refuse(CORPUS_ABSENT, str(location),
-                              "the path does not exist")
-            if not location.is_dir():
-                raise _refuse(CORPUS_UNREADABLE, str(location),
-                              "the path is not a directory")
-            roots_present = False
-            for root in self._shape.scan_roots:
-                declared = location / root
-                if not declared.exists() or not declared.is_dir():
-                    continue
-                self._require_traversable(declared)
-                roots_present = True
-            if not roots_present:
+        if not self._is_directory(location, absent_refuses=True):
+            raise _refuse(CORPUS_UNREADABLE, str(location),
+                          "the path is not a directory")
+        roots_present = False
+        for root in self._shape.scan_roots:
+            declared = location / root
+            present = self._stat(declared)
+            if present is None:
+                continue
+            if not stat.S_ISDIR(present.st_mode):
+                # NOT skipped as absent. A declared root that is THERE and is a
+                # file is a corpus laid out wrongly, and skipping it lets the
+                # corpus resolve on its other roots and then list nothing from
+                # this one -- a partial corpus reported as a whole one, which is
+                # the degradation this interface exists to refuse.
                 raise _refuse(
-                    CORPUS_UNCLASSIFIABLE, str(location),
-                    "the directory holds none of the roots this corpus is "
-                    f"declared over ({', '.join(self._shape.scan_roots)})")
-        except OSError as exc:   # an unreadable path is not this corpus either
+                    CORPUS_UNREADABLE, str(declared),
+                    "this declared root is present and is not a directory, so "
+                    "the corpus cannot be read under it; resolving anyway "
+                    "would report a partial corpus as a whole one")
+            self._require_traversable(declared)
+            roots_present = True
+        if not roots_present:
             raise _refuse(
-                CORPUS_UNREADABLE, str(location),
-                f"the path could not be read ({exc.strerror or exc})") from exc
+                CORPUS_UNCLASSIFIABLE, str(location),
+                "the directory holds none of the roots this corpus is "
+                f"declared over ({', '.join(self._shape.scan_roots)})")
 
         self._listings.clear()
         resolved = location.resolve()
@@ -585,9 +590,16 @@ class DomainCorpusAdapter:
     def _git(cwd: Path, *args: str) -> str | None:
         """git's stdout for one query about ONE directory, or None.
 
-        `-C <cwd>` and nothing else: no environment is set, no configuration is
-        read from the caller, and no second directory is ever consulted. A
-        failure of any kind -- git absent, the directory not a work tree, a
+        `-C <cwd>`, and no second directory is ever consulted. WHAT IT DOES NOT
+        CLAIM, because the claim was once written wider than the code: this is
+        not a configuration-isolated git. The subprocess inherits the
+        environment minus `AMBIENT_GIT_VARIABLES`, so system, global and
+        repository configuration are all still read -- which is deliberate,
+        since `safe.directory` and a CI runner's own settings live there and a
+        git that ignored them would refuse work trees it should read. What is
+        guaranteed is the DIRECTORY: the ambient variables that could redirect
+        `-C` are removed, and `_revision` cross-checks git's answer against the
+        path it asked about. A failure of any kind -- git absent, the directory not a work tree, a
         timeout, a non-zero exit -- comes back as None and the caller turns it
         into a named refusal, because a reader that cannot answer must say so
         rather than guess.
@@ -620,6 +632,11 @@ class DomainCorpusAdapter:
         if cached is not None:
             return cached
         location = Path(corpus.location)
+        # ONCE PER LISTING, not once per scope: `SCOPE_ALL` unions every
+        # declared scope, and a profile-derived shape declares one per artifact
+        # kind, so walking the roots inside `_scope_keys` walked the whole tree
+        # once per kind for a single `list_documents`.
+        self._require_readable_tree(location)
         names = sorted(self._shape.scopes) if scope == SCOPE_ALL else [scope]
         keys: set[str] = set()
         for name in names:
@@ -653,7 +670,6 @@ class DomainCorpusAdapter:
         `os.walk`'s `onerror`, refuses `CORPUS_UNREADABLE` naming the path it
         could not open, and decides nothing about membership.
         """
-        self._require_readable_tree(location)
         keys: set[str] = set()
         for pattern in scope.globs:
             for match in location.glob(pattern):
@@ -662,8 +678,47 @@ class DomainCorpusAdapter:
                 rel = match.relative_to(location)
                 if any(part in scope.excluded_parts for part in rel.parts):
                     continue
+                self._require_confined(location, match, rel)
                 keys.add(rel.as_posix())
         return keys
+
+    @staticmethod
+    def _require_confined(location: Path, match: Path, rel: Path) -> None:
+        """A listed document's real target must lie inside the corpus.
+
+        A SYMLINK IS THE ONE WAY A PATH UNDER THE CORPUS IS NOT OF IT.
+        `Path.glob` matches a symlinked file by its name in the tree, and `read`
+        opens it by that name, so a link named `notes/payroll.md` pointing at
+        `/etc/shadow` would be LISTED as this corpus's document and READ as its
+        content. Nothing above catches it: the key is relative, the parent is
+        inside the corpus, and the bytes come back.
+
+        This leg already holds a path to exactly this rule -- `doxbench_scope`
+        resolves a candidate and refuses one that "resolves outside the selected
+        root" -- and this is that rule at the corpus seam.
+
+        IT REFUSES RATHER THAN OMITTING, which is the harder of the two and the
+        right one. Dropping the entry would make a corpus with a stray link
+        report fewer documents than it holds and say nothing, and a listing that
+        is quietly short is the same class of lie the interface forbids for a
+        corpus that is quietly unreadable. The refusal names the path, so the
+        operator is told which link to look at.
+        """
+        try:
+            target = match.resolve()
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise _refuse(
+                CORPUS_UNREADABLE, rel.as_posix(),
+                f"the document's target could not be resolved ({exc})") from exc
+        try:
+            target.relative_to(location.resolve())
+        except ValueError as exc:
+            raise _refuse(
+                CORPUS_UNREADABLE, rel.as_posix(),
+                f"this path resolves to {str(target)!r}, which is outside the "
+                "corpus. A link is not a document of the corpus it happens to "
+                "sit in, and serving its bytes under this corpus's identity "
+                "would answer for a tree nobody pointed this reader at") from exc
 
     def _require_readable_tree(self, location: Path) -> None:
         """Refuse a declared root, or anything under one, that cannot be opened.
@@ -684,6 +739,38 @@ class DomainCorpusAdapter:
             for _dirpath, _dirnames, _filenames in os.walk(root,
                                                            onerror=_onerror):
                 pass
+
+    @staticmethod
+    def _stat(path: Path) -> os.stat_result | None:
+        """`os.stat` for a path, or None where it genuinely is not there.
+
+        NOT `Path.exists()`, and the difference is a refusal kind. `exists()`
+        answers False for EVERY `OSError` -- a parent directory this process
+        cannot open included -- so an inaccessible corpus came back as
+        `corpus-absent`, "the checkout is not there", when the truth was that
+        it is there and could not be read. Those are different facts to hand an
+        operator: one sends them to find the corpus, the other to fix a
+        permission. Only `FileNotFoundError` (and `NotADirectoryError`, which is
+        a component of the path not being a directory) means absent.
+        """
+        try:
+            return path.stat()
+        except (FileNotFoundError, NotADirectoryError):
+            return None
+        except OSError as exc:
+            raise _refuse(
+                CORPUS_UNREADABLE, str(path),
+                f"the path could not be read ({exc.strerror or exc})") from exc
+
+    @classmethod
+    def _is_directory(cls, path: Path, *, absent_refuses: bool) -> bool:
+        info = cls._stat(path)
+        if info is None:
+            if absent_refuses:
+                raise _refuse(CORPUS_ABSENT, str(path),
+                              "the path does not exist")
+            return False
+        return stat.S_ISDIR(info.st_mode)
 
     @staticmethod
     def _require_traversable(path: Path) -> None:

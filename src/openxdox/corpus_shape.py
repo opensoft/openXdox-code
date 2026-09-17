@@ -91,6 +91,22 @@ PLACEHOLDER_OPEN = "<"
 PLACEHOLDER_CLOSE = ">"
 
 
+#: Path segments a declared location may never carry, and the reason is a
+#: traversal rather than a style preference: `scan_roots` and every glob are
+#: joined onto a corpus's resolved location, so a `..` in either walks OUT of
+#: the corpus and a reader would serve bytes from a tree nobody pointed it at.
+#: An absolute location does the same in one step.
+#:
+#: This estate already refuses exactly this shape one layer up, in the words of
+#: `docs/opendox-carve-admissions.yaml`'s own header: a declared path is "a
+#: plain path relative to the destination's own root -- never absolute, never
+#: carrying a `.`/`..` segment". `doxbench_scope`'s confinement check is the
+#: same rule again at this leg. A corpus shape is held to it too, and HERE
+#: rather than at the first listing, because a shape that cannot be confined is
+#: not a corpus this reader can answer for at all.
+TRAVERSAL_SEGMENTS = frozenset({".", ".."})
+
+
 class CorpusShapeInvalid(ValueError):
     """A shape that could not answer for any corpus, refused at construction.
 
@@ -101,6 +117,29 @@ class CorpusShapeInvalid(ValueError):
     correct -- and find nothing wrong with it, because the defect is in the
     reader's construction and was silent at the moment it was made.
     """
+
+
+def _reject_traversal(value: str, where: str) -> None:
+    """Refuse an absolute declared path, or one carrying `.` or `..`.
+
+    Named `where` so the refusal says which declaration is at fault -- a scan
+    root, a scope's glob, or an artifact kind's location in a profile -- because
+    the operator who has to fix it is reading a profile, not this module.
+    """
+    if value.startswith("/") or value.startswith("\\"):
+        raise CorpusShapeInvalid(
+            f"{where} declares {value!r}, which is an ABSOLUTE path. Every "
+            "declared location is joined onto the corpus's own resolved "
+            "location, so an absolute one leaves the corpus in a single step "
+            "and this reader would answer for a tree nobody pointed it at")
+    for segment in value.split("/"):
+        if segment in TRAVERSAL_SEGMENTS:
+            raise CorpusShapeInvalid(
+                f"{where} declares {value!r}, which carries a {segment!r} "
+                "segment. Declared locations are joined onto the corpus's own "
+                "resolved location, so a traversal segment walks OUT of the "
+                "corpus and this reader would serve bytes from a tree nobody "
+                "pointed it at")
 
 
 @dataclass(frozen=True)
@@ -216,6 +255,13 @@ class CorpusShape:
                 "name, so an empty listing would mean 'this shape declares no "
                 "globs' and not 'this corpus holds no documents' -- the one "
                 "distinction the whole seam is about")
+        for root in self.scan_roots:
+            _reject_traversal(root, "a scan root")
+        for name, scope in self.scopes.items():
+            for glob in scope.globs:
+                _reject_traversal(glob, f"scope {name!r}")
+        for prefix in self.obliged_prefixes:
+            _reject_traversal(prefix, "an obliged prefix")
 
 
 # --------------------------------------------------------------------------
@@ -334,6 +380,10 @@ def from_profile(profile: DomainProfile, *,
     for kind in profile.artifact_kinds:
         globs: list[str] = []
         for location in kind.locations:
+            _reject_traversal(
+                location.strip(),
+                f"domain profile {profile.mapping_id!r}, artifact kind "
+                f"{kind.id!r}")
             root = scan_root_of(location)
             if root is not None:
                 roots.add(root)

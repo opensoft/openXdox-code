@@ -399,7 +399,7 @@ jobs:
       #
       #   python -m pytest -q tests/test_corpus_shape.py \
       #                       tests/test_domain_corpus_adapter.py --noconftest
-      #     108 passed  (36 + 72), 0 skipped, 0 errors
+      #     125 passed  (49 + 76), 0 skipped, 0 errors
       #
       # NO SKIP GUARD IS NEEDED and none is added, which is the difference
       # between these two and the three seam suites above: the seam suites skip
@@ -408,14 +408,14 @@ jobs:
       # different axis entirely — the git-backed revision assertions skip
       # where `git` is not on PATH, which on this runner it always is.
       #
-      # EVERY ASSERTION IN BOTH FILES IS MUTATION-PROVED. A sweep of 43
+      # EVERY ASSERTION IN BOTH FILES IS MUTATION-PROVED. A sweep of 48
       # deliberate defects in `corpus_shape.py` and `domain_corpus_adapter.py`
       # — the file-location refusal answering `corpus-unclassifiable`, the
       # declared write path becoming a module constant, `read` falling back to
       # a revision nobody asked for, an undeclared scope widening silently,
       # `write_back` writing the tree, the line rule breaking on exotic
       # separators, the reader adopting an enclosing repository, and thirty
-      # more — was applied one at a time and run against this list. ALL 43
+      # more — was applied one at a time and run against this list. ALL 48
       # WERE CAUGHT; the sweep and its per-mutation output are in the pull
       # request that introduced these two files. FOUR of the forty-two guard
       # a review round's own proposals: the listing matcher going back to
@@ -426,10 +426,18 @@ jobs:
       # cache, and a `DocumentId` naming another corpus being accepted.
       # A fifth guards the listing cache, whose removal took classifying an
       # 801-document corpus from 0.07s to 58.85s (quadratic, not a constant
-      # factor). The neutral conformance corpus returns 17 of 17 with or
-      # without any of them — all three of its documents are exactly one
-      # directory deep and it is three documents — which is precisely why
-      # this list is a required check and not a formality.
+      # factor). Five more guard the confinement findings the same rounds
+      # raised and this leg accepted: a declared location carrying `..` or an
+      # absolute path (joined onto the corpus's location, either one walks
+      # OUT of it), a symlink whose target leaves the corpus being listed as
+      # its document, a declared root that is present as a FILE being skipped
+      # as absent, and `Path.exists()`'s answer for an inaccessible path
+      # ('absent') standing in for the truth ('unreadable').
+      #
+      # The neutral conformance corpus returns 17 of 17 with or without any
+      # of them — three documents, all exactly one directory deep, no
+      # symlink, no unreadable path, no profile — which is precisely why this
+      # list is a required check and not a formality.
       #
       # WHAT THEY GUARD, and it is a required check because the answer is
       # otherwise invisible here: FLOOR PART 3 (`design.md` § D6 (3), RULED
