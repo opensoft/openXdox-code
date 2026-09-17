@@ -449,12 +449,19 @@ def test_a_revision_this_reader_cannot_serve_never_falls_back(reader,
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("text,expected", [
+    # The shared rule's own table, restated as data. It cannot be imported --
+    # `doc_health.lines` is openxFactory's and unreachable here -- so the rule
+    # is written down instead, and this is where a divergence would show.
+    ("", []),                       # no lines, not one empty line
+    ("a", ["a"]),
+    ("a\n", ["a"]),                 # a final ending TERMINATES; it begins nothing
     ("a\nb", ["a", "b"]),
     ("a\r\nb", ["a", "b"]),
     ("a\rb", ["a", "b"]),
+    ("a\n\n", ["a", ""]),           # an ending inside the text DOES begin a line
     ("a\n\nb", ["a", "", "b"]),
-    ("a", ["a"]),
-    ("", [""]),
+    ("\n", [""]),
+    ("a\r\nb\r\n", ["a", "b"]),
 ])
 def test_the_three_real_line_endings_separate_lines(text, expected) -> None:
     assert real_lines(text) == expected

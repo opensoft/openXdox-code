@@ -184,8 +184,29 @@ def real_lines(text: str) -> list[str]:
     The bodies alone, because every caller here reads header VALUES and none of
     them rewrites the document. A writer would need the endings back; this module
     has no writer, by construction.
+
+    A FINAL LINE ENDING TERMINATES THE LAST LINE AND DOES NOT BEGIN A NEW ONE.
+    `re.split` alone yields a trailing empty element for any text ending in a
+    separator, which almost every document does, and `''` would come back as one
+    empty line rather than as no lines.
+
+    THIS CHANGES NO ANSWER THIS MODULE GIVES, and saying so is the honest form
+    of the claim: the spare element is always LAST, so slicing a window off the
+    front cannot lose a real line to it, and an empty string starts with no
+    header prefix. It is corrected because this helper is PUBLIC and because the
+    module's claim is that the shared rule is ADOPTED — a helper that counts one
+    more line than the rule it names would be a trap for the next caller, and a
+    line count is exactly the kind of thing a later writer or a report would
+    reach for. The behaviour is now identical to that rule's for every input:
+    `''` is no lines, `'a'` and `'a\n'` are one, `'a\n\n'` is two — asserted
+    against the rule's own table in `tests/test_domain_corpus_adapter.py`.
     """
-    return _EOL.split(text)
+    if not text:
+        return []
+    rows = _EOL.split(text)
+    if rows[-1] == "":
+        rows.pop()
+    return rows
 
 
 def header_window(text: str, scan_lines: int) -> list[str]:
