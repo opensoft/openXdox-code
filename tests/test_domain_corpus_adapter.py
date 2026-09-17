@@ -140,7 +140,7 @@ def test_the_declared_factory_returns_a_reader_carrying_the_six(reader) -> None:
     assert all(callable(getattr(built, operation)) for operation in OPERATIONS)
 
 
-def test_the_factory_is_constructed_from_the_corpuss_terms_alone() -> None:
+def test_the_factory_is_constructed_from_the_corpus_terms_alone() -> None:
     """Two calls with different names and locations build equivalent readers:
     the location rides in the `CorpusRef` handed to `resolve`, which is what
     lets ONE declaration answer for the corpus's four states in one run."""
