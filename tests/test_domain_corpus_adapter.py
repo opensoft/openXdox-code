@@ -190,6 +190,17 @@ def test_a_location_that_is_a_file_refuses_unreadable(reader,
         "reader pointed at the wrong tree that said nothing useful about which")
 
 
+def test_a_corpus_path_that_is_a_dangling_symlink_is_unreadable_not_absent(
+        reader, tmp_path) -> None:
+    corpus = tmp_path / "dangling-corpus"
+    corpus.symlink_to(tmp_path / "nowhere")
+    assert os.path.lexists(corpus)
+    with pytest.raises(CorpusRefused) as caught:
+        _resolved(reader, corpus, name="dangling")
+    assert _refusal(caught) == CORPUS_UNREADABLE
+    assert caught.value.refusal.subject == str(corpus)
+
+
 def test_a_directory_holding_none_of_the_roots_refuses_unclassifiable(
         reader, tmp_path) -> None:
     """The structural test: a tree holding none of the declared roots cannot be
@@ -221,6 +232,18 @@ def test_a_declared_root_that_is_present_and_is_a_file_refuses(
         "and by THAT refusal rather than by the traversability probe tripping "
         "over the same file: an operator told 'the path could not be read' "
         "goes looking for a permission, and the defect is a layout")
+
+
+def test_a_declared_root_that_is_a_dangling_symlink_refuses_unreadable(
+        reader, tmp_path) -> None:
+    root = tmp_path / "c"
+    (root / "papers").mkdir(parents=True)
+    (root / "papers" / "gamma.md").write_text(DOCUMENTS["papers/gamma.md"])
+    (root / "notes").symlink_to(root / "missing-notes")
+    with pytest.raises(CorpusRefused) as caught:
+        _resolved(reader, root)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+    assert caught.value.refusal.subject == str(root / "notes")
 
 
 def test_a_corpus_inside_an_unopenable_parent_is_unreadable_not_absent(
@@ -775,6 +798,23 @@ def test_a_root_that_becomes_unreadable_after_resolve_refuses_the_listing(
     with pytest.raises(CorpusRefused) as caught:
         reader.list_documents(corpus)
     assert _refusal(caught) == CORPUS_UNREADABLE
+
+
+def test_a_root_that_becomes_a_dangling_symlink_after_resolve_refuses_listing(
+        reader, tmp_path) -> None:
+    root = _lay_down(tmp_path / "c")
+    corpus = _resolved(reader, root)
+    notes = root / "notes"
+    for child in notes.iterdir():
+        child.unlink()
+    notes.rmdir()
+    notes.symlink_to(root / "missing-notes")
+
+    reader._listings.clear()
+    with pytest.raises(CorpusRefused) as caught:
+        reader.list_documents(corpus)
+    assert _refusal(caught) == CORPUS_UNREADABLE
+    assert caught.value.refusal.subject == str(notes)
 
 
 def test_a_root_that_cannot_be_stat_ed_refuses_rather_than_being_skipped(

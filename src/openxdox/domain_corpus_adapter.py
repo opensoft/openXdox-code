@@ -883,7 +883,14 @@ class DomainCorpusAdapter:
         """
         try:
             return path.stat()
-        except (FileNotFoundError, NotADirectoryError):
+        except FileNotFoundError as exc:
+            if os.path.lexists(path):
+                raise _refuse(
+                    CORPUS_UNREADABLE, str(path),
+                    "the path is present as a dangling symlink, so it cannot "
+                    "be read as the corpus path it names") from exc
+            return None
+        except NotADirectoryError:
             return None
         except OSError as exc:
             raise _refuse(
