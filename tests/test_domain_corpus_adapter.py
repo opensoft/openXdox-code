@@ -365,6 +365,21 @@ def test_a_dirty_work_tree_still_resolves_at_its_own_head(
         "checkout somebody is editing has to be able to do")
 
 
+def test_a_broken_version_marker_is_present_and_refuses(reader,
+                                                       populated) -> None:
+    """A `.git` that is a DANGLING symlink is a marker that is there and does
+    not work — an unresolvable corpus, which refuses. `Path.exists()` follows
+    the link and answers False for a broken one, so this used to read as "no
+    revision notion at all" and every read was stamped `revision=None`: the
+    weaker answer that reads exactly like a legitimate one."""
+    (populated / ".git").symlink_to(populated / "nothing-is-here")
+    assert not (populated / ".git").exists(), "the control: exists() says no"
+    assert os.path.lexists(populated / ".git"), "and the marker is there"
+    with pytest.raises(CorpusRefused) as caught:
+        _resolved(reader, populated)
+    assert _refusal(caught) == REVISION_UNKNOWN
+
+
 def test_a_corpus_inside_someone_elses_checkout_is_not_that_checkouts(
         reader, tmp_path, git_available) -> None:
     """THE SHARPEST ONE, and it is a measured failure of a real reader
@@ -658,6 +673,33 @@ def test_a_symlink_pointing_out_of_the_corpus_refuses_rather_than_listing(
         reader.list_documents(corpus)
     assert _refusal(caught) == CORPUS_UNREADABLE
     assert caught.value.refusal.subject == "notes/linked.md"
+    assert "outside the corpus" in caught.value.refusal.detail
+
+
+def test_a_link_retargeted_after_listing_is_refused_at_read(
+        reader, tmp_path) -> None:
+    """CONFINEMENT HOLDS WHERE THE BYTES ARE SERVED, not only where the listing
+    was built. The listing is remembered per resolve, so a link that was
+    confined when it was listed can be retargeted before it is read — and the
+    boundary would then hold only at the moment nobody was looking."""
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "not-this-corpus.md").write_text("Type: note\nTitle: Theirs\n")
+    root = _lay_down(tmp_path / "c")
+    link = root / "notes" / "linked.md"
+    link.symlink_to(root / "notes" / "alpha.md")
+
+    corpus = _resolved(reader, root)
+    listed = {d.key for d in reader.list_documents(corpus)}
+    assert "notes/linked.md" in listed, (
+        "the control: while it pointed inside, it was an ordinary document")
+
+    link.unlink()
+    link.symlink_to(outside / "not-this-corpus.md")
+    document = DocumentId(corpus="populated", key="notes/linked.md")
+    with pytest.raises(CorpusRefused) as caught:
+        reader.read(corpus, document)
+    assert _refusal(caught) == CORPUS_UNREADABLE
     assert "outside the corpus" in caught.value.refusal.detail
 
 

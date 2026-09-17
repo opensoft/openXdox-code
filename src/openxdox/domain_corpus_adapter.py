@@ -425,6 +425,22 @@ class DomainCorpusAdapter:
         self._require_own_identity(corpus, document)
         self._require_listed(corpus, (document.key,))
         path = Path(corpus.location) / document.key
+        # CONFINEMENT IS RE-CHECKED HERE, AT THE MOMENT THE BYTES ARE SERVED,
+        # and not only while the listing was built. The listing is remembered
+        # per resolve, so a link that was confined when it was listed can be
+        # retargeted before it is read, and the boundary this reader documents
+        # would then hold only at the moment nobody was looking.
+        #
+        # WHAT THIS DOES NOT CLAIM, because the honest version is the useful
+        # one: the window is narrowed to the gap between this check and the
+        # `open` below, not closed. Closing it needs an `openat`/`O_NOFOLLOW`
+        # descriptor dance the standard library does not offer portably, and a
+        # claim of atomicity here would be the kind of overstatement this
+        # module has already had to correct once (`_git`'s isolation). What is
+        # guaranteed is that a link retargeted between listing and read is
+        # refused rather than served.
+        self._require_confined(Path(corpus.location), path,
+                               Path(document.key))
         try:
             content = path.read_bytes()
         except OSError as exc:
@@ -561,7 +577,15 @@ class DomainCorpusAdapter:
         asked about that directory only, and the answer cross-checked against
         git's own toplevel before it is believed.
         """
-        if not (location / VERSION_MARKER).exists():
+        # `os.path.lexists` AND NOT `Path.exists()`, and the difference is a
+        # fail-closed branch. `exists()` follows the link and answers False for
+        # a BROKEN one, so a corpus whose `.git` is a dangling symlink was read
+        # as "no revision notion at all" and every read was stamped
+        # `revision=None` — the weaker answer that reads exactly like a
+        # legitimate one, which is the degradation the branch below exists to
+        # refuse. A marker that is THERE and does not work is an unresolvable
+        # corpus, and `rev-parse` failing turns it into a named refusal.
+        if not os.path.lexists(location / VERSION_MARKER):
             if requested is not None:
                 raise _refuse(
                     REVISION_UNKNOWN, requested,
