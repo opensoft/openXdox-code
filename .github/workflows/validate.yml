@@ -167,9 +167,11 @@ jobs:
       # described: that every declared export is really exported, that every
       # entry takes the one RULED mount signature, that the dispose binding's
       # four computed verbs are literals now, that the hosted fallback claims
-      # six EXACT paths and never a `/views/` prefix that would intercept
-      # openDox's own modules, and that this column's reach into openDox's
-      # bundle is exactly what it declares.
+      # EXACTLY the paths this column declares — `web_assets.VIEW_ASSET_NAMES`,
+      # which is TEN since RULED Q7 sent four sheets with the six modules, and
+      # was six when this line was written — and never a `/views/` prefix that
+      # would intercept openDox's own modules, and that this column's reach into
+      # openDox's bundle is exactly what it declares.
       #
       # `--noconftest` safe and needs no consumer: it imports this package's own
       # modules and reads this package's own files as text. Its three
@@ -182,8 +184,11 @@ jobs:
       # 35 passed / 0 skipped under the invocation below. THAT PAIR IS THE
       # PIN-BUMP-ONLY MEASUREMENT, at `708591b`, and it is labelled because the
       # review of `a9264b8` read it as the current one: the review rounds then
-      # added six guard tests to this file, so under the same invocation at the
-      # head it is 41 passed / 0 skipped
+      # added six guard tests to this file, so under the same invocation it is
+      # 41 passed / 0 skipped at MAIN's head — and 54 passed / 0 skipped at
+      # THIS branch's, where RULED Q7's thirteen sheet assertions join it. Both
+      # numbers are named because the same sentence carried one of them across
+      # two pin bumps and a merge
       # (`python -m pytest -q tests/test_gate_loop_views.py --noconftest`).
       #
       # `tests/test_gate_loop_probes.py` joins it on the same footing and for

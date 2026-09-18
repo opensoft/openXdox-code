@@ -26,7 +26,10 @@ A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
 from __future__ import annotations
 
 import ast
+import dataclasses
+import fnmatch
 import re
+import sys
 from pathlib import Path
 
 import pytest
@@ -107,13 +110,17 @@ def test_every_declared_view_module_ships_with_this_package() -> None:
 
 
 def test_the_package_directory_carries_nothing_undeclared() -> None:
-    """A globbed directory is how a module reaches another leg's bundle with no
-    binding naming it. The set is declared, so the directory must match it."""
+    """A globbed directory is how a file reaches another leg's bundle with no
+    binding naming it. The set is declared, so the directory must match it —
+    and since RULED Q7 the set is modules AND sheets, which is why the
+    comparison is against `VIEW_ASSET_NAMES` rather than against the modules
+    alone: a sheet in this directory that no binding names would be exactly the
+    quiet arrival this test exists to refuse."""
     on_disk = sorted(p.name for p in MODULE_DIR.iterdir() if p.is_file())
-    assert on_disk == sorted(web_assets.VIEW_MODULE_NAMES), (
-        "the packaged view-module directory and the declared module set "
+    assert on_disk == sorted(web_assets.VIEW_ASSET_NAMES), (
+        "the packaged view-asset directory and the declared asset set "
         f"disagree: on disk {on_disk}, declared "
-        f"{sorted(web_assets.VIEW_MODULE_NAMES)}")
+        f"{sorted(web_assets.VIEW_ASSET_NAMES)}")
 
 
 def test_no_module_reaches_an_external_url() -> None:
@@ -131,14 +138,16 @@ def test_no_module_reaches_an_external_url() -> None:
         f"modules: {offenders}")
 
 
-def test_the_assembly_hook_places_every_module_in_the_bundle(tmp_path) -> None:
+def test_the_assembly_hook_places_every_asset_in_the_bundle(tmp_path) -> None:
     """RULED Q5's primary mechanism: the composed install copies them into
-    openDox's one `--web-dir` at assembly."""
+    openDox's one `--web-dir` at assembly — and since RULED Q7, the SHEETS by
+    the same act. A bundle carrying this column's modules and not its sheets is
+    a gate loop that mounts unstyled, which is a half-assembly."""
     web = tmp_path / "web"
     (web / web_assets.BUNDLE_SUBDIR).mkdir(parents=True)
     placed = web_assets.install_view_modules(web)
-    assert [p.name for p in placed] == list(web_assets.VIEW_MODULE_NAMES)
-    for path, name in zip(placed, web_assets.VIEW_MODULE_NAMES):
+    assert [p.name for p in placed] == list(web_assets.VIEW_ASSET_NAMES)
+    for path, name in zip(placed, web_assets.VIEW_ASSET_NAMES):
         assert path.parent.name == web_assets.BUNDLE_SUBDIR
         assert path.read_bytes() == web_assets.module_source(name)
 
@@ -162,22 +171,35 @@ def test_the_assembly_hook_can_refuse_to_overwrite(tmp_path) -> None:
     web = tmp_path / "web"
     views = web / web_assets.BUNDLE_SUBDIR
     views.mkdir(parents=True)
-    (views / web_assets.VIEW_MODULE_NAMES[0]).write_text("// someone else's\n")
+    (views / web_assets.VIEW_SHEET_NAMES[0]).write_text("/* someone else's */\n")
     with pytest.raises(web_assets.ViewAssetError) as clash:
         web_assets.install_view_modules(web, overwrite=False)
     assert "already" in str(clash.value) and "overwrite=False" in str(clash.value)
+    # ASSET, not MODULE (Copilot review, round 2): the collision sweep covers
+    # `VIEW_ASSET_NAMES` since RULED Q7, so a colliding `gate.css` must not be
+    # described as a second copy of the gate loop's modules.
+    assert "asset(s)" in str(clash.value)
     # NOTHING WAS COPIED (Copilot review, round 1): the collision check runs over
     # every module BEFORE the first write, so a refusal never leaves a
     # half-assembled bundle behind.
     assert sorted(p.name for p in views.iterdir()) == [
-        web_assets.VIEW_MODULE_NAMES[0]]
+        web_assets.VIEW_SHEET_NAMES[0]]
 
 
-def test_an_undeclared_module_name_is_refused() -> None:
+def test_an_undeclared_asset_name_is_refused() -> None:
     with pytest.raises(web_assets.ViewAssetError):
         web_assets.module_path("../../etc/passwd")
     with pytest.raises(web_assets.ViewAssetError):
         web_assets.module_path("helpers.js")
+    # A SHEET NAME NOTHING DECLARES IS REFUSED THE SAME WAY, and the refusal
+    # says ASSET rather than MODULE (Copilot review, round 2): since RULED Q7
+    # this function answers for both kinds, and a diagnostic that calls a
+    # missing stylesheet a "view module" points an operator at the wrong
+    # package-data line.
+    with pytest.raises(web_assets.ViewAssetError) as undeclared:
+        web_assets.module_path("gate-lens.css")
+    assert "view asset" in str(undeclared.value)
+    assert "module" not in str(undeclared.value).split("view asset")[0]
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +207,11 @@ def test_an_undeclared_module_name_is_refused() -> None:
 # declared hosted fallback."
 # ---------------------------------------------------------------------------
 
-def test_the_hosted_fallback_claims_exactly_this_columns_six_paths() -> None:
+def test_the_hosted_fallback_claims_exactly_this_columns_declared_paths() -> None:
+    """RULED Q5's fallback, over RULED Q7's assets too: a deployment that cannot
+    write into openDox's bundle receives neither the modules nor the sheets, and
+    a fallback answering only for `.js` would serve that deployment a gate loop
+    with no appearance and no error."""
     pytest.importorskip(
         "route_extension",
         reason="`route_extension` is supplied by the pinned opendox wheel; "
@@ -195,7 +221,7 @@ def test_the_hosted_fallback_claims_exactly_this_columns_six_paths() -> None:
     bindings = serve_views.view_module_bindings()
     assert [b.pattern for b in bindings] == [
         f"/{web_assets.BUNDLE_SUBDIR}/{name}"
-        for name in web_assets.VIEW_MODULE_NAMES]
+        for name in web_assets.VIEW_ASSET_NAMES]
     for binding in bindings:
         assert binding.method == "GET"
         # NEVER A PREFIX. openDox consults contributed routes before its static
@@ -206,6 +232,19 @@ def test_the_hosted_fallback_claims_exactly_this_columns_six_paths() -> None:
             "intercept openDox's own view modules")
         assert binding.handler == "_serve_contributed_view_module"
     assert serve_views.ViewModuleRoutesExtension().routes() == bindings
+    # ONE MEDIA TYPE PER SUFFIX, and the sheet's is not the module's: a browser
+    # in standards mode DROPS a stylesheet served as anything but `text/css`,
+    # and the symptom is an unstyled panel with no error event at all.
+    assert serve_views.CTYPES == {".js": serve_views.JS_CTYPE,
+                                  ".css": serve_views.CSS_CTYPE}
+    assert "text/css" in serve_views.CSS_CTYPE
+    # AND THE HANDLER'S OWN CONTRACT SAYS SO (Copilot review, round 3): a
+    # docstring promising only `/views/<module>.js` documents the CSS path as
+    # unsupported, and a later change could reintroduce a JS-only assumption
+    # without contradicting anything written down.
+    doc = serve_views.ContributedViewModuleRoutes \
+        ._serve_contributed_view_module.__doc__
+    assert ".css" in doc and ".js" in doc, doc
 
 
 def test_the_hosted_fallback_serves_only_declared_names() -> None:
@@ -237,6 +276,27 @@ def test_the_hosted_fallback_serves_only_declared_names() -> None:
     other_leg = Probe("/views/app.js")
     other_leg._serve_contributed_view_module(False)
     assert other_leg.served is None and other_leg.errored[0] == 404
+
+    # AND A DECLARED SHEET, THROUGH THE SAME HANDLER (Copilot review, round 1).
+    # Asserting the `CTYPES` table alone left the `.css` branch of
+    # `_serve_contributed_view_module` unexercised: a regression in the suffix
+    # lookup, in the bytes, or in the content type would pass while every
+    # hosted stylesheet was served as `text/javascript` — which a browser in
+    # standards mode answers by DROPPING the sheet, with no error event and an
+    # unstyled panel as the only symptom.
+    sheet = Probe("/views/gate.css")
+    sheet._serve_contributed_view_module(False)
+    assert sheet.errored is None
+    assert sheet.served[0] == web_assets.module_source("gate.css")
+    assert sheet.served[1] == serve_views.CSS_CTYPE
+    assert sheet.served[1] != serve_views.JS_CTYPE
+    # every declared sheet, not just the one above
+    for name in web_assets.VIEW_SHEET_NAMES:
+        probe = Probe(f"/views/{name}")
+        probe._serve_contributed_view_module(True)
+        assert probe.errored is None, name
+        assert probe.served[1] == serve_views.CSS_CTYPE, name
+        assert probe.served[2] is True, name
 
 
 # ---------------------------------------------------------------------------
@@ -601,13 +661,424 @@ def test_the_session_vocabulary_is_declared_by_the_binding_that_posts_it() -> No
         assert verb in session_bearing, verb
 
 
-def test_the_style_residue_is_recorded_rather_than_skipped() -> None:
-    """RULED Q7 is NOT realized in this slice, and the record says so with the
-    floor constraint that blocks it rather than leaving a silence."""
+def test_the_style_residue_records_the_discharge_rather_than_the_block() -> None:
+    """RULED Q7 IS realized now, and the record says so where it said blocked.
+
+    The `blocked_by` sentence this table carried ("styles.css is a
+    moved_verbatim carve row; no edit class covers a stylesheet block leaving
+    for another leg") is GONE, and it is gone because the premise is: slice S7
+    converted that row to `moved_with_declared_edit`. Asserting the absence
+    rather than deleting the test is the point — a successor that re-blocks
+    this work has to say so here.
+    """
     residue = view_extensions.STYLE_RESIDUE
-    assert residue["exclusive_classes"] > 0 and residue["shared_classes"] > 0
-    assert "moved_verbatim" in residue["blocked_by"]
-    assert residue["discharged_by"]
+    assert residue["blocked_by"] is None
+    assert residue["exclusive_classes"] == 54
+    # 18, not 21: openxFactory #1068's round 5 narrowed the census's gate-side
+    # scan again and `g`, `lens` and `topic` were shared only through a dotted
+    # view id, a sentence's `.g` and a `btn.title` string. What LEAVES is
+    # unchanged — the three assertions below say so.
+    assert residue["shared_classes"] == 18
+    assert residue["rule_blocks_moved"] == 59
+    assert residue["mixed_blocks_handled"] == 2
+    assert residue["rule_blocks_in_sheets"] == 61
+    assert (residue["rule_blocks_moved"] + residue["mixed_blocks_handled"]
+            == residue["rule_blocks_in_sheets"])
+    # THE RULING IS CITED WHERE THE DECISION IS STATED (RULED openxFactory#656
+    # comment `5700475319`, Brett Heap, 2026-09-16, by interactive
+    # multi-choice). Both halves of this act that were put to him — the
+    # verbatim move with the coupling REGISTERED, and the four-sheet shape —
+    # are his answers rather than this column's preference, and a reader of the
+    # residue must be able to see that without leaving the file.
+    for module in (view_extensions, web_assets):
+        source = Path(module.__file__).read_text(encoding="utf-8")
+        assert "5700475319" in source, module.__name__
+    assert residue["styles_css_lines_declared"] == 89
+    assert residue["sheets"] == web_assets.VIEW_SHEET_NAMES
+    assert "RULED Q7 realized" in residue["discharged_by"]
+    # The census it moved FROM is named with the defect it carried, so the
+    # figures cannot look like a silent re-measurement.
+    assert "cb343ae8" in residue["previously_measured_at"]
+    assert "concatenation" in residue["previously_measured_at"]
+
+
+# ---------------------------------------------------------------------------
+# RULED Q7 — the sheets themselves.
+# ---------------------------------------------------------------------------
+
+SHEET_DIR = Path(view_extensions.__file__).with_name("web") / "views"
+
+
+def _sheet_text(name: str) -> str:
+    return (SHEET_DIR / name).read_text(encoding="utf-8")
+
+
+def _sheet_body(name: str) -> str:
+    """The sheet with its `/* … */` prose blanked, newlines kept."""
+    text, out, i, n = _sheet_text(name), [], 0, 0
+    n = len(text)
+    while i < n:
+        if text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+            out.append(re.sub(r"[^\n]", " ", text[i:j]))
+            i = j
+            continue
+        out.append(text[i])
+        i += 1
+    return "".join(out)
+
+
+def test_the_package_data_globs_cover_every_declared_asset() -> None:
+    """A TYPO IN `pyproject.toml` LEAVES THIS SUITE GREEN AND THE WHEEL EMPTY
+    (Copilot review, round 1).
+
+    Every asset test above reads `src/openxdox/web/views/` directly, so none of
+    them touches `[tool.setuptools.package-data]`. Drop the `*.css` pattern and
+    a source checkout still passes while the built wheel carries four bindings
+    whose sheets cannot load — and `module_path()`'s own refusal message is
+    written for exactly that day. The patterns are read from the real file and
+    matched against the real declared set, which is the check a wheel build
+    would make without needing one.
+    """
+    # ANCHORED ON THIS FILE, not on the package: `view_extensions.__file__`
+    # points into site-packages under a non-editable install, where there is no
+    # `pyproject.toml` to read — and this suite runs `--noconftest` from the
+    # checkout, whose root is this file's parent's parent.
+    pyproject = Path(__file__).resolve().parents[1] / "pyproject.toml"
+    if not pyproject.is_file():
+        pytest.skip("no `pyproject.toml` beside `tests/`: this is an installed "
+                    "tree, and the pattern it declares is not there to read")
+    text = pyproject.read_text(encoding="utf-8")
+    block = re.search(r"^\[tool\.setuptools\.package-data\]\s*$(.*?)(?=^\[|\Z)",
+                      text, re.M | re.S)
+    assert block, "pyproject.toml declares no [tool.setuptools.package-data]"
+    patterns = re.findall(r'"([^"]+)"', block.group(1))
+    assert patterns, block.group(1)
+    # A package-data pattern is relative to the PACKAGE directory, so the path
+    # to match is `web/views/<name>` — DERIVED from `VIEW_MODULE_DIR` rather
+    # than spelled here, or this test would carry a second copy of the layout
+    # it is checking.
+    package_dir = Path(web_assets.__file__).resolve().parent
+    subdir = web_assets.VIEW_MODULE_DIR.resolve().relative_to(package_dir)
+    # `fnmatch` IS NOT PATH-AWARE, and setuptools' globbing is (Copilot
+    # review, round 7). `fnmatch.fnmatch("web/views/gate.css", "web/*.css")`
+    # is TRUE because `*` there matches `/` like any other character, while a
+    # package-data pattern of `web/*.css` does NOT cover a file one directory
+    # down — so this guard would have passed a declaration that leaves the
+    # sheets out of the wheel, which is the single failure it exists to catch.
+    # Matching SEGMENT BY SEGMENT is the fix: each pattern segment is matched
+    # against the corresponding path segment, and only a `**` segment spans
+    # separators.
+    def _covers(pattern: str, rel_path: str) -> bool:
+        pattern_parts = pattern.split("/")
+        path_parts = rel_path.split("/")
+        if "**" in pattern_parts:
+            head = pattern_parts[:pattern_parts.index("**")]
+            tail = pattern_parts[pattern_parts.index("**") + 1:]
+            if len(path_parts) < len(head) + len(tail):
+                return False
+            pairs = list(zip(head, path_parts[:len(head)]))
+            pairs += list(zip(tail, path_parts[len(path_parts) - len(tail):]
+                              if tail else []))
+        else:
+            if len(pattern_parts) != len(path_parts):
+                return False
+            pairs = list(zip(pattern_parts, path_parts))
+        return all(fnmatch.fnmatch(part, glob) for glob, part in pairs)
+
+    # the guard's own guard: the defect it was blind to must now be caught
+    assert not _covers("web/*.css", "web/views/gate.css")
+    assert _covers("web/views/*.css", "web/views/gate.css")
+    assert _covers("web/**/*.css", "web/views/gate.css")
+
+    for name in web_assets.VIEW_ASSET_NAMES:
+        rel = f"{subdir.as_posix()}/{name}"
+        assert any(_covers(pattern, rel) for pattern in patterns), (
+            f"{rel!r} is declared in `VIEW_ASSET_NAMES` and matches no "
+            f"package-data pattern {patterns}: it would be missing from the "
+            "built wheel while every test in this file, which reads the source "
+            "tree, stayed green")
+
+
+def test_every_declared_sheet_ships_and_every_shipped_sheet_is_declared() -> None:
+    """`VIEW_MODULE_NAMES`' own rule, applied to the sheets: a file nothing
+    declares is a file shipped into another leg's bundle with no binding naming
+    it, and a glob is how that happens quietly."""
+    declared = set(web_assets.VIEW_SHEET_NAMES)
+    shipped = {p.name for p in SHEET_DIR.glob("*.css")}
+    assert declared == shipped, (declared ^ shipped)
+    for name in declared:
+        assert (SHEET_DIR / name).is_file()
+
+
+def test_each_binding_names_the_sheet_that_carries_its_own_selectors() -> None:
+    """RULED Q7's placement, held to the census rather than to a list.
+
+    FOUR sheets for six bindings, and both departures from one-each are
+    measured: `gate.lens` names none because `gate-lens.js` owns no selector of
+    its own, and the two workbench bindings name the SAME sheet because eleven
+    of its nineteen blocks are named by both modules. openDox's registry
+    dedupes the injected link by href, so the second naming costs nothing.
+    """
+    by_id = {spec["id"]: spec.get("styles", "") for spec in SPECS}
+    assert by_id == {
+        "gate.bar": "./views/gate.css",
+        "gate.lens": "",
+        "gate.projects": "./views/gate-projects.css",
+        "gate.dispose": "./views/dispose.css",
+        "gate.workbench.create": "./views/swb.css",
+        "gate.workbench.session": "./views/swb.css",
+    }
+    for spec in SPECS:
+        sheet = spec.get("styles", "")
+        if not sheet:
+            continue
+        assert sheet.startswith("./views/") and sheet.endswith(".css"), sheet
+        assert sheet[len("./views/"):] in web_assets.VIEW_SHEET_NAMES, sheet
+
+
+def test_no_contributed_sheet_declares_a_design_token() -> None:
+    """RULED Q7: the `--st-*` family is openDox's ONE stable styling surface.
+
+    A contributed sheet READS `var(--st-…)` — that is what the surface is for —
+    and never WRITES one: `views/display.js`'s `applyTokens` is already the one
+    authority, and a second would shadow a host's declared role per theme.
+    """
+    for name in web_assets.VIEW_SHEET_NAMES:
+        written = _declared_st_tokens(_sheet_body(name))
+        assert written == [], f"{name} declares {written}"
+
+
+#: A DECLARATION FOLLOWS THE START OF THE TEXT, A `{`, OR A `;` — never only a
+#: newline (Copilot review, round 1). These sheets are written one rule per
+#: line, so `.x { --st-proposed: red; }` declares the token after a `{` and a
+#: second one after a `;`, and a `^\s*` scan saw neither. `(` is deliberately
+#: not in the list: that is what bounds a `var()` READ, which RULED Q7 permits
+#: and this guard must not catch.
+_ST_DECLARATION = re.compile(r"(?:^|[{;])\s*(--st-[A-Za-z0-9_-]+)\s*:")
+
+
+def _declared_st_tokens(css: str) -> list[str]:
+    """Every `--st-*` a sheet WRITES. Comments must already be blanked."""
+    return _ST_DECLARATION.findall(css)
+
+
+def test_the_design_token_guard_sees_an_inline_declaration() -> None:
+    """The guard above is worth running only if it catches the shape these
+    sheets are actually written in. Asserted, because a guard that cannot fail
+    is a comment."""
+    assert _declared_st_tokens(".x { --st-proposed: red; }") == ["--st-proposed"]
+    assert _declared_st_tokens("a{color:red;--st-captured:blue}") == ["--st-captured"]
+    assert _declared_st_tokens("  --st-organized: green;") == ["--st-organized"]
+    assert _declared_st_tokens(".x { color: var(--st-proposed); }") == []
+
+
+def test_the_sheets_carry_the_blocks_the_residue_counts() -> None:
+    """61 RULE BLOCKS, AND THE RECORD SAYS WHY IT IS NOT 59 (Copilot review,
+    round 3, which counted the shipped bytes against the recorded figure).
+
+    59 blocks are the EXCLUSIVE ones — every class in the selector this
+    column's own. The other two are the file's only MIXED rules and were
+    handled rather than exempted: one selector list SPLIT, so openDox keeps
+    `.filterpop[hidden]` and this column re-states the gate half; and
+    `.swb-draftchrome .swb-cactions` MOVED WHOLE, carrying the one openDox
+    class a sheet here names as host context.
+
+    Counted off the shipped sheets, so the audit record cannot silently
+    disagree with the bytes.
+    """
+    blocks = 0
+    for name in web_assets.VIEW_SHEET_NAMES:
+        body = _sheet_body(name)
+        blocks += body.count("{")
+        assert body.count("{") == body.count("}"), name
+    residue = view_extensions.STYLE_RESIDUE
+    assert blocks == residue["rule_blocks_in_sheets"], blocks
+    assert blocks == residue["rule_blocks_moved"] + residue["mixed_blocks_handled"]
+
+    # THE TWO MIXED RULES ARE WHERE THE RECORD SAYS, not merely counted.
+    projects = _sheet_body("gate-projects.css")
+    assert ".projectform.projectpanel[hidden]" in projects
+    swb = _sheet_body("swb.css")
+    for host in residue["open_coupling"]["host_context_classes"]:
+        assert f".{host} " in swb, host
+
+
+def test_every_sheet_header_declares_the_host_context_exception() -> None:
+    """The headers said every selector's classes are this column's own, and
+    `swb.css` carries `.swb-draftchrome .swb-cactions` (Copilot review, round
+    3). A sheet whose own prose contradicts the census is worse than one with
+    no prose."""
+    for name in web_assets.VIEW_SHEET_NAMES:
+        header = _sheet_text(name)
+        assert "WITH ONE DECLARED EXCEPTION" in header, name
+        assert "host_context_classes" in header, name
+        # and the tool is named as it is committed, not as it was drafted
+        assert "scripts/measure_opendox_css_census.py" in header, name
+        assert "measure-css-census.py" not in header, name
+
+
+def test_the_non_token_coupling_is_the_number_the_residue_records() -> None:
+    """The one thing RULED Q7 leaves open here, COUNTED instead of hidden.
+
+    These sheets read openDox's non-token custom properties, which Q7's own
+    sentence says are not a stable surface. Inlining their values would end dark
+    mode for this column on every install, so the reads stay — and the count is
+    pinned, so a new one arrives as a red test and a decision rather than as a
+    quiet widening of the coupling.
+    """
+    read: set[str] = set()
+    for name in web_assets.VIEW_SHEET_NAMES:
+        read.update(re.findall(r"var\(\s*(--[A-Za-z0-9_-]+)", _sheet_body(name)))
+    tokens = {p for p in read if p.startswith("--st-")}
+    non_token = read - tokens
+    residue = view_extensions.STYLE_RESIDUE["open_coupling"]
+    assert len(tokens) == residue["st_tokens_read"], sorted(tokens)
+    assert len(non_token) == residue["non_token_custom_properties_read"], \
+        sorted(non_token)
+
+
+def test_a_pin_that_carries_styles_materializes_the_declared_sheets(
+        monkeypatch) -> None:
+    """THE NEW-PIN BRANCH, EXECUTED (Copilot review, round 3).
+
+    `GateLoopViews.views()` is where `specs_for()`'s answer becomes real
+    bindings, and nothing ELSE drives it with a `ViewBinding` that HAS
+    `styles`: the three live materialization assertions below read region,
+    routes, exports, requires and the manifest ids — never the SHEET — and the
+    `specs_for` test drives the filter and not the constructor. So a regression
+    between the two — a spec the filter kept that the constructor drops — would
+    leave the sheets inert with every test green.
+
+    Driven through a STUB `opendox.view_extension`. This paragraph read
+    "because the pin bump that brings the real one is a later act and this
+    assertion must not wait for it", and that bump has since landed
+    (`0b4e8bbf` -> `5c137a90`, openXdox-code#24, openDox-code#27's field). THE
+    STUB STAYS: what it holds is the constructor's behaviour for a binding that
+    CARRIES the field, and an ASSEMBLY chooses the `opendox` this column runs
+    under — so both shapes must be driven from either pin, which is the same
+    reason `test_an_old_pin_materializes_without_the_field` below is a stub too.
+    """
+    import types
+
+    @dataclasses.dataclass(frozen=True)
+    class StubBinding:
+        id: str = ""
+        region: str = ""
+        module: str = ""
+        entry: str = ""
+        view_class: str = ""
+        routes: tuple = ()
+        exports: tuple = ()
+        requires: tuple = ()
+        optional: bool = False
+        styles: str = ""
+
+    stub = types.ModuleType("opendox.view_extension")
+    stub.ViewBinding = StubBinding
+    package = types.ModuleType("opendox")
+    package.view_extension = stub
+    monkeypatch.setitem(sys.modules, "opendox", package)
+    monkeypatch.setitem(sys.modules, "opendox.view_extension", stub)
+
+    bindings = view_extensions.GateLoopViews().views()
+    assert [b.id for b in bindings] == [spec["id"] for spec in SPECS]
+    assert [b.styles for b in bindings] == [
+        "./views/gate.css", "", "./views/gate-projects.css",
+        "./views/dispose.css", "./views/swb.css", "./views/swb.css"]
+    # every declared sheet is reached by at least one binding, and no binding
+    # names a sheet this column does not ship
+    named = {b.styles[len("./views/"):] for b in bindings if b.styles}
+    assert named == set(web_assets.VIEW_SHEET_NAMES)
+
+
+def test_an_old_pin_materializes_without_the_field(monkeypatch) -> None:
+    """The other side of the same call path: a `ViewBinding` with no `styles`
+    still materializes the whole column, unstyled rather than absent."""
+    import types
+
+    @dataclasses.dataclass(frozen=True)
+    class OldBinding:
+        id: str = ""
+        region: str = ""
+        module: str = ""
+        entry: str = ""
+        view_class: str = ""
+        routes: tuple = ()
+        exports: tuple = ()
+        requires: tuple = ()
+        optional: bool = False
+
+    stub = types.ModuleType("opendox.view_extension")
+    stub.ViewBinding = OldBinding
+    package = types.ModuleType("opendox")
+    package.view_extension = stub
+    monkeypatch.setitem(sys.modules, "opendox", package)
+    monkeypatch.setitem(sys.modules, "opendox.view_extension", stub)
+
+    bindings = view_extensions.GateLoopViews().views()
+    assert [b.id for b in bindings] == [spec["id"] for spec in SPECS]
+    assert not any(hasattr(b, "styles") for b in bindings)
+
+
+def test_the_styles_field_is_dropped_for_a_pin_that_cannot_express_it() -> None:
+    """RULED Q7's field REACHED THIS LEG'S PIN, and the drop path still runs.
+
+    Driven against two stub `ViewBinding` shapes rather than against whatever
+    `opendox` happens to be installed, so the behaviour is asserted at BOTH
+    shapes from either pin — the one this leg pinned until openXdox-code#24
+    (`0b4e8bbf`, no `styles`), which an assembly is still free to install, and
+    the one it pins today (`5c137a90`, openDox-code#27), which carries it.
+    This summary read "is NEWER THAN THIS LEG'S PIN" while that was true; it is
+    corrected rather than quoted as provenance, because it was a claim about
+    what is installed TODAY and the paragraph below carries the history.
+    """
+    @dataclasses.dataclass(frozen=True)
+    class Old:
+        id: str = ""
+        styles_absent: bool = True
+
+    @dataclasses.dataclass(frozen=True)
+    class New:
+        id: str = ""
+        styles: str = ""
+
+    dropped = view_extensions.specs_for(Old)
+    assert all("styles" not in spec for spec in dropped)
+    assert [spec["id"] for spec in dropped] == [spec["id"] for spec in SPECS]
+    # and nothing else is lost with it
+    assert [spec["exports"] for spec in dropped] == [spec["exports"] for spec in SPECS]
+
+    kept = view_extensions.specs_for(New)
+    assert kept == SPECS
+    assert [spec.get("styles", "") for spec in kept] == [
+        "./views/gate.css", "", "./views/gate-projects.css", "./views/dispose.css",
+        "./views/swb.css", "./views/swb.css"]
+
+
+def test_the_sheets_carry_no_remote_asset_and_no_import() -> None:
+    """§ 4.4's vendor policy, at the one seam that could leak past it.
+
+    `_SHEET` bounds the SPECIFIER a binding declares; nothing bounds what the
+    sheet then fetches. A `url(https://…)`, an `@import` or a `src:` reaching
+    out is a remote asset arriving through a door the module loader never sees,
+    which is `test_renderer.py::test_no_external_urls_anywhere_in_bundle`'s
+    subject one file over.
+    """
+    # CSS AT-RULES AND `url()` ARE CASE-INSENSITIVE (Copilot review, round 1):
+    # `@IMPORT` and `URL(https://…)` are valid CSS and both evaded a lowercase
+    # scan, which is the whole policy this test states. The scheme is folded
+    # too, because `HTTPS://` is equally valid.
+    for name in web_assets.VIEW_SHEET_NAMES:
+        body = _sheet_body(name)
+        assert not re.search(r"@import\b", body, re.I), name
+        for url in re.findall(r"url\(([^)]*)\)", body, re.I):
+            assert not re.match(r"\s*['\"]?(?:https?:)?//", url, re.I), (name, url)
+
+    # AND THE SCAN CATCHES BOTH SPELLINGS, asserted rather than assumed.
+    assert re.search(r"@import\b", "@IMPORT url(x);", re.I)
+    assert re.match(r"\s*['\"]?(?:https?:)?//", "HTTPS://cdn.example/x.css", re.I)
 
 
 # ---------------------------------------------------------------------------
@@ -717,6 +1188,44 @@ def test_the_facet_conforms_to_the_view_extension_protocol() -> None:
         assert binding.requires == spec["requires"]
 
 
+def test_the_pinned_binding_class_answers_for_the_sheets_or_for_none() -> None:
+    """THE DECLARED PIN'S OWN ANSWER about `styles`, asserted (Copilot round 10).
+
+    The two stub tests above drive `GateLoopViews.views()` through `ViewBinding`
+    shapes this file defines, which is how BOTH pins are asserted from either —
+    but until this one, nothing read the sheet off a binding the DECLARED PIN
+    constructed. The live materialization assertions around it read region,
+    routes, exports, requires and the manifest ids and never the SHEET, so a pin
+    that stopped carrying the field, or a `specs_for()` that stopped handing it
+    over, would leave all four contributed sheets inert with every test green.
+
+    BOTH BRANCHES ASSERT, because the point is to refuse a quiet green: where
+    the installed `ViewBinding` takes `styles` the values must be this column's
+    declared sheets, and where it does not the materialized bindings must carry
+    no such attribute at all — the degrade `specs_for()` exists to produce. The
+    branch is chosen by the same `dataclasses.fields()` reading the module makes,
+    never by a version.
+    """
+    view_extension = _view_extension_or_skip()
+    fields = {f.name for f in dataclasses.fields(view_extension.ViewBinding)}
+    bindings = view_extensions.GateLoopViews().views()
+    assert [b.id for b in bindings] == [spec["id"] for spec in SPECS]
+    if "styles" in fields:
+        assert [b.styles for b in bindings] == [
+            "./views/gate.css", "", "./views/gate-projects.css",
+            "./views/dispose.css", "./views/swb.css", "./views/swb.css"], (
+                "the pinned `ViewBinding` takes `styles`, so every binding that "
+                "owns selectors must reach this column's own sheet")
+        assert [b.styles for b in bindings] == [
+            spec.get("styles", "") for spec in SPECS]
+        named = {b.styles[len("./views/"):] for b in bindings if b.styles}
+        assert named == set(web_assets.VIEW_SHEET_NAMES)
+    else:
+        assert not any(hasattr(b, "styles") for b in bindings), (
+            "the pinned `ViewBinding` cannot express `styles`, so `specs_for()` "
+            "must have dropped it and the column must mount unstyled")
+
+
 def test_the_column_collects_through_openDox_beside_its_own_routes() -> None:
     """The whole contribution, assembled the way `serve.build_server()` does it:
     this column's bindings collected against this column's contributed ROUTES.
@@ -738,6 +1247,16 @@ def test_the_column_collects_through_openDox_beside_its_own_routes() -> None:
     assert manifest["kind"] == view_extension.MANIFEST_KIND
     assert [entry["id"] for entry in manifest["views"]] == \
         [spec["id"] for spec in SPECS]
+    # AND THE SHEETS CROSS IT (Copilot round 10). The manifest is the JSON
+    # openDox's registry injects the `<link>` elements from, so a `styles` that
+    # reaches the binding and not the manifest is four inert sheets with every
+    # other assertion green. Both branches assert, for the reason the sibling
+    # test above gives.
+    if "styles" in {f.name for f in dataclasses.fields(view_extension.ViewBinding)}:
+        assert [entry.get("styles", "") for entry in manifest["views"]] == \
+            [spec.get("styles", "") for spec in SPECS]
+    else:
+        assert all("styles" not in entry for entry in manifest["views"])
 
 
 def test_every_region_this_column_names_is_a_declared_shell_region() -> None:

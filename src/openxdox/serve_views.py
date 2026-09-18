@@ -1,4 +1,4 @@
-"""The DECLARED HOSTED FALLBACK for this column's view modules (RULED Q5).
+"""The DECLARED HOSTED FALLBACK for this column's view ASSETS (RULED Q5).
 
 RULED Q5 (`opensoft/openxFactory#656` comment `5648044785`, Brett Heap,
 2026-09-12): *"the COMPOSED DEPLOYMENT assembles the bundle. openXdox ships its
@@ -17,11 +17,19 @@ WHY EXACT BINDINGS AND NOT A `/views/` PREFIX. openDox consults contributed
 routes AFTER every fixed core arm and BEFORE the static fallback
 (`opendox/serve.py`'s `_route`), so a PREFIX binding on `/views/` would
 intercept every one of openDox's own view modules and this column would be
-answering for the shell's files. Six EXACT bindings claim exactly the six paths
-this column contributes and nothing else; anything else under `/views/` falls
+answering for the shell's files. One EXACT binding per declared asset claims exactly the
+paths this column contributes and nothing else; anything else under `/views/` falls
 through to openDox's static fallback exactly as it does today. That is the same
 discipline `route_extension.collect_bindings` enforces between columns, applied
 by this column to itself.
+
+TEN BINDINGS, NOT SIX, SINCE RULED Q7 (Copilot review, round 7): six `.js`
+modules and the four `.css` sheets RULED Q7 sends with the bindings that own
+them (`#656` comment `5648049748`). The count is `web_assets.VIEW_ASSET_NAMES`'
+and is never spelled here, because a number written down twice is a number that
+goes stale — which is exactly what this paragraph did when the sheets arrived.
+The rule is unchanged and is what matters: EXACT bindings for exactly the paths
+this column contributes, never a `/views/` prefix.
 
 THE HANDLER IS A METHOD NAME, never a callable: `serve.build_server()` refuses a
 build whose contributed handler does not resolve on the bound handler class, so
@@ -39,6 +47,8 @@ import route_extension
 from openxdox import web_assets
 
 __all__ = [
+    "CSS_CTYPE",
+    "CTYPES",
     "JS_CTYPE",
     "ContributedViewModuleRoutes",
     "ViewModuleRoutesExtension",
@@ -51,6 +61,18 @@ __all__ = [
 #: being able to say why — so it is stated here rather than inferred.
 JS_CTYPE = "text/javascript; charset=utf-8"
 
+#: And the one a STYLESHEET must be served with. A browser in standards mode
+#: DROPS a `<link rel="stylesheet">` whose response is not `text/css`, and the
+#: symptom is a panel that mounts and renders unstyled with nothing logged —
+#: exactly the failure `injectBindingStyles`' own console refusal exists to
+#: name, arriving by a route that produces no error event at all.
+CSS_CTYPE = "text/css; charset=utf-8"
+
+#: Suffix -> media type, for the ONE handler that answers for both. Stated as a
+#: table rather than branched in the handler so a third asset kind cannot be
+#: added without choosing its type here.
+CTYPES: dict[str, str] = {".js": JS_CTYPE, ".css": CSS_CTYPE}
+
 
 class ContributedViewModuleRoutes:
     """The GET door for this column's view modules, mixed into `DashboardHandler`.
@@ -62,7 +84,11 @@ class ContributedViewModuleRoutes:
     """
 
     def _serve_contributed_view_module(self, head_only: bool) -> None:
-        """Answer one exact `/views/<module>.js` this column declares.
+        """Answer one exact `/views/<asset>` this column declares — `.js` OR
+        `.css` (Copilot review, round 3: this contract still promised only a
+        module, so the CSS path RULED Q7 added read as unsupported and a later
+        change could reintroduce a JS-only assumption without contradicting
+        anything written here).
 
         The binding is EXACT, so openDox's dispatcher calls this with
         `head_only` alone and the path is read off the request. The name is
@@ -74,22 +100,36 @@ class ContributedViewModuleRoutes:
         path = self.path.split("?", 1)[0].split("#", 1)[0]
         prefix = f"/{web_assets.BUNDLE_SUBDIR}/"
         name = path[len(prefix):] if path.startswith(prefix) else ""
-        if name not in web_assets.VIEW_MODULE_NAMES:
+        # DECLARED ASSETS, modules and sheets alike: `VIEW_ASSET_NAMES`, not
+        # `VIEW_MODULE_NAMES`, since RULED Q7 sends a binding's sheet with it.
+        if name not in web_assets.VIEW_ASSET_NAMES:
             # Not this column's to answer. 404 rather than falling through:
             # the dispatcher already decided this route is ours, and serving
             # openDox's bundle from here would be the fork the seam prevents.
             self.send_error(404, "not found")
             return
-        self._serve_bytes(web_assets.module_source(name), JS_CTYPE, head_only)
+        suffix = name[name.rfind("."):]
+        # ONE MEDIA TYPE PER SUFFIX, from the declared table: a browser in
+        # standards mode DROPS a stylesheet served as `text/javascript`, with no
+        # error event and an unstyled panel as the only symptom.
+        self._serve_bytes(web_assets.module_source(name), CTYPES[suffix],
+                          head_only)
 
 
 def view_module_bindings() -> tuple[route_extension.RouteBinding, ...]:
-    """One EXACT GET binding per declared view module, in declaration order."""
+    """One EXACT GET binding per declared view ASSET, in declaration order.
+
+    The sheets RULED Q7 sends with the bindings need the fallback for the same
+    reason the modules do: a deployment that cannot write into openDox's bundle
+    cannot receive either, and a gate loop served unstyled through a fallback
+    that answers only for `.js` is the half-assembly `install_view_modules`
+    refuses to produce.
+    """
     return tuple(
         route_extension.RouteBinding(
             "GET", web_assets.served_path(name), False,
             "_serve_contributed_view_module")
-        for name in web_assets.VIEW_MODULE_NAMES
+        for name in web_assets.VIEW_ASSET_NAMES
     )
 
 
@@ -99,9 +139,13 @@ class ViewModuleRoutesExtension:
     Deliberately a SECOND extension rather than more bindings on
     `serve_gate.GateRoutesExtension`: that one contributes the gate VERBS, a
     POST prefix the whole estate reasons about as "the gate column's routes",
-    and folding six static GETs into it would make `contributed_routes` — which
-    openDox's registry checks every view binding's ownership against — read as
-    though the gate column had claimed the shell's view directory.
+    and folding this column's static GETs into it would make
+    `contributed_routes` — which openDox's registry checks every view binding's
+    ownership against — read as though the gate column had claimed the shell's
+    view directory. This paragraph said "six static GETs" and the module
+    docstring's own rule is why it no longer does: the count is
+    `web_assets.VIEW_ASSET_NAMES`' (ten since RULED Q7) and a number written
+    down twice is a number that goes stale.
 
     NOT REGISTERED BY DEFAULT. An assembly that ran the copy hook must NOT also
     register this extension: the modules are already in the bundle, and two
