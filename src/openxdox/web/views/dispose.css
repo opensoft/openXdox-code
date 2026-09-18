@@ -1,0 +1,72 @@
+/* dispose.css — the dispose tray, its verbs and the refusal panel (`views/dispose.js`), RULED Q7.
+
+   *"a contributed binding's CSS lives WITH THE BINDING, in its own sheet;
+   openDox's declared design tokens (the `--st-*` family, S7) are the one
+   stable styling surface; nothing else in `styles.css` is."*
+   — Brett Heap, 2026-09-12, `opensoft/openxFactory#656` comment `5648049748`
+
+   EVERY RULE HERE LEFT openDox's `src/opendox/web/styles.css` VERBATIM, and
+   the manifest row that carries that file declares the lines they left on
+   (RULED Q-L1's form, `#656` comment `5628560136`). What selects them is
+   measured, never chosen: each selector's every class is named by this
+   column's six modules and by no file of openDox's own bundle
+   (openxFactory `scripts/measure_opendox_css_census.py`, which reads THIS
+   column's side from class-bearing positions only and openDox's side broadly,
+   because over-including on openDox's side keeps a rule and over-including on
+   ours moves one).
+
+   WITH ONE DECLARED EXCEPTION, and `swb.css` is where it lives:
+   `.swb-draftchrome .swb-cactions` names `.swb-draftchrome`, which is
+   openDox's own draft chrome. The DECLARATION styles this column's action row
+   and belongs with the binding; the ancestor travels with it as HOST CONTEXT,
+   and `view_extensions.STYLE_RESIDUE["open_coupling"]["host_context_classes"]`
+   is where that is recorded rather than left for a reader to notice.
+
+   WHAT THIS SHEET READS THAT IS NOT A `--st-*` TOKEN is openDox's own
+   non-token custom properties, which RULED Q7 declares are NOT a stable
+   surface. They are read here because the alternative is inlining colour
+   values, which would end dark mode for this column on every install. The
+   coupling is REGISTERED rather than hidden: this column's own
+   `tests/test_gate_loop_views.py` counts every non-token property these
+   sheets read and holds the number, so a rename at openDox turns this
+   column's suite red instead of turning its panels invisible.
+
+   Placed into openDox's `--web-dir` at assembly by `openxdox.web_assets`
+   (RULED Q5), beside the module it belongs to, and named by that module's
+   `ViewBinding.styles`. */
+
+.disposetray { display: inline-flex; gap: 4px; margin-left: 6px; }
+.disposetray.is-busy { opacity: 0.5; pointer-events: none; }
+.dispose-accepted { border-color: var(--good); color: var(--good); }
+.dispose-accepted:hover { background: var(--good); color: var(--panel); }
+.dispose-rejected { border-color: var(--blocked); color: var(--blocked); }
+.dispose-rejected:hover { background: var(--blocked); color: var(--panel); }
+.dispose-deferred:hover { border-color: var(--st-proposed); color: var(--st-proposed); }
+.dispose-propose { border-color: var(--st-proposed); color: var(--st-proposed); }
+.dispose-propose:hover:not(:disabled) { background: var(--st-proposed); color: var(--panel); }
+.dispose-propose:disabled { opacity: 0.55; cursor: default; }
+.refusalpanel {
+  position: fixed; right: 14px; bottom: 14px; z-index: 30; width: 340px;
+  max-height: 40vh; overflow-y: auto; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2); font-size: 11px;
+}
+.refusalpanel-head {
+  display: flex; align-items: center; padding: 6px 10px;
+  border-bottom: 1px solid var(--faint);
+}
+.refusalpanel-title { font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; flex: 1; }
+.refusalpanel-clear { border: none; background: none; color: var(--faint-ink); cursor: pointer; font-size: 10px; }
+.refusalpanel-list { list-style: none; margin: 0; padding: 4px 10px 8px; }
+.refusalpanel-item { display: flex; gap: 6px; padding: 3px 0; align-items: baseline; }
+.refusalpanel-kind { flex: none; font-family: var(--mono); font-size: 9px; border-radius: 999px; padding: 0 6px; }
+.is-refused .refusalpanel-kind { background: var(--blocked-bg); color: var(--blocked); }
+.is-ok .refusalpanel-kind { background: var(--good-bg); color: var(--good); }
+/* the HOSTED plane's other outcomes (task 4.4): submitted-not-yet-decided,
+   recorded-but-not-dispatched, and never-sent-at-all. Distinct from a refusal
+   on purpose - only one of the three is a verdict on the decision. */
+.is-queued .refusalpanel-kind { background: var(--faint); color: var(--st-proposed); }
+.is-stalled .refusalpanel-kind { background: var(--faint); color: var(--blocked); }
+.is-error .refusalpanel-kind { background: var(--faint); color: var(--faint-ink); }
+.refusalpanel-msg { color: var(--ink); }
+.intentchips { display: inline-flex; gap: 4px; margin-left: 6px; align-items: center; }

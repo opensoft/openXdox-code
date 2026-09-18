@@ -1,4 +1,12 @@
-"""The gate loop's VIEW MODULE BYTES, and the assembly hook that places them.
+"""The gate loop's VIEW ASSET BYTES, and the assembly hook that places them.
+
+MODULES AND, SINCE RULED Q7, THE SHEETS THAT PAINT THEM (`opensoft/openxFactory#656`
+comment `5648049748`). `VIEW_ASSET_NAMES` is `VIEW_MODULE_NAMES + VIEW_SHEET_NAMES`
+and every public name below answers for all of them — `module_path`,
+`module_source`, `served_path`, `install_view_modules`, `ViewAssetError`. The
+`module_*` spellings are kept because they are the seam openDox's registry and
+this column's route extension already import; a rename is its own act, and the
+contract each states is the ASSET contract (Copilot review, round 7).
 
 RULED Q5 (`opensoft/openxFactory#656` comment `5648044785`, Brett Heap,
 2026-09-12, on openXdox-spec `docs/gate-loop-view-contract.md` § 8 Q5 @
@@ -39,8 +47,10 @@ from pathlib import Path
 
 __all__ = [
     "BUNDLE_SUBDIR",
+    "VIEW_ASSET_NAMES",
     "VIEW_MODULE_DIR",
     "VIEW_MODULE_NAMES",
+    "VIEW_SHEET_NAMES",
     "ViewAssetError",
     "install_view_modules",
     "module_path",
@@ -50,7 +60,11 @@ __all__ = [
 
 
 class ViewAssetError(RuntimeError):
-    """An assembly that cannot place this column's view modules.
+    """An assembly that cannot place this column's view ASSETS.
+
+    MODULES AND SHEETS ALIKE since RULED Q7 (Copilot review, round 7): the name
+    already said ASSET and the docstring still said "modules", so the one
+    exception that answers for a missing `.css` read as though it did not.
 
     One exception for every placement defect — a missing package file, a target
     that is not a directory, a copy that failed — because a caller does nothing
@@ -86,43 +100,101 @@ VIEW_MODULE_NAMES: tuple[str, ...] = (
 )
 
 
+#: THE SHEETS, RULED Q7 (`opensoft/openxFactory#656` comment `5648049748`,
+#: Brett Heap, 2026-09-12): *"a contributed binding's CSS lives WITH THE
+#: BINDING, in its own sheet."* Declared rather than globbed, for
+#: `VIEW_MODULE_NAMES`' own reason, and FOUR rather than six because that is
+#: what the census measures: `gate-lens.js` owns no selector of its own (its
+#: plan-panel controls reuse the shell's shared chrome), and the two workbench
+#: modules are named by eleven of the nineteen blocks in `swb.css` between them,
+#: so they name ONE sheet — the only shape that neither duplicates those eleven
+#: into two files nor makes one optional binding depend on another's sheet.
+#: openDox's registry dedupes the injected `<link>` by resolved href, which is
+#: what makes naming one sheet twice correct rather than merely tolerated —
+#: and that de-duplication is LOAD-BEARING BY RULING and not by convenience:
+#: RULED openxFactory#656 comment `5700475319` (Brett Heap, 2026-09-16, by
+#: interactive multi-choice) keeps this measured shape against a tuple-valued
+#: `styles` with a seventh shared sheet, and against six sheets duplicating the
+#: eleven blocks both workbench modules name.
+VIEW_SHEET_NAMES: tuple[str, ...] = (
+    "gate.css",
+    "gate-projects.css",
+    "dispose.css",
+    "swb.css",
+)
+
+#: EVERY BYTE THIS COLUMN PLACES IN openDox's BUNDLE, modules and sheets alike.
+#: One tuple, because an assembly places them by one act and a hosted fallback
+#: answers for them by one rule, and two lists to keep in step would be the
+#: drift `VIEW_MODULE_NAMES`' "declared rather than globbed" note is about.
+VIEW_ASSET_NAMES: tuple[str, ...] = VIEW_MODULE_NAMES + VIEW_SHEET_NAMES
+
+
 def module_path(name: str) -> Path:
-    """The packaged path of one declared module, refusing an undeclared name."""
-    if name not in VIEW_MODULE_NAMES:
+    """The packaged path of one declared asset, refusing an undeclared name."""
+    if name not in VIEW_ASSET_NAMES:
         raise ViewAssetError(
-            f"{name!r} is not one of this column's declared view modules "
-            f"({list(VIEW_MODULE_NAMES)}): a module nothing declares is a file "
+            f"{name!r} is not one of this column's declared view assets "
+            f"({list(VIEW_ASSET_NAMES)}): a file nothing declares is a file "
             "shipped into another leg's bundle with no binding naming it")
     path = VIEW_MODULE_DIR / name
     if not path.is_file():
-        raise ViewAssetError(
-            f"declared view module {name!r} is missing from this package at "
-            f"{path}: the wheel was built without "
-            "`[tool.setuptools.package-data] openxdox = [\"web/views/*.js\"]`, "
-            "so every binding this column declares names a module that cannot "
-            "load — and a binding that cannot be mounted must not look "
+        # THE DIAGNOSTIC SAYS WHICH DEFECT THIS IS (Copilot review, round 7).
+        # A missing MODULE and a missing SHEET fail differently at the browser,
+        # and one suffix for both told an operator hunting a missing `gate.js`
+        # that the binding would "mount and paint unstyled" — which is the
+        # sheet's symptom and not the module's. The wheel is where either is
+        # caught; the sentence now names the one that happened.
+        detail = (
+            "the binding mounts and paints UNSTYLED, which RULED Q7 treats as "
+            "a degrade and not a refusal — the quieter direction of the same "
+            "defect, which is exactly why it has to be caught here"
+            if name in VIEW_SHEET_NAMES else
+            "every binding this column declares names a MODULE that cannot "
+            "load, and a binding that cannot be mounted must not look "
             "registered (openDox `views/view_extension.js`'s own rule)")
+        raise ViewAssetError(
+            f"declared view asset {name!r} is missing from this package at "
+            f"{path}: the wheel was built without "
+            "`[tool.setuptools.package-data] openxdox = [\"web/views/*.js\", "
+            f"\"web/views/*.css\"]`, so {detail}")
     return path
 
 
 def module_source(name: str) -> bytes:
-    """One declared module's bytes — what both mechanisms hand over."""
+    """One declared ASSET's bytes — what both mechanisms hand over.
+
+    A MODULE OR A SHEET (Copilot review, round 7: the public names here still
+    said "module" after RULED Q7 made CSS a shipped asset, so a caller reading
+    this API could not tell that a sheet is served by the same three
+    functions). `module_path`, `module_source`, `served_path`,
+    `install_view_modules` and `ViewAssetError` all answer for
+    `VIEW_ASSET_NAMES` — modules AND sheets. The names are kept because they
+    are the seam openDox's registry and this column's route extension already
+    import; what changes is that they say so.
+    """
     return module_path(name).read_bytes()
 
 
 def served_path(name: str) -> str:
-    """The URL path the browser imports this module from.
+    """The URL path the browser loads this ASSET from — module or sheet.
 
-    `./views/gate.js` resolved against the bundle root, which is what
-    `views/view_extension.js`'s `resolveView` computes and therefore what the
-    hosted fallback (`openxdox.serve_views`) must answer.
+    `./views/gate.js` (and, since RULED Q7, `./views/gate.css`) resolved
+    against the bundle root, which is what `views/view_extension.js`'s
+    `resolveView` computes for a module and its `injectBindingStyles` computes
+    for a sheet — and therefore what the hosted fallback
+    (`openxdox.serve_views`) must answer for both.
     """
     return f"/{BUNDLE_SUBDIR}/{name}"
 
 
 def install_view_modules(web_dir: str | Path, *,
                          overwrite: bool = True) -> tuple[Path, ...]:
-    """THE ASSEMBLY HOOK. Copy this column's view modules into openDox's bundle.
+    """THE ASSEMBLY HOOK. Copy this column's view ASSETS into openDox's bundle.
+
+    Modules AND the sheets RULED Q7 sends with them, by one act: a bundle
+    carrying this column's modules and not its sheets is a gate loop that
+    mounts unstyled, which is a half-assembly and not a lawful deployment.
 
     `web_dir` is the ONE directory `serve.build_server(web_dir=…)` serves. The
     modules land in its `views/` subdirectory, which is where the specifier
@@ -154,33 +226,37 @@ def install_view_modules(web_dir: str | Path, *,
             "is not the bundle these modules were declared against")
     # EVERY COLLISION BEFORE ANY COPY (Copilot review, round 1). Checking each
     # destination immediately before copying it left a half-assembled bundle
-    # whenever a LATER module collided: some of this column's six placed, the
+    # whenever a LATER asset collided: some of this column's ASSETS placed, the
     # rest not, and an assembly that refused after mutating the tree it was
-    # refusing to mutate. `overwrite=False` exists for an installer that wants
+    # refusing to mutate. This read "a LATER module ... this column's six" while
+    # the loop below read `VIEW_MODULE_NAMES`; it reads `VIEW_ASSET_NAMES` now,
+    # which is the six modules and RULED Q7's four sheets. `overwrite=False` exists for an installer that wants
     # to know the bundle was clean, so the answer has to come before the first
     # write.
     if not overwrite:
-        collisions = [target_dir / name for name in VIEW_MODULE_NAMES
+        collisions = [target_dir / name for name in VIEW_ASSET_NAMES
                       if (target_dir / name).exists()]
         if collisions:
             raise ViewAssetError(
                 f"{', '.join(str(path) for path in collisions)} already "
-                "exist(s) and overwrite=False: this column's module(s) would "
+                "exist(s) and overwrite=False: this column's asset(s) would "
                 "replace files the bundle already carries, which is either a "
-                "second copy of the gate loop or a name collision, and neither "
-                "is something to do silently. Nothing was copied")
+                "second placement of this column or a name collision with "
+                "openDox's own bundle, and neither is something to do "
+                "silently. Nothing was copied")
     # EVERY SOURCE RESOLVED BEFORE ANY COPY, for the same reason as the
     # collision sweep above and found by the same review one round later
     # (Copilot, round 2). `module_path()` raises `ViewAssetError` for a declared
     # module the installed package does not carry — a wheel built without the
     # package-data line, a partial install — and resolving it INSIDE the copy
-    # loop meant a later missing module refused only after the earlier ones had
-    # already been written: a bundle carrying three of this column's six
-    # modules, which an installer may serve or retry over. Both preconditions
+    # loop meant a later missing asset refused only after the earlier ones had
+    # already been written: a bundle carrying PART of this column's assets,
+    # which an installer may serve or retry over (this said "three of this
+    # column's six modules" when the loop read modules alone). Both preconditions
     # this function can answer without touching the tree are now answered
     # before the first write. What stays inside the loop is the I/O the
     # filesystem decides, which no amount of pre-checking can foresee.
-    sources = [(name, module_path(name)) for name in VIEW_MODULE_NAMES]
+    sources = [(name, module_path(name)) for name in VIEW_ASSET_NAMES]
     placed: list[Path] = []
     for name, source in sources:
         destination = target_dir / name
@@ -194,9 +270,10 @@ def install_view_modules(web_dir: str | Path, *,
         except OSError as exc:
             raise ViewAssetError(
                 f"could not place {name!r} at {str(destination)!r}: {exc}. "
-                "The assembly step (RULED Q5) copies this column's view modules "
-                "into openDox's bundle; a bundle that cannot receive them is an "
-                "assembly error, not a partial install to continue past"
+                "The assembly step (RULED Q5) copies this column's view ASSETS "
+                "— its modules and, since RULED Q7, the sheets that paint them "
+                "— into openDox's bundle; a bundle that cannot receive them is "
+                "an assembly error, not a partial install to continue past"
             ) from exc
         placed.append(destination)
     return tuple(placed)
