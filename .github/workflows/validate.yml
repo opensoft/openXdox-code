@@ -498,6 +498,7 @@ jobs:
       - name: pytest
         run: >-
           python -m pytest -q
+          --junitxml=pytest-report.xml
           tests/test_leg_shape.py
           tests/test_dependency_direction.py
           tests/test_domain_profile.py
@@ -515,3 +516,31 @@ jobs:
           tests/test_corpus_shape.py
           tests/test_domain_corpus_adapter.py
           --noconftest
+
+      # -----------------------------------------------------------------------
+      # MEASURE THE COLLECTION TRIPLE — first half of § 5.4 clause (d)'s
+      # openXdox leg. THIS COMMIT ONLY PRINTS IT; the pin lands in the next
+      # commit of the same pull request, with the numbers taken from THIS
+      # step's own CI run rather than from a developer machine.
+      - name: Measure the triple (pin lands next commit)
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET, pathlib
+          f = pathlib.Path("pytest-report.xml")
+          if not f.exists():
+              print("MISSING pytest-report.xml")
+              raise SystemExit(1)
+          tot = {"tests": 0, "skipped": 0, "failures": 0, "errors": 0}
+          root = ET.parse(f).getroot()
+          suites = root.iter("testsuite") if root.tag == "testsuites" else [root]
+          for ts in suites:
+              for k in tot:
+                  tot[k] += int(ts.get(k, 0))
+          selected = tot["tests"]
+          passed = selected - tot["skipped"] - tot["failures"] - tot["errors"]
+          print(f"TRIPLE selected={selected} passed={passed} "
+                f"skipped={tot['skipped']} failures={tot['failures']} "
+                f"errors={tot['errors']}")
+          PY
