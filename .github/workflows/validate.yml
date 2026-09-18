@@ -7,6 +7,25 @@ name: validate
 # Levelled against openDox-code by the OQ-O scaffold-levelling pass
 # (openxFactory#656): same pinned pytest major, same least-privilege
 # `permissions:` block.
+#
+# READ THE HEAD, NOT THE ROLLUP, AND THIS IS NOT A GENERAL CAUTION — it is a
+# thing that happened on the pull request that added the last two entries of
+# the list below, twice. `on: pull_request` does not fire for a push made with
+# a GitHub App token, which is what `copilot-swe-agent[bot]` pushes with when a
+# review is requested on a PR. So a head whose last commit is the bot's can
+# report an aggregate status of SUCCESS while THIS CHECK, the required one,
+# never ran on it at all — the rollup is green because the advisory checks that
+# do fire (SonarCloud) passed, and the missing one is invisible unless you list
+# the contexts:
+#
+#   gh api graphql ... statusCheckRollup { state contexts { ... } }
+#     head a120b79d   rollup SUCCESS
+#       SonarCloud Code Analysis: SUCCESS      <- advisory
+#       (validate absent)                      <- REQUIRED, never ran
+#
+# The remedy is a commit of your own on top, which is a real push and does
+# trigger it. Merging a head in that state is merging something this gate has
+# not measured.
 
 on:
   pull_request:
@@ -54,19 +73,19 @@ jobs:
       # correction was already in the file, twenty lines further down
       # ("§ 3.4 SLICE S8 UN-NARROWS THIS LIST AS FAR AS THE MEASUREMENT
       # ALLOWS"), and had never been pointed at from up here. MEASURED against
-      # that list rather than asserted — it names FOURTEEN files:
+      # that list rather than asserted — it names SIXTEEN files:
       #   * THREE never import anything under test (`test_leg_shape.py`,
       #     `test_dependency_direction.py`, `test_no_hardcoded_status_words.py`
       #     parse trees with `ast`). Those are the scaffold shape assertions the
       #     paragraph above is about, and they are all that "only the scaffold's
       #     shape assertions" ever described.
-      #   * ELEVEN import a runtime module. `test_domain_profile.py` imports
+      #   * THIRTEEN import a runtime module. `test_domain_profile.py` imports
       #     `openxdox.domain_profile` alone, on the § 4.4 grounds set out below;
-      #     the other TEN RUN here — and calling all ten "carved" was wrong, as
+      #     the other TWELVE RUN here — and calling all twelve "carved" was wrong, as
       #     the review of `e92fb06` said: measured against openxFactory's own two
       #     registers, only TWO are ARRIVED carve rows
       #     (`test_doxbench_abstract_store.py`, `test_doxbench_telemetry.py`, each
-      #     with a row in `docs/opendox-carve-manifest.yaml`) and EIGHT are CREATED
+      #     with a row in `docs/opendox-carve-manifest.yaml`) and TEN are CREATED
       #     files admitted by name in `docs/opendox-carve-admissions.yaml` — the two
       #     gate-loop suites of § 3.4 slice S5 and the three evidence/workbench/
       #     authority pairs. The distinction is not cosmetic: an ARRIVED row's edits
@@ -75,7 +94,7 @@ jobs:
       #     and why the 29 importer annotations are left alone), while a CREATED
       #     file is this leg's to edit. Re-derive with
       #     `grep -c '<path>' <that repo>/docs/opendox-carve-{manifest,admissions}.yaml`.
-      #     FOUR of the ten reach the PINNED openDox — in TWO DIFFERENT WAYS, which
+      #     FOUR of the twelve reach the PINNED openDox — in TWO DIFFERENT WAYS, which
       #     this line ran together until the review of `24cd5f2` on #21 measured
       #     them apart:
       #       - ONE reads the pinned WEB BUNDLE: `test_gate_loop_probes.py`, whose
@@ -96,9 +115,9 @@ jobs:
       #         or a failing assertion, loudly and unclassified.
       #     So `tests/opendox_bundle.py::_absent` decides for TWO of the four —
       #     the bundle for probes, the view contract for views — and for neither
-      #     doxbench suite. Measured over the fourteen files named below:
-      #       grep -ln 'import opendox_bundle' <the 14>   -> views, probes
-      #       grep -ln 'from opendox import'   <the 14>   -> views, telemetry,
+      #     doxbench suite. Measured over the sixteen files named below:
+      #       grep -ln 'import opendox_bundle' <the 16>   -> views, probes
+      #       grep -ln 'from opendox import'   <the 16>   -> views, telemetry,
       #                                                      abstract_store
       #       grep -n  'opendox_bundle\.' tests/test_gate_loop_views.py
       #                                                  -> three `_absent()` calls,
@@ -387,6 +406,95 @@ jobs:
       # `--noconftest` STAYS, and it is why this list is a list: `tests/
       # conftest.py` imports the carved session fixtures, which reach both
       # absent packages. Every file named here stands on its own under it.
+      #
+      # TWO FILES JOIN THIS LIST WITH THE CORPUS-ADAPTER IMPLEMENTATION
+      # (`design.md` § D4 machinery (1); RULED Q-X1..Q-X4, Brett Heap
+      # 2026-09-17, `opensoft/openxFactory#656` comment `5715212264`):
+      # `tests/test_corpus_shape.py` and `tests/test_domain_corpus_adapter.py`,
+      # appended LAST so the list reads in the order the leg grew.
+      #
+      # They join on exactly the grounds `test_dependency_direction.py` joined
+      # under § 4.1 and `test_domain_profile.py` under § 4.4, and they do NOT
+      # un-narrow RULED Q-L8 (b'): both cover modules AUTHORED HERE
+      # (`src/openxdox/corpus_shape.py`, `domain_corpus_adapter.py`,
+      # `conformance_corpus.py` — created files, no carve-manifest row under
+      # RULED OQ-C), and both import only `pytest`, the standard library, the
+      # PINNED `opendox` interface and this package. No `doc_health`, no
+      # `ideation_dashboard`, no carved suite — measured:
+      #
+      #   python -m pytest -q tests/test_corpus_shape.py \
+      #                       tests/test_domain_corpus_adapter.py --noconftest
+      #     160 passed  (63 + 97), 0 skipped, 0 errors
+      #
+      # AND THE WHOLE LIST, because a count in this file that stops
+      # being true is the stale-claim class this leg already sweeps
+      # for: the invocation below now reads 520 passed / 6 skipped.
+      # The “360 passed / 6 skipped” above is NOT corrected and is not
+      # wrong — it is the 2026-09-16 pin bump's own measured pair, at
+      # the commit that wrote it, and re-pointing it at today's total
+      # would destroy the before/after it exists to record. That it is
+      # ALSO the figure below is not a copy and not a coincidence worth
+      # hiding: no test file has been added to this list between that
+      # bump and this act, so the pin bump's total and the list as this
+      # act found it are the same measurement taken twice — 360 + 6.
+      # 160 of today's 520 is the two files this act adds; 6 skipped is
+      # unchanged, because neither new file skips.
+      #
+      # NO SKIP GUARD IS NEEDED and none is added, which is the difference
+      # between these two and the three seam suites above: the seam suites skip
+      # where `doc_health` is unreachable, and nothing either of these files
+      # imports is unreachable at this leg. Four tests do carry a skip, on a
+      # different axis entirely — the git-backed revision assertions skip
+      # where `git` is not on PATH, which on this runner it always is.
+      #
+      # EVERY ASSERTION IN BOTH FILES IS MUTATION-PROVED. A sweep of 69
+      # deliberate defects in `corpus_shape.py` and `domain_corpus_adapter.py`
+      # — the file-location refusal answering `corpus-unclassifiable`, the
+      # declared write path becoming a module constant, `read` falling back to
+      # a revision nobody asked for, an undeclared scope widening silently,
+      # `write_back` writing the tree, the line rule breaking on exotic
+      # separators, the reader adopting an enclosing repository, and sixty-two
+      # more — was applied one at a time and run against this list. ALL 69
+      # WERE CAUGHT; the sweep and its per-mutation output are in the pull
+      # request that introduced these two files. The review-round guards here
+      # include the listing matcher going back to
+      # `PurePath.match` (which has no recursive `**` and silently dropped
+      # every document below depth one of a rooted pattern — the ordinary
+      # shape `corpus_shape.from_profile` emits), an unreadable directory
+      # being omitted rather than refused, one resolved corpus invalidating
+      # another one's listing snapshot, and a `DocumentId` naming another
+      # corpus being accepted.
+      # Two more guard the listing cache, whose cost is quadratic in the
+      # corpus's own size and not a constant factor — REMOVING it took
+      # classifying an 801-document corpus from 0.07s to 58.85s, and
+      # scoping it to handles `resolve` itself issued (a round-nine
+      # proposal, measured and narrowed rather than taken) left a
+      # hand-built `ResolvedCorpus`, which the interface permits, on the
+      # once-per-document walk at 0.17s against 101.38s. Five more guard
+      # the confinement findings the same rounds
+      # raised and this leg accepted: a declared location carrying `..` or an
+      # absolute path (joined onto the corpus's location, either one walks
+      # OUT of it), a symlink whose target leaves the corpus being listed as
+      # its document, a declared root that is present as a FILE being skipped
+      # as absent, and `Path.exists()`'s answer for an inaccessible path
+      # ('absent') standing in for the truth ('unreadable').
+      #
+      # The neutral conformance corpus returns 17 of 17 with or without any
+      # of them — three documents, all exactly one directory deep, no
+      # symlink, no unreadable path, no profile — which is precisely why this
+      # list is a required check and not a formality.
+      #
+      # WHAT THEY GUARD, and it is a required check because the answer is
+      # otherwise invisible here: FLOOR PART 3 (`design.md` § D6 (3), RULED
+      # OQ-1) is measured by openxFactory's runner over openxFactory's corpus,
+      # which this leg does not carry and must not depend on. So the run that
+      # answers `OK — 17 of 17` is reported in the pull request, and what stays
+      # ASSERTED in this leg's own required check is the shape of the same
+      # answers over a corpus of the same shape in `tmp_path`, plus the things
+      # the seventeen checks do not reach: every one of the interface's eight
+      # refusal kinds, the CR/LF/CRLF line rule the header window is counted in,
+      # the write-path dispatch, and the guard that stops this reader adopting
+      # the git checkout a corpus directory happens to sit inside.
       - name: pytest
         run: >-
           python -m pytest -q
@@ -404,4 +512,6 @@ jobs:
           tests/test_model_scenario_workbench_seam.py
           tests/test_role_authority_projection.py
           tests/test_role_authority_projection_seam.py
+          tests/test_corpus_shape.py
+          tests/test_domain_corpus_adapter.py
           --noconftest
