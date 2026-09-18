@@ -371,6 +371,9 @@ def test_a_dirty_work_tree_still_resolves_at_its_own_head(
     unreadable. Two readers over one corpus giving opposite answers is the thing
     § 3.7 exists to prevent, so the change belongs to a ruling and not to this
     act. The question is registered in this PR rather than decided in it.
+    RULED 2026-09-18 (openxFactory#656 comment 5728368325): LEAVE AS IS —
+    recorded here because the sentence above read true when it was written
+    and reads OPEN now that the question has an answer.
     """
     _git(populated, "init", "-q")
     _git(populated, "config", "user.email", "corpus@example.invalid")
