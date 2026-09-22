@@ -107,20 +107,23 @@ jobs:
       #         `test_gate_loop_views.py` takes `opendox.view_extension` through its
       #         own guarded helper (`_view_extension_or_skip`, which is why it
       #         imports `opendox_bundle` at all — for `_absent()`, the CLASSIFIER,
-      #         not for the bundle), while `test_doxbench_abstract_store.py:43,45`
+      #         not for the bundle), and `opendox.display_profile` through a second
+      #         one built on it (`_display_profile_or_skip`, the DISPLAY facet's
+      #         section), while `test_doxbench_abstract_store.py:43,45`
       #         (`from opendox import doxbench_abstract_store`, `doxbench_turns`)
       #         and `test_doxbench_telemetry.py:21` (`from opendox import
       #         doxbench_telemetry`) import at module scope with NO guard in the
       #         path: a regression in the pin reaches those two as an ImportError
       #         or a failing assertion, loudly and unclassified.
       #     So `tests/opendox_bundle.py::_absent` decides for TWO of the four —
-      #     the bundle for probes, the view contract for views — and for neither
-      #     doxbench suite. Measured over the sixteen files named below:
+      #     the bundle for probes, the view contract and the display reader for
+      #     views — and for neither doxbench suite. Measured over the sixteen
+      #     files named below:
       #       grep -ln 'import opendox_bundle' <the 16>   -> views, probes
       #       grep -ln 'from opendox import'   <the 16>   -> views, telemetry,
       #                                                      abstract_store
       #       grep -n  'opendox_bundle\.' tests/test_gate_loop_views.py
-      #                                                  -> three `_absent()` calls,
+      #                                                  -> four `_absent()` calls,
       #                                                     no `find`/`require`
       # What Q-L8 (b′) still keeps out is the REST of the carved corpus, which
       # is BUILD-blocked on `doc_health` / `ideation_dashboard` — and
@@ -190,6 +193,9 @@ jobs:
       # numbers are named because the same sentence carried one of them across
       # two pin bumps and a merge
       # (`python -m pytest -q tests/test_gate_loop_views.py --noconftest`).
+      # The 54 is main's own figure once RULED Q7 landed. The DISPLAY facet's
+      # nineteen tests (RULED openxFactory#656 comment 5784683830) take the
+      # same invocation to 73 passed / 0 skipped.
       #
       # `tests/test_gate_loop_probes.py` joins it on the same footing and for
       # the reason the slice exists: slice S4 proved its two new modules by
