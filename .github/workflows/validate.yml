@@ -572,6 +572,14 @@ jobs:
       # reason to prefer CI over a developer machine ("THE PIN IS TAKEN FROM
       # CI'S OWN RUN"): self-skip guards resolve differently on a runner.
       #
+      # RAISED BY #26 (the DISPLAY facet, RULED openxFactory#656 comment
+      # 5784683830), the same way: run 35799110856 (2026-09-22) measured
+      # `9ef72921`, the head before this change, at selected 559, passed 553,
+      # skipped 6, failures 0, errors 0. The +20 on both floors is the twenty
+      # tests the facet adds to `tests/test_gate_loop_views.py`, the only file
+      # on the list whose count moved (54 -> 74). Skipped is unchanged,
+      # because none of them skips.
+      #
       # AND THE SIX SKIPS ARE THE ONES THIS FILE ALREADY NAMED, which is why
       # the exact pin is safe to take here: "The 6 skips that remain are the
       # three seam suites' `doc_health` pairs, which no pin bump touches."
@@ -588,8 +596,8 @@ jobs:
           # FLOORS - may only RISE, and only with the reason in the commit
           # message. Set to the measured values, which this suite has
           # actually met on CI rather than an aspiration.
-          MIN_SELECTED: "539"
-          MIN_PASSED: "533"
+          MIN_SELECTED: "559"
+          MIN_PASSED: "553"
           # EXACT - the load-bearing number.
           EXPECT_SKIPPED: "6"
         run: |
