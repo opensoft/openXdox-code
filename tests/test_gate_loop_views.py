@@ -1493,8 +1493,20 @@ IMPLEMENTED = "implemented"
 ENGINEERING_PROFILE = (Path(__file__).resolve().parent / "fixtures"
                        / "openxfactory-engineering-profile.yaml")
 
-#: The three readers the facet crosses the boundary through.
-DISPLAY_READERS = ("normalize_display", "host_display", "display_manifest")
+#: EVERY name this section reads off the pinned openDox, by module, so the guard
+#: below can check all of them (Copilot review of `7956c05c`: checking only the
+#: three readers left the constants, the proxy and the registry to surface as an
+#: `AttributeError` instead of the ruled outcome).
+#: `test_the_guard_checks_every_name_the_display_section_reads` holds this table
+#: to the file's own reads, so a new read cannot slip past it.
+DISPLAY_READS: dict[str, tuple[str, ...]] = {
+    "display_profile": ("normalize_display", "host_display", "display_manifest",
+                        "DISPLAY_KIND", "DISPLAY_SCHEMA_VERSION", "PROFILE_FACET",
+                        "NEUTRAL_DISPLAY", "STAGE_ROLES", "DisplayFacetError"),
+    "profile_proxy": ("profile_openxfactory",),
+    "domain_profile": ("register", "unregister", "current", "is_registered"),
+    "view_extension": ("host_profile_name",),
+}
 
 
 def _display_profile_or_skip():
@@ -1505,24 +1517,29 @@ def _display_profile_or_skip():
     test the ASSEMBLED openDox; a consumer may pin behind the view contract").
     `display_profile` arrived with openDox-code#21 (§ 3.4 slice S7), one PR after
     the view contract's `exports` (#20), so an assembly can carry a view registry
-    this column mounts on and no display reader at all. At the pin this leg
-    declares, a missing module or reader FAILS; at a different installed commit
-    it SKIPS, naming both.
+    this column mounts on and no display reader at all. It checks every module
+    and name in `DISPLAY_READS`. At the pin this leg declares, anything missing
+    FAILS; at a different installed commit it SKIPS, naming both.
     """
+    import importlib
     import opendox_bundle
     view_extension = _view_extension_or_skip()
-    try:
-        from opendox import display_profile
-    except ImportError:
-        display_profile = None
-    if display_profile is None or not all(
-            callable(getattr(display_profile, reader, None))
-            for reader in DISPLAY_READERS):
+    modules: dict[str, object] = {}
+    missing: list[str] = []
+    for module, names in DISPLAY_READS.items():
+        try:
+            modules[module] = importlib.import_module(f"opendox.{module}")
+        except ImportError:
+            missing.append(f"opendox.{module}")
+            continue
+        missing += [f"opendox.{module}.{name}" for name in names
+                    if not hasattr(modules[module], name)]
+    if missing:
         opendox_bundle._absent(
-            "`opendox.display_profile` and its readers "
-            f"({', '.join(DISPLAY_READERS)}; § 3.4 slice S7, openDox-code#21)",
+            "what the DISPLAY facet's reader needs from openDox "
+            f"({', '.join(missing)}; § 3.4 slice S7, openDox-code#21)",
             module_level=False)
-    return display_profile, view_extension
+    return modules["display_profile"], view_extension
 
 
 def _engineering_host(*facets: str):
@@ -1838,3 +1855,28 @@ def test_a_missing_display_reader_SKIPS_for_a_different_installed_commit(
     message = str(raised.value)
     assert _PIN_DECLARED[:8] in message
     assert _PIN_OTHER[:8] in message
+
+
+def test_the_guard_checks_every_name_the_display_section_reads() -> None:
+    """`DISPLAY_READS` against this file's own reads, parsed rather than trusted.
+
+    Every attribute read off `display_profile`, and off `registry` (the name this
+    section gives `opendox.domain_profile`), must be a name the guard checks, and
+    `host_profile_name` is the one `view_extension` read the section adds. So a
+    test that starts reading a new name fails here until the guard checks it too.
+    """
+    tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+
+    def reads(alias: str) -> set[str]:
+        return {node.attr for node in ast.walk(tree)
+                if isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name) and node.value.id == alias}
+
+    checked = set(DISPLAY_READS["display_profile"])
+    assert reads("display_profile") - {"__file__"} <= checked, sorted(
+        reads("display_profile") - {"__file__"} - checked)
+    assert reads("registry") <= set(DISPLAY_READS["domain_profile"]), sorted(
+        reads("registry") - set(DISPLAY_READS["domain_profile"]))
+    assert "host_profile_name" in reads("view_extension")
+    assert "host_profile_name" in DISPLAY_READS["view_extension"]
+    assert "profile_openxfactory" in DISPLAY_READS["profile_proxy"]

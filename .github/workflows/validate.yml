@@ -94,34 +94,43 @@ jobs:
       #     and why the 29 importer annotations are left alone), while a CREATED
       #     file is this leg's to edit. Re-derive with
       #     `grep -c '<path>' <that repo>/docs/opendox-carve-{manifest,admissions}.yaml`.
-      #     FOUR of the twelve reach the PINNED openDox — in TWO DIFFERENT WAYS, which
+      #     SIX of the twelve reach the PINNED openDox — in TWO DIFFERENT WAYS, which
       #     this line ran together until the review of `24cd5f2` on #21 measured
-      #     them apart:
+      #     them apart. It said FOUR until #26 re-measured it, after the review of
+      #     `7956c05c` called this block's module count inaccurate: #23's two
+      #     corpus suites reach it too, and the count never took them in:
       #       - ONE reads the pinned WEB BUNDLE: `test_gate_loop_probes.py`, whose
       #         `_opendox_bundle()` finds the marker under the installed `opendox`
       #         and whose `bundle` fixture composes it. `tests/opendox_bundle.py`'s
       #         own `find()` / `require()` call site is driven from that file too;
       #         `test_gate_loop_views.py` never calls `find()`, `require()` or that
       #         fixture, which this bullet claimed until the review of `a0eed16`;
-      #       - THREE import pinned openDox PYTHON MODULES:
+      #       - FIVE import pinned openDox PYTHON MODULES:
       #         `test_gate_loop_views.py` takes `opendox.view_extension` through its
       #         own guarded helper (`_view_extension_or_skip`, which is why it
       #         imports `opendox_bundle` at all — for `_absent()`, the CLASSIFIER,
-      #         not for the bundle), and `opendox.display_profile` through a second
-      #         one built on it (`_display_profile_or_skip`, the DISPLAY facet's
-      #         section), while `test_doxbench_abstract_store.py:43,45`
-      #         (`from opendox import doxbench_abstract_store`, `doxbench_turns`)
-      #         and `test_doxbench_telemetry.py:21` (`from opendox import
-      #         doxbench_telemetry`) import at module scope with NO guard in the
-      #         path: a regression in the pin reaches those two as an ImportError
-      #         or a failing assertion, loudly and unclassified.
-      #     So `tests/opendox_bundle.py::_absent` decides for TWO of the four —
+      #         not for the bundle). Its DISPLAY facet section takes THREE more,
+      #         `opendox.display_profile`, `opendox.profile_proxy` and
+      #         `opendox.domain_profile`, only after a second guard built on the
+      #         first (`_display_profile_or_skip`) has checked every name it reads.
+      #         The other four import at module scope with NO guard in the path:
+      #         `test_doxbench_abstract_store.py:43,45` (`from opendox import
+      #         doxbench_abstract_store`, `doxbench_turns`),
+      #         `test_doxbench_telemetry.py:21` (`from opendox import
+      #         doxbench_telemetry`), and `test_corpus_shape.py:31` /
+      #         `test_domain_corpus_adapter.py:37` (`from opendox.corpus_adapter
+      #         import`, #23's "NO SKIP GUARD IS NEEDED"). A regression in the pin
+      #         reaches those four as an ImportError or a failing assertion, loudly
+      #         and unclassified.
+      #     So `tests/opendox_bundle.py::_absent` decides for TWO of the six —
       #     the bundle for probes, the view contract and the display reader for
-      #     views — and for neither doxbench suite. Measured over the sixteen
-      #     files named below:
+      #     views — and for none of the four unguarded suites. Measured over the
+      #     sixteen files named below:
       #       grep -ln 'import opendox_bundle' <the 16>   -> views, probes
       #       grep -ln 'from opendox import'   <the 16>   -> views, telemetry,
       #                                                      abstract_store
+      #       grep -ln 'from opendox\.'        <the 16>   -> views, corpus_shape,
+      #                                                      domain_corpus_adapter
       #       grep -n  'opendox_bundle\.' tests/test_gate_loop_views.py
       #                                                  -> four `_absent()` calls,
       #                                                     no `find`/`require`
@@ -194,8 +203,8 @@ jobs:
       # two pin bumps and a merge
       # (`python -m pytest -q tests/test_gate_loop_views.py --noconftest`).
       # The 54 is main's own figure once RULED Q7 landed. The DISPLAY facet's
-      # nineteen tests (RULED openxFactory#656 comment 5784683830) take the
-      # same invocation to 73 passed / 0 skipped.
+      # twenty tests (RULED openxFactory#656 comment 5784683830) take the
+      # same invocation to 74 passed / 0 skipped.
       #
       # `tests/test_gate_loop_probes.py` joins it on the same footing and for
       # the reason the slice exists: slice S4 proved its two new modules by
