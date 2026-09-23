@@ -588,6 +588,16 @@ jobs:
       # on the list whose count moved (54 -> 74). Skipped is unchanged,
       # because none of them skips.
       #
+      # RAISED BY #27 (the completion stage's item nouns, RULED openxFactory#656
+      # comment 5801057769), the same way: run 35913645237 (2026-09-23)
+      # measured `d3b179a4`, the head before this change, at selected 564,
+      # passed 558, skipped 6, failures 0, errors 0. The +5 on both floors is
+      # the five wheel-sentence probes it adds to
+      # `tests/test_gate_loop_probes.py`, the only file on the list whose count
+      # moved (50 -> 55); the six `tests/test_gate_loop_views.py` cases it
+      # amends leave that file at 74. Skipped is unchanged, because none of
+      # them skips on a runner with node, which this one is.
+      #
       # AND THE SIX SKIPS ARE THE ONES THIS FILE ALREADY NAMED, which is why
       # the exact pin is safe to take here: "The 6 skips that remain are the
       # three seam suites' `doc_health` pairs, which no pin bump touches."
@@ -604,8 +614,8 @@ jobs:
           # FLOORS - may only RISE, and only with the reason in the commit
           # message. Set to the measured values, which this suite has
           # actually met on CI rather than an aspiration.
-          MIN_SELECTED: "559"
-          MIN_PASSED: "553"
+          MIN_SELECTED: "564"
+          MIN_PASSED: "558"
           # EXACT - the load-bearing number.
           EXPECT_SKIPPED: "6"
         run: |
