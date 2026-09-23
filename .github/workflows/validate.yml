@@ -104,7 +104,11 @@ jobs:
       #         and whose `bundle` fixture composes it. `tests/opendox_bundle.py`'s
       #         own `find()` / `require()` call site is driven from that file too;
       #         `test_gate_loop_views.py` never calls `find()`, `require()` or that
-      #         fixture, which this bullet claimed until the review of `a0eed16`;
+      #         fixture, which this bullet claimed until the review of `a0eed16`.
+      #         Its wheel-sentence section (RULED openxFactory#656 comment
+      #         5801057769) also reads the DISPLAY facet, through
+      #         `test_gate_loop_views.py`'s host and guard, imported rather than
+      #         repeated, so it names no openDox module of its own;
       #       - FIVE import pinned openDox PYTHON MODULES:
       #         `test_gate_loop_views.py` takes `opendox.view_extension` through its
       #         own guarded helper (`_view_extension_or_skip`, which is why it
@@ -204,7 +208,9 @@ jobs:
       # (`python -m pytest -q tests/test_gate_loop_views.py --noconftest`).
       # The 54 is main's own figure once RULED Q7 landed. The DISPLAY facet's
       # twenty tests (RULED openxFactory#656 comment 5784683830) take the
-      # same invocation to 74 passed / 0 skipped.
+      # same invocation to 74 passed / 0 skipped. The item nouns (comment
+      # 5801057769) amend six of those twenty in place and add none, so it
+      # stays at 74.
       #
       # `tests/test_gate_loop_probes.py` joins it on the same footing and for
       # the reason the slice exists: slice S4 proved its two new modules by
@@ -223,6 +229,8 @@ jobs:
       # `708591b`; the rounds added thirty-seven guard tests here, so at the head
       # the same invocation reads 50 passed / 0 skipped
       # (`python -m pytest -q tests/test_gate_loop_probes.py --noconftest`).
+      # The wheel's two completion sentences (RULED openxFactory#656 comment
+      # 5801057769) add five, to 55 passed / 0 skipped.
       # The skip survives for an assembly
       # that installs a DIFFERENT openDox from the one this leg declares — the
       # guard compares two commit identities and never asks git which came first,

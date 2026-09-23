@@ -42,7 +42,8 @@ READING which openDox is installed:
     plainly that the installed one is unrecorded (it cannot name what it could
     not read, which is why this is a different sentence from the one above);
   * the DECLARED commit -> FAIL, because THAT is a regression here, and a skip
-    would take these thirteen probes quietly green in a required check;
+    would take every probe on the `bundle` fixture quietly green in a required
+    check;
   * no recorded provenance UNDER CI -> FAIL TOO, and the review of `f6f1b991` on
     #21 was right that this line used to file it under the word "regression". It
     is not one. It is a PROVENANCE ANOMALY: the required run cannot establish
@@ -61,13 +62,14 @@ A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
 
 import pytest
 
-from openxdox import web_assets
+from openxdox import view_extensions, web_assets
 
 NODE = shutil.which("node")
 
@@ -687,6 +689,282 @@ console.log(JSON.stringify({ a, b, sent }));
 
 
 # ---------------------------------------------------------------------------
+# THE WHEEL'S TWO COMPLETION SENTENCES, EXECUTED — RULED
+# `opensoft/openxFactory#656` comment `5801057769` (Brett Heap, 2026-09-23,
+# verbatim "yes, overlay implemented items too").
+#
+# `view_extensions.DISPLAY` overlays the completion stage's item nouns. In the
+# bundle of the `opendox` this leg pins, `one` renders in two sentences, both in
+# openDox's `views/wheel.js` and both named by openXdox-code #26 when it left the
+# item nouns open: the archived tile's `landed` verb title, and the empty note of
+# the flyout that verb opens. The probes below run THOSE sentences under node,
+# with the vocabulary the shell builds from what the xFactory host serves, and
+# run them again without the facet.
+#
+# WHAT RUNS IS THE SHIPPED TEXT, AND WHAT IS REPLAYED IS NAMED. Neither sentence
+# is reachable from outside `wheel.js`: `FLYOUT_VERBS` is a module constant and
+# `renderLandedBody` a closure inside `renderWheel`. Reaching that closure through
+# `renderWheel` needs a tile focused, seated on the line by the spring and then
+# expanded, which is a physics harness rather than a sentence test. So `_lift()`
+# copies each declaration the sentences need out of the pinned `views/wheel.js`
+# VERBATIM:
+#   * its imports from `display.js`, `helpers.js` and `wheel-model.js`;
+#   * the statement that binds `COMPLETION`;
+#   * `vocab` and its per-render assignment;
+#   * `FLYOUT_VERBS`, `fetchDeltaTexts` and `renderLandedBody`.
+# The harness runs them in the bundle's own `views/`, beside the modules they
+# import from. What is REPLAYED is the shell around them:
+#   * `app.js` reading the vocabulary with `readDisplay(probedCaps)` and the
+#     wheel's mount handing it down as `ctx.display`;
+#   * the button mounter resolving the title with `verb.title(vocab)`;
+#   * `showLanded` reading a change's delta files and rendering the result.
+# `test_the_replayed_shell_statements_are_the_pinned_bundles` holds each of those
+# to the code it stands in for.
+#
+# THE HOST IS `test_gate_loop_views.py`'s, imported rather than repeated: the
+# engineering host, the registry fixture that restores what it replaces, the
+# replay of `serve.build_server()`'s display statement, and the guard in front of
+# all three. So the served payload here is the one that file's DISPLAY section
+# proves, and this section adds only what the shell does with it.
+# ---------------------------------------------------------------------------
+
+from test_gate_loop_views import (  # noqa: E402  (the DISPLAY section's host)
+    IMPLEMENTED_ITEM,
+    _display_profile_or_skip,
+    _engineering_host,
+    _served_display,
+    register_host,  # noqa: F401  (a fixture: pytest injects it by name)
+)
+
+
+def _lex(source: str) -> str:
+    """One character per character of `source`: `c` code, `/` comment, `s` string.
+
+    Just enough JavaScript to find where a declaration starts and ends: `//` and
+    `/* */` comments, and `'`, `"` and backquoted strings with their escapes. It
+    reads no regular-expression literal and no `${}` nesting, and nothing
+    `_lift()` takes out of `views/wheel.js` or `app.js` contains either. A file
+    that outgrows it fails LOUDLY, as a head found zero times or twice or as a
+    lifted text node cannot parse; it cannot pass quietly on a wrong extent.
+    """
+    kinds = ["c"] * len(source)
+    i = 0
+    while i < len(source):
+        if source.startswith("//", i):
+            end, kind = source.find("\n", i), "/"
+            end = len(source) if end < 0 else end
+        elif source.startswith("/*", i):
+            end, kind = source.find("*/", i + 2), "/"
+            end = len(source) if end < 0 else end + 2
+        elif source[i] in "'\"`":
+            end, kind = i + 1, "s"
+            while end < len(source) and source[end] != source[i]:
+                end += 2 if source[end] == "\\" else 1
+            end = min(end + 1, len(source))
+        else:
+            i += 1
+            continue
+        kinds[i:end] = [kind] * (end - i)
+        i = end
+    return "".join(kinds)
+
+
+def _lift(source: str, head: str, *, through: str, name: str) -> str:
+    """ONE statement or declaration of a pinned bundle file, copied verbatim.
+
+    `head` must start in CODE exactly once: a comment or a string that quotes
+    it does not count. `through=";"` ends at the first `;` outside every
+    bracket; `through="}"` or `")"` ends where the first bracket of that kind
+    closes.
+    """
+    kinds = _lex(source)
+    starts = [m.start() for m in re.finditer(re.escape(head), source)
+              if kinds[m.start()] == "c"]
+    assert len(starts) == 1, (
+        f"{name} carries {len(starts)} code occurrences of {head!r}, not one; "
+        "the wheel-sentence harness lifts that declaration out of the pinned "
+        "bundle and needs re-reading against it")
+    opener = {"}": "{", ")": "("}.get(through)
+    depth, opened_at = 0, None
+    for i in range(starts[0], len(source)):
+        if kinds[i] != "c":
+            continue
+        ch = source[i]
+        if ch in "([{":
+            if ch == opener and opened_at is None:
+                opened_at = depth
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+            if ch == through and depth == opened_at:
+                return source[starts[0]:i + 1]
+        elif ch == ";" and through == ";" and depth == 0:
+            return source[starts[0]:i + 1]
+    raise AssertionError(f"{name}: {head!r} never reaches its {through!r}")
+
+
+def _lift_import(source: str, module: str, *, name: str) -> str:
+    """The ONE `import { … } from "<module>";` statement `source` makes, verbatim."""
+    kinds = _lex(source)
+    found = [m.group(0) for m in re.finditer(
+                 r"\bimport\s*\{[^}]*\}\s*from\s*(['\"])(?P<module>[^'\"]+)\1\s*;",
+                 source)
+             if kinds[m.start()] == "c" and m.group("module") == module]
+    assert len(found) == 1, (
+        f"{name} imports from {module!r} {len(found)} times, not once")
+    return found[0]
+
+
+def _code(text: str) -> str:
+    """`text` with its comments dropped and its whitespace collapsed."""
+    kinds = _lex(text)
+    return " ".join("".join(ch for ch, kind in zip(text, kinds)
+                            if kind != "/").split())
+
+
+def _sentence_harness(wheel: str, capabilities: dict | None) -> str:
+    """The two sentences' declarations, lifted, run the way the shell runs them."""
+    def lift(head: str, through: str) -> str:
+        return _lift(wheel, head, through=through, name="views/wheel.js")
+
+    return "\n".join([
+        _lift_import(wheel, "./display.js", name="views/wheel.js"),
+        _lift_import(wheel, "./helpers.js", name="views/wheel.js"),
+        _lift_import(wheel, "./wheel-model.js", name="views/wheel.js"),
+        # `app.js`'s own reader, which `wheel.js` does not import itself.
+        'import { readDisplay } from "./display.js";',
+        lift("const [SOURCE, GROUPING,", ";"),
+        lift("let vocab = ", ";"),
+        # REPLAYED: `app.js` reads the vocabulary once per render, with
+        # `readDisplay(probedCaps)`, and the wheel's mount hands it down.
+        f"const ctx = {{ display: readDisplay({json.dumps(capabilities)}) }};",
+        lift("vocab = ctx?.display", ";"),
+        lift("const FLYOUT_VERBS = {", ";"),
+        lift("async function fetchDeltaTexts(", "}"),
+        lift("function renderLandedBody(", "}"),
+        # REPLAYED: `showLanded`'s read and render, for an archived change whose
+        # files carry no spec delta, and the mounter's `verb.title(vocab)`.
+        "const item = { id: 'change-1', ref: { files: [] } };",
+        "const result = await fetchDeltaTexts(specDeltaPaths(item.ref?.files));",
+        "const body = document.createElement('div');",
+        "renderLandedBody(body, item, result, landedFromDeltas(result.files));",
+        "console.log(JSON.stringify({",
+        "  landed: FLYOUT_VERBS.landed.title(vocab),",
+        "  empty: byClass(body, 'wheelfly-note').map((n) => n.textContent),",
+        "}));",
+    ])
+
+
+def _run_sentences(bundle: Path, capabilities: dict | None) -> dict:
+    """Both sentences, as the composed bundle's `views/wheel.js` spells them.
+
+    `capabilities` is the `/capabilities` payload the shell probed, or `None`
+    for a static image that 404s the route. The DOM is slice S2's walkable
+    shim, above, because the empty note is read back out of the tree.
+    """
+    views = bundle / "views"
+    wheel = (views / "wheel.js").read_text(encoding="utf-8")
+    script = views / "wheel-sentences.mjs"
+    script.write_text(_S2_DOM_SHIM + _sentence_harness(wheel, capabilities),
+                      encoding="utf-8")
+    proc = subprocess.run([NODE, str(script)], capture_output=True, text=True,
+                          timeout=120)
+    assert proc.returncode == 0, proc.stderr
+    return json.loads(proc.stdout.strip().splitlines()[-1])
+
+
+def _served(register_host, *facets: str) -> dict:
+    """`/capabilities["display"]` through the engineering host, forwarding `facets`."""
+    display_profile, view_extension = _display_profile_or_skip()
+    register_host(_engineering_host(*facets))
+    return _served_display(display_profile, view_extension)
+
+
+def _the_sentences(one: str, served: dict) -> dict:
+    """What the two sentences say for the item noun `one`, with the served delta noun."""
+    delta = served["artifacts"]["delta"]["label"]
+    return {"landed": f"what landed: this {one}'s {delta}",
+            "empty": [f"this {one} records no {delta}"]}
+
+
+@pytest.mark.skipif(NODE is None, reason="node is not installed")
+def test_js_the_wheels_completion_sentences_say_implemented_item_through_the_host(
+        bundle, register_host) -> None:
+    """Both sentences take the second ruling's noun from what the host serves."""
+    served = _served(register_host, "DISPLAY")
+    assert served["host_facet"] == "declared"
+    assert served["stages"]["completion"]["one"] == IMPLEMENTED_ITEM
+    assert (_run_sentences(bundle, {"display": served})
+            == _the_sentences(IMPLEMENTED_ITEM, served))
+
+
+@pytest.mark.skipif(NODE is None, reason="node is not installed")
+@pytest.mark.parametrize("without", ["host-forwards-no-facet",
+                                     "no-capabilities-payload"])
+def test_js_the_wheels_completion_sentences_stay_neutral_without_the_facet(
+        bundle, register_host, without) -> None:
+    """openDox's own noun, both ways the facet can be missing.
+
+    The engineering host forwarding no `DISPLAY`, which the server names as
+    `host_facet: "absent"`; and no payload at all, which is a static image
+    whose `/capabilities` 404s, so the shell reads `null`.
+    """
+    served = _served(register_host)
+    assert served["host_facet"] == "absent"
+    neutral = served["stages"]["completion"]["one"]
+    assert neutral == "completed item"
+    capabilities = {"display": served} if without == "host-forwards-no-facet" else None
+    assert _run_sentences(bundle, capabilities) == _the_sentences(neutral, served)
+
+
+@pytest.mark.skipif(NODE is None, reason="node is not installed")
+def test_js_the_first_rulings_overlay_alone_leaves_both_sentences_neutral(
+        bundle, register_host, monkeypatch) -> None:
+    """THE MUTATION: the stage's names overlaid without its item nouns.
+
+    That is the facet #26 landed, `short` and `label` alone. The host still
+    reports the facet declared, and both sentences still say openDox's noun,
+    which is what the positive probe above must refuse.
+    """
+    names_only = {role: {field: word for field, word in entry.items()
+                         if field in ("short", "label")}
+                  for role, entry in view_extensions.DISPLAY["stages"].items()}
+    monkeypatch.setattr(view_extensions, "DISPLAY", {"stages": names_only})
+    served = _served(register_host, "DISPLAY")
+    assert served["host_facet"] == "declared"
+    assert served["stages"]["completion"]["short"] != "completed"
+    neutral = served["stages"]["completion"]["one"]
+    assert neutral == "completed item"
+    sentences = _run_sentences(bundle, {"display": served})
+    assert sentences == _the_sentences(neutral, served)
+    assert sentences != _the_sentences(IMPLEMENTED_ITEM, served)
+
+
+def test_the_replayed_shell_statements_are_the_pinned_bundles(bundle) -> None:
+    """Each statement the harness REPLAYS, held to the pinned code it stands in for.
+
+    Compared as CODE: `_code()` drops comments first, so an old statement kept
+    in a comment cannot stand in for a live one that changed. That is the
+    finding the review of `a1eef310` made against a fragment search on #26.
+    """
+    app = (bundle / "app.js").read_text(encoding="utf-8")
+    wheel = (bundle / "views" / "wheel.js").read_text(encoding="utf-8")
+    assert _code(_lift(app, "const display = readDisplay(", through=";",
+                       name="app.js")) == "const display = readDisplay(probedCaps);"
+    mount = _code(_lift(app, "renderWheel(root, snap,", through=")", name="app.js"))
+    assert "display: ctx.display," in mount, mount
+    assert _code(_lift(wheel, "btn.title = typeof verb.title", through=";",
+                       name="views/wheel.js")) == (
+        'btn.title = typeof verb.title === "function" ? verb.title(vocab)'
+        ' : (verb.title || "");')
+    landed = _code(_lift(wheel, "function showLanded(", through="}",
+                         name="views/wheel.js"))
+    assert "prepare: () => fetchDeltaTexts(specDeltaPaths(item.ref?.files))," in landed
+    assert ("render: (body, result) => renderLandedBody(body, item, result,"
+            " landedFromDeltas(result.files)),") in landed
+
+
+# ---------------------------------------------------------------------------
 # THE GUARD ITSELF, TESTED DIRECTLY — Copilot round-2 thread on #21
 # (`PRRT_kwDOUPv7_s6i_iiz`, "the new provenance decision is only exercised
 # indirectly on the normal bundle-present path; there are no tests"). Accurate:
@@ -697,7 +975,7 @@ console.log(JSON.stringify({ a, b, sent }));
 # needs an admission row in openxFactory's `docs/opendox-carve-admissions.yaml`
 # (RULED OQ-C), and adding one is not a pin bump's act. This module is already
 # admitted, already on `validate.yml`'s list, and already owns the fixture whose
-# thirteen probes the decision gates.
+# probes the decision gates.
 # ---------------------------------------------------------------------------
 
 import opendox_bundle as _ob  # noqa: E402  (a helper import, never OPENDOX_WEB)
@@ -1426,9 +1704,9 @@ def test_require_forwards_its_DEFAULT_module_level_to_the_skip(monkeypatch) -> N
 def test_the_bundle_fixture_FAILS_at_the_declared_pin(request, monkeypatch) -> None:
     """The `bundle` fixture's call site, driven through the real fixture.
 
-    `request.getfixturevalue` runs the fixture that the thirteen probes below
-    receive, so what is proven is the branch they actually take — not a copy of
-    it written into the test.
+    `request.getfixturevalue` runs the fixture that every probe above receives,
+    so what is proven is the branch they actually take — not a copy of it
+    written into the test.
     """
     import sys
     _pin(monkeypatch, _PIN_A, _PIN_A)

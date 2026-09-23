@@ -20,16 +20,18 @@ openDox-spec's own § 4.5 test is written to, and the BEHAVIOURAL probes of thes
 modules live at openDox-code where the shell that mounts them is.
 
 AND THE DISPLAY FACET, the second thing `view_extensions` declares for openDox's
-shell (RULED `opensoft/openxFactory#656` comment `5784683830`). Its section, at
-the end of this file, is where this suite reaches the pinned openDox's
-`display_profile`, `profile_proxy` and `domain_profile`, and reads the pinned
-`serve.py` as text. It registers a host built from the vendored engineering
-profile with openDox's registry, one test at a time, and reads the facet back
-through the lazy proxy by the statement the pinned `serve.build_server()` makes.
-Every test there that reads anything off openDox asks `_display_profile_or_skip()`
-first, on `_view_extension_or_skip()`'s footing. The guard's own call-site tests
-are the exception: they take openDox apart before they call it, which is their
-point.
+shell (RULED `opensoft/openxFactory#656` comments `5784683830` and `5801057769`).
+Its section, at the end of this file, is where this suite reaches the pinned
+openDox's `display_profile`, `profile_proxy` and `domain_profile`, and reads the
+pinned `serve.py` as text. It registers a host built from the vendored
+engineering profile with openDox's registry, one test at a time, and reads the
+facet back through the lazy proxy by the statement the pinned
+`serve.build_server()` makes. Every test there that reads anything off openDox
+asks `_display_profile_or_skip()` first, on `_view_extension_or_skip()`'s
+footing. The guard's own call-site tests are the exception: they take openDox
+apart before they call it, which is their point. What the SHELL then renders
+from that facet is executed under node in `tests/test_gate_loop_probes.py`,
+whose wheel-sentence section borrows this section's host and guard.
 
 A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
 (RULED OQ-C).
@@ -1479,15 +1481,21 @@ def test_a_view_extension_without_ViewBinding_SKIPS_for_a_different_commit(
 # ---------------------------------------------------------------------------
 # THE DISPLAY FACET — RULED `opensoft/openxFactory#656` comment `5784683830`
 # (Brett Heap, 2026-09-22, verbatim "1, keep completed and overlay
-# implemented"). The facet `view_extensions` declares beside `VIEW_EXTENSIONS`,
-# read the way openDox reads it: off the ONE registered host, through the lazy
-# proxy, by the statement the pinned `serve.build_server()` makes. The host is
-# built from the vendored engineering profile and registered for ONE test at a
-# time; nothing here leaves a registration behind.
+# implemented"), and comment `5801057769` (Brett Heap, 2026-09-23, verbatim
+# "yes, overlay implemented items too"). The facet `view_extensions` declares
+# beside `VIEW_EXTENSIONS`, read the way openDox reads it: off the ONE
+# registered host, through the lazy proxy, by the statement the pinned
+# `serve.build_server()` makes. The host is built from the vendored engineering
+# profile and registered for ONE test at a time; nothing here leaves a
+# registration behind.
 # ---------------------------------------------------------------------------
 
-#: The word the ruling overlays on openDox's sixth stage.
+#: The word the first ruling overlays on openDox's sixth stage's two names.
 IMPLEMENTED = "implemented"
+
+#: The item nouns the second ruling overlays on the same stage.
+IMPLEMENTED_ITEM = "implemented item"
+IMPLEMENTED_ITEMS = "implemented items"
 
 #: The vendored engineering profile, openXdox-spec's worked example of
 #: openxFactory's OWN profile. The host below is built from it, so the name the
@@ -1616,8 +1624,11 @@ def _reports_the_facet(manifest: dict) -> bool:
 
 
 def _completion_renders_implemented(manifest: dict) -> bool:
+    """Both rulings' words, every one: the stage's two names and its two item nouns."""
     completion = manifest["stages"]["completion"]
-    return completion["short"] == IMPLEMENTED and completion["label"] == IMPLEMENTED
+    return (completion["short"] == IMPLEMENTED and completion["label"] == IMPLEMENTED
+            and completion["one"] == IMPLEMENTED_ITEM
+            and completion["many"] == IMPLEMENTED_ITEMS)
 
 
 def _flatten(value, path: str = "") -> dict[str, object]:
@@ -1631,16 +1642,17 @@ def _flatten(value, path: str = "") -> dict[str, object]:
 
 
 def test_the_display_facet_declares_one_stage_entry_and_nothing_else() -> None:
-    """The ruling's partial facet, pinned as a value: `stages.completion`, two fields.
+    """The rulings' partial facet, pinned as a value: `stages.completion`, four fields.
 
     `short` and `label` because they are the stage's two rendered names and
-    openDox spells both `completed`; `one`, `many` and `gate` are left to
-    openDox. The block above `DISPLAY` in `view_extensions.py` gives the render
-    sites.
+    openDox spells both `completed` (the first ruling); `one` and `many` because
+    they are its two item nouns (the second). `gate` is left to openDox. The
+    block above `DISPLAY` in `view_extensions.py` gives the render sites.
     """
     assert "DISPLAY" in view_extensions.__all__
     assert view_extensions.DISPLAY == {
-        "stages": {"completion": {"short": IMPLEMENTED, "label": IMPLEMENTED}},
+        "stages": {"completion": {"one": IMPLEMENTED_ITEM, "many": IMPLEMENTED_ITEMS,
+                                  "short": IMPLEMENTED, "label": IMPLEMENTED}},
     }
 
 
@@ -1650,6 +1662,8 @@ def test_the_display_facet_conforms_to_the_pinned_reader() -> None:
     merged = display_profile.normalize_display(view_extensions.DISPLAY)
     assert merged["stages"]["completion"]["short"] == IMPLEMENTED
     assert merged["stages"]["completion"]["label"] == IMPLEMENTED
+    assert merged["stages"]["completion"]["one"] == IMPLEMENTED_ITEM
+    assert merged["stages"]["completion"]["many"] == IMPLEMENTED_ITEMS
 
 
 def test_the_facet_name_is_not_a_field_of_the_domain_profile() -> None:
@@ -1682,14 +1696,16 @@ def test_the_manifest_through_the_xfactory_host_reports_the_facet_declared(
 
 def test_the_completion_stage_renders_implemented_through_the_host(
         register_host) -> None:
-    """Both of the stage's names say `implemented`; its item nouns stay openDox's."""
+    """Both names say `implemented` and both item nouns `implemented item(s)`.
+
+    The stage's `gate` is the one field of the entry that stays openDox's.
+    """
     display_profile, view_extension = _display_profile_or_skip()
     register_host(_engineering_host("DISPLAY"))
     served = _served_display(display_profile, view_extension)
     assert _completion_renders_implemented(served), served["stages"]["completion"]
     neutral = display_profile.NEUTRAL_DISPLAY["stages"]["completion"]
-    for field in ("one", "many", "gate"):
-        assert served["stages"]["completion"][field] == neutral[field], field
+    assert served["stages"]["completion"]["gate"] == neutral["gate"]
 
 
 def test_every_other_stage_still_renders_the_neutral_word(register_host) -> None:
@@ -1704,9 +1720,9 @@ def test_every_other_stage_still_renders_the_neutral_word(register_host) -> None
         assert served["stages"][role] == neutral, role
 
 
-def test_the_overlay_changes_two_words_and_the_named_absence_and_nothing_else(
+def test_the_overlay_changes_four_words_and_the_named_absence_and_nothing_else(
         register_host) -> None:
-    """Against the same host WITHOUT the facet: three leaves differ, and they are these.
+    """Against the same host WITHOUT the facet: five leaves differ, and they are these.
 
     Both payloads come through the same chain. The facet-less host is registered
     second, after an explicit `unregister()`, because the registry refuses a
@@ -1726,6 +1742,8 @@ def test_the_overlay_changes_two_words_and_the_named_absence_and_nothing_else(
                for path in declared if declared[path] != absent[path]}
     assert changed == {
         "host_facet": ("absent", "declared"),
+        "stages.completion.one": ("completed item", IMPLEMENTED_ITEM),
+        "stages.completion.many": ("completed items", IMPLEMENTED_ITEMS),
         "stages.completion.short": ("completed", IMPLEMENTED),
         "stages.completion.label": ("completed", IMPLEMENTED),
     }
@@ -1811,6 +1829,7 @@ def test_dropping_the_facet_fails_the_overlay(register_host, monkeypatch,
     served = _served_display(display_profile, view_extension)
     assert served["host_facet"] == "absent"
     assert served["stages"]["completion"]["short"] == "completed"
+    assert served["stages"]["completion"]["one"] == "completed item"
     assert not _reports_the_facet(served)
     assert not _completion_renders_implemented(served)
 
