@@ -1731,25 +1731,65 @@ def test_the_overlay_changes_two_words_and_the_named_absence_and_nothing_else(
     }
 
 
+def _is_display_assignment(node: ast.AST) -> bool:
+    """`capabilities["display"] = …`, the one statement the replay stands in for."""
+    if not (isinstance(node, ast.Assign) and len(node.targets) == 1):
+        return False
+    target = node.targets[0]
+    return (isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name)
+            and target.value.id == "capabilities"
+            and isinstance(target.slice, ast.Constant)
+            and target.slice.value == "display")
+
+
 def test_the_replayed_statement_is_the_one_the_pinned_serve_makes() -> None:
-    """`_served_display` replays `serve.build_server()`; this holds it to the text.
+    """`_served_display` replays `serve.build_server()`; this holds it to its AST.
 
     A pin bump that changed how the server builds the block would otherwise
     leave every assertion in this section green over a replay of a statement
-    the server no longer makes.
+    the server no longer makes. Both sides are PARSED, not searched (Copilot
+    review of `a1eef310`: matching scattered fragments could pass with the live
+    assignment changed and the old text left in a comment). There must be
+    exactly one `capabilities["display"] = …` in `build_server`, its value must
+    be the very expression `_served_display` returns (compared by `ast.dump`,
+    so comments and a trailing comma do not count), and the three names that
+    expression uses must be bound where the replay binds them:
+    `display_profile` and `view_extension` from `opendox` at module scope, and
+    `profile_openxfactory` from `opendox.profile_proxy` inside `build_server`.
     """
     display_profile, _ = _display_profile_or_skip()
     serve = Path(display_profile.__file__).with_name("serve.py")
-    source = serve.read_text(encoding="utf-8")
-    for fragment in (
-            "from opendox.profile_proxy import profile_openxfactory",
-            'capabilities["display"] = display_profile.display_manifest(',
-            "display_profile.host_display(profile_openxfactory),",
-            "host_profile=view_extension.host_profile_name(profile_openxfactory),"):
-        assert fragment in source, (
-            f"the installed {serve} no longer carries {fragment!r}: "
-            "`_served_display` replays a statement the pinned server may no "
-            "longer make, and needs re-reading against it")
+    served = ast.parse(serve.read_text(encoding="utf-8"))
+    builds = [node for node in served.body
+              if isinstance(node, ast.FunctionDef) and node.name == "build_server"]
+    assert len(builds) == 1, f"{serve} defines build_server {len(builds)} times"
+    assignments = [node for node in ast.walk(builds[0])
+                   if _is_display_assignment(node)]
+    assert len(assignments) == 1, (
+        f"{serve}'s build_server makes {len(assignments)} "
+        '`capabilities["display"] = …` assignments; the replay stands in for one')
+
+    here = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    replay = next(node for node in here.body if isinstance(node, ast.FunctionDef)
+                  and node.name == "_served_display")
+    returned = [node.value for node in ast.walk(replay)
+                if isinstance(node, ast.Return)]
+    assert len(returned) == 1
+    assert ast.dump(assignments[0].value) == ast.dump(returned[0]), (
+        f"{serve} builds the display block as "
+        f"{ast.unparse(assignments[0].value)!r}, and `_served_display` replays "
+        f"{ast.unparse(returned[0])!r}: the replay needs re-reading against it")
+
+    def bound(scope: ast.AST, module: str) -> set[str]:
+        return {alias.asname or alias.name for node in ast.walk(scope)
+                if isinstance(node, ast.ImportFrom) and node.module == module
+                for alias in node.names}
+
+    module_scope = ast.Module(body=[node for node in served.body
+                                    if isinstance(node, ast.ImportFrom)],
+                              type_ignores=[])
+    assert {"display_profile", "view_extension"} <= bound(module_scope, "opendox")
+    assert "profile_openxfactory" in bound(builds[0], "opendox.profile_proxy")
 
 
 @pytest.mark.parametrize("dropped", ["host-forwards-no-facet", "module-value-deleted"])
