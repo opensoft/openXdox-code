@@ -26,8 +26,10 @@ the end of this file, is where this suite reaches the pinned openDox's
 `serve.py` as text. It registers a host built from the vendored engineering
 profile with openDox's registry, one test at a time, and reads the facet back
 through the lazy proxy by the statement the pinned `serve.build_server()` makes.
-Every test there that reads the facet asks `_display_profile_or_skip()` first,
-on `_view_extension_or_skip()`'s footing.
+Every test there that reads anything off openDox asks `_display_profile_or_skip()`
+first, on `_view_extension_or_skip()`'s footing. The guard's own call-site tests
+are the exception: they take openDox apart before they call it, which is their
+point.
 
 A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
 (RULED OQ-C).
@@ -1498,7 +1500,8 @@ ENGINEERING_PROFILE = (Path(__file__).resolve().parent / "fixtures"
 #: three readers left the constants, the proxy and the registry to surface as an
 #: `AttributeError` instead of the ruled outcome).
 #: `test_the_guard_checks_every_name_the_display_section_reads` holds this table
-#: to the file's own reads, so a new read cannot slip past it.
+#: to the section's own reads, both ways, so a new read cannot slip past it and
+#: no entry outlives the read it was added for.
 DISPLAY_READS: dict[str, tuple[str, ...]] = {
     "display_profile": ("normalize_display", "host_display", "display_manifest",
                         "DISPLAY_KIND", "DISPLAY_SCHEMA_VERSION", "PROFILE_FACET",
