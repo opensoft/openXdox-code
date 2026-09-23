@@ -1556,11 +1556,11 @@ def _engineering_host(*facets: str):
     an `AttributeError`, so `host_display()`'s three-argument `getattr` answers
     `None` for a facet this host does not forward.
     """
-    from openxdox import domain_profile
+    from openxdox import domain_profile as engine
 
-    loaded = domain_profile.load(ENGINEERING_PROFILE)
+    loaded = engine.load(ENGINEERING_PROFILE)
 
-    class EngineeringHost(domain_profile.DomainProfile):
+    class EngineeringHost(engine.DomainProfile):
         __slots__ = ()
 
         def __getattr__(self, name: str):
@@ -1660,11 +1660,11 @@ def test_the_facet_name_is_not_a_field_of_the_domain_profile() -> None:
     named like a profile field. A `DISPLAY` on the dataclass would be read
     instead of forwarded, and would stop that composite being built at all.
     """
-    from openxdox import domain_profile
+    from openxdox import domain_profile as engine
 
-    fields = {f.name for f in dataclasses.fields(domain_profile.DomainProfile)}
+    fields = {f.name for f in dataclasses.fields(engine.DomainProfile)}
     assert "DISPLAY" not in fields
-    assert not hasattr(domain_profile.load(ENGINEERING_PROFILE), "DISPLAY")
+    assert not hasattr(engine.load(ENGINEERING_PROFILE), "DISPLAY")
 
 
 def test_the_manifest_through_the_xfactory_host_reports_the_facet_declared(
@@ -1914,6 +1914,15 @@ def test_the_guard_checks_every_name_the_display_section_reads() -> None:
     `from opendox import X` to a module the table names (Copilot review of
     `f8d2aad7`: the first version checked two aliases and two names, not every
     module and proxy read).
+
+    THIS LEG'S OWN `openxdox.domain_profile` IS NOT AN openDox READ, and it is
+    not collected: it is bound as `engine`, as openxFactory's `opendox_host`
+    binds it, so that it cannot be mistaken for openDox's registry of the same
+    module name. Only a guard return or a `from opendox import X` puts a name
+    in `held`, and a `from opendox.X import Y` adds its pair directly (Copilot
+    review of `2dcceceb` read `engine.load` and `engine.DomainProfile` as
+    openDox reads; listing them would make the guard refuse the declared pin,
+    whose `opendox.domain_profile` has neither).
     """
     source = Path(__file__).read_text(encoding="utf-8")
     header = source.count("\n", 0, source.index("# THE DISPLAY FACET — RULED")) + 1
