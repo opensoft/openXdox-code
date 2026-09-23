@@ -121,6 +121,13 @@ sitting rather than against this module's own account of it:
   Q12 a COMPUTED route is declared as its LITERALS: `gate.dispose` declares the
       four `/actions/gate/<verb>` routes `dispose.js` used to concatenate.
 
+AND ONE FACET THAT IS NOT A BINDING. `DISPLAY`, declared below
+`VIEW_EXTENSIONS`, is the other thing this module contributes to openDox's
+shell: not a panel but a WORD, the xFactory host's label for openDox's sixth
+stage, RULED at `opensoft/openxFactory#656` comment `5784683830`. Its own block
+says what it declares, why it is partial, and what the assembly still owes
+before a served page shows it.
+
 A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
 (RULED OQ-C).
 """
@@ -135,6 +142,7 @@ from openxdox import web_assets
 __all__ = [
     "BUNDLE_REACH",
     "CTX_MODEL_REACH",
+    "DISPLAY",
     "GUARANTEED_BUNDLE_MODULE",
     "STYLE_RESIDUE",
     "VIEW_BINDING_SPECS",
@@ -593,6 +601,64 @@ class GateLoopViews:
 #: there. That one line is the assembly's, not this leg's, and it is recorded as
 #: owed rather than reached for from here.
 VIEW_EXTENSIONS: tuple[GateLoopViews, ...] = (GateLoopViews(),)
+
+
+#: THE DISPLAY FACET, beside `VIEW_EXTENSIONS`: the words openDox's shell
+#: renders, where `VIEW_EXTENSIONS` is the panels it mounts.
+#: `opendox.display_profile.host_display()` reads it off the ONE registered host
+#: profile by the name `PROFILE_FACET` = `"DISPLAY"`, and `serve.build_server()`
+#: publishes the result as the `display` block of `/capabilities`, which every
+#: class-C view resolves BY ROLE.
+#:
+#: RULED, NOT CHOSEN HERE: `opensoft/openxFactory#656` comment `5784683830`
+#: (Brett Heap, 2026-09-22, verbatim "1, keep completed and overlay
+#: implemented"), after comment `5784654370` ("2, keep completed"). openDox's
+#: sixth neutral stage keeps the role `completion` and the word `completed`, and
+#: the xFactory host overlays `implemented`, the word the governed lifecycle
+#: already uses. openxFactory `docs/document-lifecycle.md` declares that
+#: lifecycle "for openxFactory and every DomainxFactory", and its spine reads
+#: `implemented  the artifact (doc, schema, validator, template) is built`
+#: ("`proposed -> ratified -> implemented`: standard OpenSpec flow"). It is a
+#: stage LABEL, not a status any engine compares against, and it is none of the
+#: nine `Status:` words RULING C2 keeps out of this package's engine
+#: (`tests/test_no_hardcoded_status_words.py`, `TAXONOMY_WORDS`).
+#:
+#: PARTIAL, WHICH IS THE SCHEMA'S OWN POINT: one stage entry, two fields.
+#: `normalize_display` fills every other role and field from `NEUTRAL_DISPLAY`
+#: ("PARTIAL IS LEGAL, AND IT IS THE POINT"). Its `_STAGE_FIELDS_REQUIRED`
+#: (`one`, `many`, `short`, `label`) names the text fields a stage entry MAY
+#: carry and reads each one only where it is present, so no entry has to carry
+#: all four. TWO FIELDS RATHER THAN ONE, because `short` and `label` are the
+#: stage's two rendered NAMES and openDox spells both `completed`: in the pinned
+#: bundle `views/lineage.js` titles a tile with `label` and captions the same
+#: tile with `short`, `views/board.js` heads the column with `label`, and
+#: `views/wheel-model.js` names the reel with `short`. Overlaying only one of
+#: them would show the stage under both words at once. `one` and `many`
+#: ("completed item", "completed items") are ITEM nouns rather than the stage's
+#: label, and `gate` is `None`, so all three stay openDox's.
+#:
+#: A MODULE VALUE, NEVER A FIELD OF `openxdox.domain_profile.DomainProfile`.
+#: The estate's composite host (openxFactory `scripts/opendox_host.py`,
+#: `OpenxFactoryProfile`) is a `DomainProfile` subclass that FORWARDS a facet
+#: only when ordinary attribute lookup fails, and its `build_profile()` refuses
+#: a facet named like a profile field. A `DISPLAY` on the dataclass would
+#: therefore never be forwarded, and would stop that composite being built at
+#: all. `tests/test_gate_loop_views.py` asserts the name stays off it.
+#:
+#: WHAT REACHES A SERVED PAGE, AND WHAT IS OWED. openDox reads the registered
+#: profile, never this module. In this estate that profile forwards `DISPLAY` to
+#: openxFactory's `scripts/profile_openxfactory.py`, which ALREADY declares a
+#: facet of its own (openxFactory #1021 -> `7b3d097b`: statuses, areas, acts and
+#: artifacts). That facet deliberately declares no `stages`, and
+#: `tests/test_engineering_profile_display_facet.py` there asserts the absence.
+#: So this entry renders once that facet takes this leg's `stages` into its
+#: own. That is the assembly's act, recorded as owed rather than reached for
+#: from here, exactly as the `VIEW_EXTENSIONS` re-export above is.
+DISPLAY: dict[str, Any] = {
+    "stages": {
+        "completion": {"short": "implemented", "label": "implemented"},
+    },
+}
 
 
 #: Re-exported so a reader of this module can see, in one place, that the

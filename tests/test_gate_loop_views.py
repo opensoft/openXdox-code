@@ -19,6 +19,18 @@ have — the JS assertions are text/regex SHAPE assertions, the same constraint
 openDox-spec's own § 4.5 test is written to, and the BEHAVIOURAL probes of these
 modules live at openDox-code where the shell that mounts them is.
 
+AND THE DISPLAY FACET, the second thing `view_extensions` declares for openDox's
+shell (RULED `opensoft/openxFactory#656` comment `5784683830`). Its section, at
+the end of this file, is where this suite reaches the pinned openDox's
+`display_profile`, `profile_proxy` and `domain_profile`, and reads the pinned
+`serve.py` as text. It registers a host built from the vendored engineering
+profile with openDox's registry, one test at a time, and reads the facet back
+through the lazy proxy by the statement the pinned `serve.build_server()` makes.
+Every test there that reads anything off openDox asks `_display_profile_or_skip()`
+first, on `_view_extension_or_skip()`'s footing. The guard's own call-site tests
+are the exception: they take openDox apart before they call it, which is their
+point.
+
 A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
 (RULED OQ-C).
 """
@@ -1462,3 +1474,520 @@ def test_a_view_extension_without_ViewBinding_SKIPS_for_a_different_commit(
     assert "ViewBinding" in message
     assert _PIN_DECLARED[:8] in message
     assert _PIN_OTHER[:8] in message
+
+
+# ---------------------------------------------------------------------------
+# THE DISPLAY FACET — RULED `opensoft/openxFactory#656` comment `5784683830`
+# (Brett Heap, 2026-09-22, verbatim "1, keep completed and overlay
+# implemented"). The facet `view_extensions` declares beside `VIEW_EXTENSIONS`,
+# read the way openDox reads it: off the ONE registered host, through the lazy
+# proxy, by the statement the pinned `serve.build_server()` makes. The host is
+# built from the vendored engineering profile and registered for ONE test at a
+# time; nothing here leaves a registration behind.
+# ---------------------------------------------------------------------------
+
+#: The word the ruling overlays on openDox's sixth stage.
+IMPLEMENTED = "implemented"
+
+#: The vendored engineering profile, openXdox-spec's worked example of
+#: openxFactory's OWN profile. The host below is built from it, so the name the
+#: served payload carries is the engineering domain's rather than a stand-in's.
+ENGINEERING_PROFILE = (Path(__file__).resolve().parent / "fixtures"
+                       / "openxfactory-engineering-profile.yaml")
+
+#: EVERY name this section reads off the pinned openDox, by module, so the guard
+#: below can check all of them (Copilot review of `7956c05c`: checking only the
+#: three readers left the constants, the proxy and the registry to surface as an
+#: `AttributeError` instead of the ruled outcome).
+#: `test_the_guard_checks_every_name_the_display_section_reads` holds this table
+#: to the section's own reads, both ways, so a new read cannot slip past it and
+#: no entry outlives the read it was added for.
+DISPLAY_READS: dict[str, tuple[str, ...]] = {
+    "display_profile": ("normalize_display", "host_display", "display_manifest",
+                        "DISPLAY_KIND", "DISPLAY_SCHEMA_VERSION", "PROFILE_FACET",
+                        "NEUTRAL_DISPLAY", "STAGE_ROLES", "DisplayFacetError"),
+    "profile_proxy": ("profile_openxfactory",),
+    "domain_profile": ("register", "unregister", "current", "is_registered"),
+    "view_extension": ("host_profile_name",),
+}
+
+
+def _display_profile_or_skip():
+    """`opendox.display_profile` and `opendox.view_extension`, or `_absent()`'s outcome.
+
+    `_view_extension_or_skip()`'s guard, one facet over, on the same ruled
+    footing (RULED openxFactory#656 comment 5700475319: keep the guards, "they
+    test the ASSEMBLED openDox; a consumer may pin behind the view contract").
+    `display_profile` arrived with openDox-code#21 (§ 3.4 slice S7), one PR after
+    the view contract's `exports` (#20), so an assembly can carry a view registry
+    this column mounts on and no display reader at all. It checks every module
+    and name in `DISPLAY_READS`. At the pin this leg declares, anything missing
+    FAILS; at a different installed commit it SKIPS, naming both.
+    """
+    import importlib
+    import opendox_bundle
+    view_extension = _view_extension_or_skip()
+    modules: dict[str, object] = {}
+    missing: list[str] = []
+    for module, names in DISPLAY_READS.items():
+        try:
+            modules[module] = importlib.import_module(f"opendox.{module}")
+        except ImportError:
+            missing.append(f"opendox.{module}")
+            continue
+        missing += [f"opendox.{module}.{name}" for name in names
+                    if not hasattr(modules[module], name)]
+    if missing:
+        opendox_bundle._absent(
+            "what the DISPLAY facet's reader needs from openDox "
+            f"({', '.join(missing)}; § 3.4 slice S7, openDox-code#21)",
+            module_level=False)
+    return modules["display_profile"], view_extension
+
+
+def _engineering_host(*facets: str):
+    """openxFactory's engineering profile, composed into a host as the estate does.
+
+    openxFactory's `scripts/opendox_host.py` builds `OpenxFactoryProfile`, an
+    `openxdox.domain_profile.DomainProfile` subclass that FORWARDS its declared
+    facets when ordinary attribute lookup fails. This is that shape with this
+    leg's module as the forward target: each name in `facets` is read off
+    `view_extensions` at the moment openDox asks for it, and every other name is
+    an `AttributeError`, so `host_display()`'s three-argument `getattr` answers
+    `None` for a facet this host does not forward.
+    """
+    from openxdox import domain_profile as engine
+
+    loaded = engine.load(ENGINEERING_PROFILE)
+
+    class EngineeringHost(engine.DomainProfile):
+        __slots__ = ()
+
+        def __getattr__(self, name: str):
+            if name in facets:
+                return getattr(view_extensions, name)
+            raise AttributeError(name)
+
+    return EngineeringHost(**{f.name: getattr(loaded, f.name)
+                              for f in dataclasses.fields(loaded)})
+
+
+@pytest.fixture
+def register_host():
+    """Hand a test openDox's `register`, and restore the registry afterwards.
+
+    The registry is process-global and `validate` runs every listed file in ONE
+    process, so whatever was registered before is put back and nothing this
+    section registers survives the test that registered it. The guard runs
+    FIRST, so an assembly without the display reader gets its ruled outcome
+    before this fixture reaches openDox's registry at all.
+    """
+    _display_profile_or_skip()
+    from opendox import domain_profile as registry
+
+    previous = registry.current() if registry.is_registered() else None
+    registry.unregister()
+    try:
+        yield registry.register
+    finally:
+        registry.unregister()
+        if previous is not None:
+            registry.register(previous)
+
+
+def _served_display(display_profile, view_extension) -> dict:
+    """`/capabilities["display"]`, by the pinned `serve.build_server()`'s statement.
+
+    `opendox.serve` cannot be imported at this leg (it reaches
+    `ideation_dashboard`, which is openxFactory's), so the statement is REPLAYED
+    rather than called, and
+    `test_the_replayed_statement_is_the_one_the_pinned_serve_makes` holds the
+    replay to the installed `serve.py`'s text.
+    """
+    from opendox.profile_proxy import profile_openxfactory
+
+    return display_profile.display_manifest(
+        display_profile.host_display(profile_openxfactory),
+        host_profile=view_extension.host_profile_name(profile_openxfactory))
+
+
+def _reports_the_facet(manifest: dict) -> bool:
+    return manifest["host_facet"] == "declared"
+
+
+def _completion_renders_implemented(manifest: dict) -> bool:
+    completion = manifest["stages"]["completion"]
+    return completion["short"] == IMPLEMENTED and completion["label"] == IMPLEMENTED
+
+
+def _flatten(value, path: str = "") -> dict[str, object]:
+    """Every leaf of a payload by dotted path, so two payloads compare leaf by leaf."""
+    if isinstance(value, dict):
+        out: dict[str, object] = {}
+        for key, item in value.items():
+            out.update(_flatten(item, f"{path}.{key}" if path else str(key)))
+        return out
+    return {path: value}
+
+
+def test_the_display_facet_declares_one_stage_entry_and_nothing_else() -> None:
+    """The ruling's partial facet, pinned as a value: `stages.completion`, two fields.
+
+    `short` and `label` because they are the stage's two rendered names and
+    openDox spells both `completed`; `one`, `many` and `gate` are left to
+    openDox. The block above `DISPLAY` in `view_extensions.py` gives the render
+    sites.
+    """
+    assert "DISPLAY" in view_extensions.__all__
+    assert view_extensions.DISPLAY == {
+        "stages": {"completion": {"short": IMPLEMENTED, "label": IMPLEMENTED}},
+    }
+
+
+def test_the_display_facet_conforms_to_the_pinned_reader() -> None:
+    """Handed to the pinned `normalize_display` itself, never a copy of its schema."""
+    display_profile, _ = _display_profile_or_skip()
+    merged = display_profile.normalize_display(view_extensions.DISPLAY)
+    assert merged["stages"]["completion"]["short"] == IMPLEMENTED
+    assert merged["stages"]["completion"]["label"] == IMPLEMENTED
+
+
+def test_the_facet_name_is_not_a_field_of_the_domain_profile() -> None:
+    """The name stays OFF `DomainProfile`, which is why the facet is a module value.
+
+    The composite host forwards a facet only when ordinary attribute lookup
+    fails, and openxFactory's `opendox_host.build_profile()` refuses a facet
+    named like a profile field. A `DISPLAY` on the dataclass would be read
+    instead of forwarded, and would stop that composite being built at all.
+    """
+    from openxdox import domain_profile as engine
+
+    fields = {f.name for f in dataclasses.fields(engine.DomainProfile)}
+    assert "DISPLAY" not in fields
+    assert not hasattr(engine.load(ENGINEERING_PROFILE), "DISPLAY")
+
+
+def test_the_manifest_through_the_xfactory_host_reports_the_facet_declared(
+        register_host) -> None:
+    """The named absence turns into a named presence, and the host is named."""
+    display_profile, view_extension = _display_profile_or_skip()
+    register_host(_engineering_host("DISPLAY"))
+    served = _served_display(display_profile, view_extension)
+    assert served["kind"] == display_profile.DISPLAY_KIND
+    assert served["schema_version"] == display_profile.DISPLAY_SCHEMA_VERSION
+    assert served["facet"] == display_profile.PROFILE_FACET == "DISPLAY"
+    assert _reports_the_facet(served), served["host_facet"]
+    assert served["host_profile"] == "openxfactory-engineering"
+
+
+def test_the_completion_stage_renders_implemented_through_the_host(
+        register_host) -> None:
+    """Both of the stage's names say `implemented`; its item nouns stay openDox's."""
+    display_profile, view_extension = _display_profile_or_skip()
+    register_host(_engineering_host("DISPLAY"))
+    served = _served_display(display_profile, view_extension)
+    assert _completion_renders_implemented(served), served["stages"]["completion"]
+    neutral = display_profile.NEUTRAL_DISPLAY["stages"]["completion"]
+    for field in ("one", "many", "gate"):
+        assert served["stages"]["completion"][field] == neutral[field], field
+
+
+def test_every_other_stage_still_renders_the_neutral_word(register_host) -> None:
+    """Five stages, every field, exactly as openDox declares them."""
+    display_profile, view_extension = _display_profile_or_skip()
+    register_host(_engineering_host("DISPLAY"))
+    served = _served_display(display_profile, view_extension)
+    others = [role for role in display_profile.STAGE_ROLES if role != "completion"]
+    assert len(others) == 5
+    for role in others:
+        neutral = display_profile.NEUTRAL_DISPLAY["stages"][role]
+        assert served["stages"][role] == neutral, role
+
+
+def test_the_overlay_changes_two_words_and_the_named_absence_and_nothing_else(
+        register_host) -> None:
+    """Against the same host WITHOUT the facet: three leaves differ, and they are these.
+
+    Both payloads come through the same chain. The facet-less host is registered
+    second, after an explicit `unregister()`, because the registry refuses a
+    second, different profile over a first.
+    """
+    from opendox import domain_profile as registry
+
+    display_profile, view_extension = _display_profile_or_skip()
+    register_host(_engineering_host("DISPLAY"))
+    declared = _flatten(_served_display(display_profile, view_extension))
+    registry.unregister()
+    register_host(_engineering_host())
+    absent = _flatten(_served_display(display_profile, view_extension))
+    assert absent["host_facet"] == "absent"
+    assert declared.keys() == absent.keys()
+    changed = {path: (absent[path], declared[path])
+               for path in declared if declared[path] != absent[path]}
+    assert changed == {
+        "host_facet": ("absent", "declared"),
+        "stages.completion.short": ("completed", IMPLEMENTED),
+        "stages.completion.label": ("completed", IMPLEMENTED),
+    }
+
+
+def _is_display_assignment(node: ast.AST) -> bool:
+    """`capabilities["display"] = …`, the one statement the replay stands in for."""
+    if not (isinstance(node, ast.Assign) and len(node.targets) == 1):
+        return False
+    target = node.targets[0]
+    return (isinstance(target, ast.Subscript) and isinstance(target.value, ast.Name)
+            and target.value.id == "capabilities"
+            and isinstance(target.slice, ast.Constant)
+            and target.slice.value == "display")
+
+
+def test_the_replayed_statement_is_the_one_the_pinned_serve_makes() -> None:
+    """`_served_display` replays `serve.build_server()`; this holds it to its AST.
+
+    A pin bump that changed how the server builds the block would otherwise
+    leave every assertion in this section green over a replay of a statement
+    the server no longer makes. Both sides are PARSED, not searched (Copilot
+    review of `a1eef310`: matching scattered fragments could pass with the live
+    assignment changed and the old text left in a comment). There must be
+    exactly one `capabilities["display"] = …` in `build_server`, its value must
+    be the very expression `_served_display` returns (compared by `ast.dump`,
+    so comments and a trailing comma do not count), and the three names that
+    expression uses must be bound where the replay binds them:
+    `display_profile` and `view_extension` from `opendox` at module scope, and
+    `profile_openxfactory` from `opendox.profile_proxy` inside `build_server`.
+    """
+    display_profile, _ = _display_profile_or_skip()
+    serve = Path(display_profile.__file__).with_name("serve.py")
+    served = ast.parse(serve.read_text(encoding="utf-8"))
+    builds = [node for node in served.body
+              if isinstance(node, ast.FunctionDef) and node.name == "build_server"]
+    assert len(builds) == 1, f"{serve} defines build_server {len(builds)} times"
+    assignments = [node for node in ast.walk(builds[0])
+                   if _is_display_assignment(node)]
+    assert len(assignments) == 1, (
+        f"{serve}'s build_server makes {len(assignments)} "
+        '`capabilities["display"] = …` assignments; the replay stands in for one')
+
+    here = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    replay = next(node for node in here.body if isinstance(node, ast.FunctionDef)
+                  and node.name == "_served_display")
+    returned = [node.value for node in ast.walk(replay)
+                if isinstance(node, ast.Return)]
+    assert len(returned) == 1
+    assert ast.dump(assignments[0].value) == ast.dump(returned[0]), (
+        f"{serve} builds the display block as "
+        f"{ast.unparse(assignments[0].value)!r}, and `_served_display` replays "
+        f"{ast.unparse(returned[0])!r}: the replay needs re-reading against it")
+
+    def bound(scope: ast.AST, module: str) -> set[str]:
+        return {alias.asname or alias.name for node in ast.walk(scope)
+                if isinstance(node, ast.ImportFrom) and node.module == module
+                for alias in node.names}
+
+    module_scope = ast.Module(body=[node for node in served.body
+                                    if isinstance(node, ast.ImportFrom)],
+                              type_ignores=[])
+    assert {"display_profile", "view_extension"} <= bound(module_scope, "opendox")
+    assert "profile_openxfactory" in bound(builds[0], "opendox.profile_proxy")
+
+
+@pytest.mark.parametrize("dropped", ["host-forwards-no-facet", "module-value-deleted"])
+def test_dropping_the_facet_fails_the_overlay(register_host, monkeypatch,
+                                              dropped) -> None:
+    """THE FIRST MUTATION: the facet is gone, so both positive checks above fail.
+
+    Dropped two ways, because either is a real regression: an assembly that
+    stops forwarding the name, and a module that stops declaring it. Either way
+    openDox reports the named absence and renders its own word, which is exactly
+    what the two predicates the positive tests use must refuse.
+    """
+    display_profile, view_extension = _display_profile_or_skip()
+    if dropped == "host-forwards-no-facet":
+        register_host(_engineering_host())
+    else:
+        register_host(_engineering_host("DISPLAY"))
+        monkeypatch.delattr(view_extensions, "DISPLAY")
+    served = _served_display(display_profile, view_extension)
+    assert served["host_facet"] == "absent"
+    assert served["stages"]["completion"]["short"] == "completed"
+    assert not _reports_the_facet(served)
+    assert not _completion_renders_implemented(served)
+
+
+@pytest.mark.parametrize("typo", ["completed", "complete", "completions",
+                                  "Completion"])
+def test_a_misspelled_stage_role_is_refused_where_the_server_is_built(
+        register_host, monkeypatch, typo) -> None:
+    """THE SECOND MUTATION: the role is misspelled, and the build refuses it by name.
+
+    `completed` leads the list because it is the likeliest slip: the neutral
+    WORD in place of the ROLE. A role openDox does not read renders nowhere, so
+    `normalize_display` refuses it rather than serving a silent no-op, and that
+    refusal is raised where `build_server()` builds `/capabilities`.
+    """
+    display_profile, view_extension = _display_profile_or_skip()
+    entry = dict(view_extensions.DISPLAY["stages"]["completion"])
+    monkeypatch.setattr(view_extensions, "DISPLAY", {"stages": {typo: entry}})
+    register_host(_engineering_host("DISPLAY"))
+    with pytest.raises(display_profile.DisplayFacetError) as raised:
+        _served_display(display_profile, view_extension)
+    message = str(raised.value)
+    assert repr([typo]) in message
+    assert "under stages" in message
+
+
+def test_a_misspelled_stage_field_is_refused_the_same_way(register_host,
+                                                          monkeypatch) -> None:
+    """One tier down: the role right, a field wrong, refused naming the field."""
+    display_profile, view_extension = _display_profile_or_skip()
+    monkeypatch.setattr(view_extensions, "DISPLAY",
+                        {"stages": {"completion": {"shrot": IMPLEMENTED}}})
+    register_host(_engineering_host("DISPLAY"))
+    with pytest.raises(display_profile.DisplayFacetError) as raised:
+        _served_display(display_profile, view_extension)
+    message = str(raised.value)
+    assert "['shrot']" in message
+    assert "under stages.completion" in message
+
+
+# `_display_profile_or_skip`'s OWN CALL SITE, driven both ways for the reason the
+# section above gives for `_view_extension_or_skip`'s three: a branch proved only
+# at the declared pin can become an unconditional failure with every test green,
+# and that breaks the consumer RULED 5700475319 protects. ONE call site, two
+# shapes: the module absent, and the module present without one of its readers.
+
+def _without_display_profile(monkeypatch) -> None:
+    """Make `from opendox import display_profile` raise ImportError.
+
+    The same two steps `_without_view_extension` takes, for the same reason.
+    """
+    import sys
+    import opendox
+    monkeypatch.delattr(opendox, "display_profile", raising=False)
+    monkeypatch.setitem(sys.modules, "opendox.display_profile", None)
+
+
+def _without_a_display_reader(monkeypatch) -> None:
+    """Leave the module importable and take `normalize_display` off it."""
+    display_profile, _ = _display_profile_or_skip()
+    monkeypatch.delattr(display_profile, "normalize_display")
+
+
+@pytest.mark.parametrize("shape", [_without_display_profile,
+                                   _without_a_display_reader])
+def test_a_missing_display_reader_FAILS_at_the_declared_pin(monkeypatch,
+                                                           shape) -> None:
+    shape(monkeypatch)
+    _guard_reads(monkeypatch, _PIN_DECLARED, _PIN_DECLARED)
+    with pytest.raises(pytest.fail.Exception) as raised:
+        _display_profile_or_skip()
+    message = str(raised.value)
+    assert "REGRESSION at the declared pin" in message
+    assert "display_profile" in message
+
+
+@pytest.mark.parametrize("shape", [_without_display_profile,
+                                   _without_a_display_reader])
+def test_a_missing_display_reader_SKIPS_for_a_different_installed_commit(
+        monkeypatch, shape) -> None:
+    shape(monkeypatch)
+    _guard_reads(monkeypatch, _PIN_DECLARED, _PIN_OTHER)
+    with pytest.raises(pytest.skip.Exception) as raised:
+        _display_profile_or_skip()
+    message = str(raised.value)
+    assert _PIN_DECLARED[:8] in message
+    assert _PIN_OTHER[:8] in message
+
+
+def test_the_guard_checks_every_name_the_display_section_reads() -> None:
+    """`DISPLAY_READS` against the section's own reads, parsed rather than trusted.
+
+    The section is every top-level statement after its header. Inside it, the
+    names that hold an openDox module are the guard's two returns
+    (`display_profile`, `view_extension`) and every alias a
+    `from opendox import X` binds (`registry`). Each attribute read off one of
+    them, and each name a `from opendox.X import Y` takes, must be a pair in the
+    table. The check runs both ways: a new read the guard does not check fails
+    here, and so does a table entry nothing reads, which would make the guard
+    refuse an assembly over a name the section never uses. It also holds a
+    `from opendox import X` to a module the table names (Copilot review of
+    `f8d2aad7`: the first version checked two aliases and two names, not every
+    module and proxy read).
+
+    THIS LEG'S OWN `openxdox.domain_profile` IS NOT AN openDox READ, and it is
+    not collected: it is bound as `engine`, as openxFactory's `opendox_host`
+    binds it, so that it cannot be mistaken for openDox's registry of the same
+    module name. Only a guard return or a `from opendox import X` puts a name
+    in `held`, and a `from opendox.X import Y` adds its pair directly (Copilot
+    review of `2dcceceb` read `engine.load` and `engine.DomainProfile` as
+    openDox reads; listing them would make the guard refuse the declared pin,
+    whose `opendox.domain_profile` has neither).
+
+    QUALIFIED IMPORTS COUNT TOO (Copilot review of `62461da2`). An
+    `import opendox.X` names module X, and `as Y` binds Y to it. A read of
+    `opendox.X.Y` off the package is the pair (X, Y). And the section's one
+    call to `import_module` or `__import__` must be the guard's own loop over
+    this table, so a module loaded by name cannot pass the parse unseen.
+    """
+    source = Path(__file__).read_text(encoding="utf-8")
+    header = source.count("\n", 0, source.index("# THE DISPLAY FACET — RULED")) + 1
+    section = [node for node in ast.parse(source).body if node.lineno > header]
+    walked = [node for top in section for node in ast.walk(top)]
+
+    held = {"display_profile": "display_profile", "view_extension": "view_extension"}
+    packages: set[str] = set()      # the names bound to the `opendox` package itself
+    modules: set[str] = set()
+    pairs: set[tuple[str, str]] = set()
+    for node in walked:
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "opendox":
+                    packages.add(alias.asname or alias.name)
+                elif alias.name.startswith("opendox."):
+                    module = alias.name.split(".", 1)[1]
+                    modules.add(module)
+                    if alias.asname:
+                        held[alias.asname] = module
+                    else:
+                        packages.add("opendox")
+        elif isinstance(node, ast.ImportFrom) and node.module == "opendox":
+            for alias in node.names:
+                held[alias.asname or alias.name] = alias.name
+                modules.add(alias.name)
+        elif (isinstance(node, ast.ImportFrom)
+              and (node.module or "").startswith("opendox.")):
+            module = node.module.split(".", 1)[1]
+            modules.add(module)
+            pairs |= {(module, alias.name) for alias in node.names}
+    for node in walked:
+        if not isinstance(node, ast.Attribute) or node.attr == "__file__":
+            continue
+        base = node.value
+        if isinstance(base, ast.Name) and base.id in held:
+            pairs.add((held[base.id], node.attr))
+        elif isinstance(base, ast.Name) and base.id in packages:
+            modules.add(node.attr)
+        elif (isinstance(base, ast.Attribute) and isinstance(base.value, ast.Name)
+              and base.value.id in packages):
+            pairs.add((base.attr, node.attr))
+
+    def dynamic(nodes) -> list[ast.Call]:
+        return [node for node in nodes if isinstance(node, ast.Call)
+                and getattr(node.func, "attr", getattr(node.func, "id", None))
+                in {"import_module", "__import__"}]
+
+    guard = next(node for node in section if isinstance(node, ast.FunctionDef)
+                 and node.name == "_display_profile_or_skip")
+    assert len(dynamic(walked)) == len(dynamic(ast.walk(guard))) == 1, (
+        "a dynamic import outside the guard's own loop reaches past this parse")
+
+    assert {("display_profile", "display_manifest"), ("domain_profile", "register"),
+            ("profile_proxy", "profile_openxfactory"),
+            ("view_extension", "host_profile_name")} <= pairs, (
+        "the parse no longer sees the section's own reads")
+    assert modules <= set(DISPLAY_READS), sorted(modules - set(DISPLAY_READS))
+    table = {(module, name) for module, names in DISPLAY_READS.items()
+             for name in names}
+    assert pairs - table == set(), sorted(pairs - table)
+    assert table - pairs == set(), sorted(table - pairs)
