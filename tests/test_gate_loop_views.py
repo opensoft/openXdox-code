@@ -1858,25 +1858,48 @@ def test_a_missing_display_reader_SKIPS_for_a_different_installed_commit(
 
 
 def test_the_guard_checks_every_name_the_display_section_reads() -> None:
-    """`DISPLAY_READS` against this file's own reads, parsed rather than trusted.
+    """`DISPLAY_READS` against the section's own reads, parsed rather than trusted.
 
-    Every attribute read off `display_profile`, and off `registry` (the name this
-    section gives `opendox.domain_profile`), must be a name the guard checks, and
-    `host_profile_name` is the one `view_extension` read the section adds. So a
-    test that starts reading a new name fails here until the guard checks it too.
+    The section is every top-level statement after its header. Inside it, the
+    names that hold an openDox module are the guard's two returns
+    (`display_profile`, `view_extension`) and every alias a
+    `from opendox import X` binds (`registry`). Each attribute read off one of
+    them, and each name a `from opendox.X import Y` takes, must be a pair in the
+    table. The check runs both ways: a new read the guard does not check fails
+    here, and so does a table entry nothing reads, which would make the guard
+    refuse an assembly over a name the section never uses. It also holds a
+    `from opendox import X` to a module the table names (Copilot review of
+    `f8d2aad7`: the first version checked two aliases and two names, not every
+    module and proxy read).
     """
-    tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    source = Path(__file__).read_text(encoding="utf-8")
+    header = source.count("\n", 0, source.index("# THE DISPLAY FACET — RULED")) + 1
+    section = [node for node in ast.parse(source).body if node.lineno > header]
+    walked = [node for top in section for node in ast.walk(top)]
 
-    def reads(alias: str) -> set[str]:
-        return {node.attr for node in ast.walk(tree)
-                if isinstance(node, ast.Attribute)
-                and isinstance(node.value, ast.Name) and node.value.id == alias}
+    held = {"display_profile": "display_profile", "view_extension": "view_extension"}
+    modules: set[str] = set()
+    pairs: set[tuple[str, str]] = set()
+    for node in walked:
+        if isinstance(node, ast.ImportFrom) and node.module == "opendox":
+            for alias in node.names:
+                held[alias.asname or alias.name] = alias.name
+                modules.add(alias.name)
+        elif (isinstance(node, ast.ImportFrom)
+              and (node.module or "").startswith("opendox.")):
+            module = node.module.split(".", 1)[1]
+            modules.add(module)
+            pairs |= {(module, alias.name) for alias in node.names}
+    pairs |= {(held[node.value.id], node.attr) for node in walked
+              if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
+              and node.value.id in held and node.attr != "__file__"}
 
-    checked = set(DISPLAY_READS["display_profile"])
-    assert reads("display_profile") - {"__file__"} <= checked, sorted(
-        reads("display_profile") - {"__file__"} - checked)
-    assert reads("registry") <= set(DISPLAY_READS["domain_profile"]), sorted(
-        reads("registry") - set(DISPLAY_READS["domain_profile"]))
-    assert "host_profile_name" in reads("view_extension")
-    assert "host_profile_name" in DISPLAY_READS["view_extension"]
-    assert "profile_openxfactory" in DISPLAY_READS["profile_proxy"]
+    assert {("display_profile", "display_manifest"), ("domain_profile", "register"),
+            ("profile_proxy", "profile_openxfactory"),
+            ("view_extension", "host_profile_name")} <= pairs, (
+        "the parse no longer sees the section's own reads")
+    assert modules <= set(DISPLAY_READS), sorted(modules - set(DISPLAY_READS))
+    table = {(module, name) for module, names in DISPLAY_READS.items()
+             for name in names}
+    assert pairs - table == set(), sorted(pairs - table)
+    assert table - pairs == set(), sorted(table - pairs)
