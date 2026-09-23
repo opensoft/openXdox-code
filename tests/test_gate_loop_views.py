@@ -1923,6 +1923,12 @@ def test_the_guard_checks_every_name_the_display_section_reads() -> None:
     review of `2dcceceb` read `engine.load` and `engine.DomainProfile` as
     openDox reads; listing them would make the guard refuse the declared pin,
     whose `opendox.domain_profile` has neither).
+
+    QUALIFIED IMPORTS COUNT TOO (Copilot review of `62461da2`). An
+    `import opendox.X` names module X, and `as Y` binds Y to it. A read of
+    `opendox.X.Y` off the package is the pair (X, Y). And the section's one
+    call to `import_module` or `__import__` must be the guard's own loop over
+    this table, so a module loaded by name cannot pass the parse unseen.
     """
     source = Path(__file__).read_text(encoding="utf-8")
     header = source.count("\n", 0, source.index("# THE DISPLAY FACET — RULED")) + 1
@@ -1930,10 +1936,22 @@ def test_the_guard_checks_every_name_the_display_section_reads() -> None:
     walked = [node for top in section for node in ast.walk(top)]
 
     held = {"display_profile": "display_profile", "view_extension": "view_extension"}
+    packages: set[str] = set()      # the names bound to the `opendox` package itself
     modules: set[str] = set()
     pairs: set[tuple[str, str]] = set()
     for node in walked:
-        if isinstance(node, ast.ImportFrom) and node.module == "opendox":
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "opendox":
+                    packages.add(alias.asname or alias.name)
+                elif alias.name.startswith("opendox."):
+                    module = alias.name.split(".", 1)[1]
+                    modules.add(module)
+                    if alias.asname:
+                        held[alias.asname] = module
+                    else:
+                        packages.add("opendox")
+        elif isinstance(node, ast.ImportFrom) and node.module == "opendox":
             for alias in node.names:
                 held[alias.asname or alias.name] = alias.name
                 modules.add(alias.name)
@@ -1942,9 +1960,27 @@ def test_the_guard_checks_every_name_the_display_section_reads() -> None:
             module = node.module.split(".", 1)[1]
             modules.add(module)
             pairs |= {(module, alias.name) for alias in node.names}
-    pairs |= {(held[node.value.id], node.attr) for node in walked
-              if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)
-              and node.value.id in held and node.attr != "__file__"}
+    for node in walked:
+        if not isinstance(node, ast.Attribute) or node.attr == "__file__":
+            continue
+        base = node.value
+        if isinstance(base, ast.Name) and base.id in held:
+            pairs.add((held[base.id], node.attr))
+        elif isinstance(base, ast.Name) and base.id in packages:
+            modules.add(node.attr)
+        elif (isinstance(base, ast.Attribute) and isinstance(base.value, ast.Name)
+              and base.value.id in packages):
+            pairs.add((base.attr, node.attr))
+
+    def dynamic(nodes) -> list[ast.Call]:
+        return [node for node in nodes if isinstance(node, ast.Call)
+                and getattr(node.func, "attr", getattr(node.func, "id", None))
+                in {"import_module", "__import__"}]
+
+    guard = next(node for node in section if isinstance(node, ast.FunctionDef)
+                 and node.name == "_display_profile_or_skip")
+    assert len(dynamic(walked)) == len(dynamic(ast.walk(guard))) == 1, (
+        "a dynamic import outside the guard's own loop reaches past this parse")
 
     assert {("display_profile", "display_manifest"), ("domain_profile", "register"),
             ("profile_proxy", "profile_openxfactory"),
