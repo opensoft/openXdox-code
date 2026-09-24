@@ -11,9 +11,9 @@ comments ARE the requirements) on top of plain draft-2020-12 validation, and it
 attaches a `FormatChecker` so `date`/`date-time` are actually enforced rather
 than left as annotations.
 
-The schema family under `contracts/schemas/` (all loaded into one offline
-registry so the register kernel's cross-file `$ref` into the snapshot's
-`evidence_pin` resolves):
+The schema family under `contracts/schemas/` (every one the contracts directory
+carries is loaded into one offline registry, so the register kernel's
+cross-file `$ref` into the snapshot's `evidence_pin` resolves):
     ideation-dashboard-snapshot.schema.yaml   (kind: ideation-dashboard-snapshot)
     ideation-dashboard-snapshot-index.schema.yaml
                                               (kind:
@@ -92,6 +92,7 @@ Exit codes: 0 ok, 1 findings (or warnings under --strict), 2 harness error.
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -112,8 +113,32 @@ except ImportError:  # pragma: no cover
     sys.exit(2)
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMAS_DIR = ROOT / "contracts" / "schemas"
-EXAMPLES_DIR = ROOT / "examples" / "ideation-dashboard"
+# WHERE THE CONTRACTS THIS VALIDATOR READS LIVE (split-opendox-two-layer-product
+# § 8.9 residue (i)). As carved, `ROOT / "contracts"` named a directory the
+# openXdox-code leg does not have, so the validator could run from nowhere.
+# This tree's own `contracts/` still comes first when the tree carries one: the
+# pre-shed layout, and openxFactory's `doxbench_contracts._composed_validator`,
+# which composes the whole family beside a copy of this script. Otherwise the
+# contracts are the directory `CONTRACTS_DIR` names: the channel the assembly
+# root's `AGENTS-shape.md` (openRepoShape's, digest-pinned in opensoft/openXdox)
+# declares for "a contract the code READS but does not OWN", which "lives in the
+# SPEC leg" — the code leg's tooling "takes `CONTRACTS_DIR` from the environment
+# ... rather than each script guessing at `../`". So nothing above ROOT is read
+# by position, the class § 8.9 residue (iii) names (a reader adopting its
+# enclosing tree). The packaged examples sit beside `contracts/` in each tree
+# that carries the family.
+_DECLARED_CONTRACTS = os.environ.get("CONTRACTS_DIR", "")
+if (ROOT / "contracts" / "schemas").is_dir():
+    CONTRACTS, CONTRACTS_SOURCE = ROOT / "contracts", "this tree's own contracts/"
+elif _DECLARED_CONTRACTS:
+    CONTRACTS = Path(_DECLARED_CONTRACTS).resolve()
+    CONTRACTS_SOURCE = f"CONTRACTS_DIR={_DECLARED_CONTRACTS}"
+else:
+    CONTRACTS = ROOT / "contracts"
+    CONTRACTS_SOURCE = ("this tree carries no contracts/ and CONTRACTS_DIR is not "
+                        "set; export it as the spec leg's contracts directory")
+SCHEMAS_DIR = CONTRACTS / "schemas"
+EXAMPLES_DIR = CONTRACTS.parent / "examples" / "ideation-dashboard"
 
 SCHEMA_FILENAMES = [
     "ideation-dashboard-snapshot.schema.yaml",
@@ -221,13 +246,24 @@ def load_yaml(path: Path) -> Any:
 # --------------------------- schema registry ---------------------------
 
 def build_registry() -> tuple[Registry, dict[str, dict]]:
-    """Offline registry over all five schemas so the register kernel's
-    cross-file `$ref` into the snapshot's `evidence_pin` resolves (same
-    approach as scripts/validate-document-catalog.py / validate-avatar-client.py)."""
+    """Offline registry over the family schemas SCHEMAS_DIR CARRIES, so the
+    register kernel's cross-file `$ref` into the snapshot's `evidence_pin`
+    resolves (same approach as scripts/validate-document-catalog.py /
+    validate-avatar-client.py).
+
+    A family schema SCHEMAS_DIR does not carry is left out here and refused BY
+    NAME where an instance needs it (`doc_validator`, harness exit 2). Since the
+    carve the ten are split across openXdox-spec, openDox-spec and openxFactory,
+    and this product's own spec leg carries three of them; a run that meets any
+    other kind has validated nothing and must say so, never pass (§ 8.9 residue
+    (i))."""
     resources = []
     docs: dict[str, dict] = {}
     for name in SCHEMA_FILENAMES:
-        doc = load_yaml(SCHEMAS_DIR / name)
+        path = SCHEMAS_DIR / name
+        if not path.is_file():
+            continue
+        doc = load_yaml(path)
         docs[name] = doc
         rid = doc.get("$id", name)
         resources.append((rid, Resource.from_contents(doc, default_specification=DRAFT202012)))
@@ -235,6 +271,11 @@ def build_registry() -> tuple[Registry, dict[str, dict]]:
 
 
 def doc_validator(schema_name: str, registry: Registry, docs: dict[str, dict]) -> Draft202012Validator:
+    if schema_name not in docs:
+        raise FileNotFoundError(
+            f"{schema_name} is not carried under {SCHEMAS_DIR} ({CONTRACTS_SOURCE}), "
+            "so no instance of that kind can be validated here (the carve split this "
+            "family across openXdox-spec, openDox-spec and openxFactory)")
     return Draft202012Validator(docs[schema_name], registry=registry, format_checker=FORMAT_CHECKER)
 
 
@@ -1819,7 +1860,7 @@ def check_repo_tree(
 def run_default(repo: Path, strict: bool) -> int:
     f = Findings()
     if not SCHEMAS_DIR.is_dir():
-        print(f"ERROR {SCHEMAS_DIR} not found", file=sys.stderr)
+        print(f"ERROR {SCHEMAS_DIR} not found ({CONTRACTS_SOURCE})", file=sys.stderr)
         return 2
     registry, docs = build_registry()
     for name, doc in docs.items():
