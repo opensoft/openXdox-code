@@ -10,7 +10,7 @@ date by the generator. List ordering is the generator's responsibility.
 Writes go through the interactivity boundary (never around it): `write_snapshot`
 takes an `OutputBoundary` and writes only under a declared output path.
 
-Validation is DELEGATED to the pinned openxFactory validator
+Validation is DELEGATED to this product's own validator, in this repository
 (`scripts/validate-ideation-dashboard-contracts.py`) — the schema is never
 restated here. `validate_or_raise` fails loudly on a non-conforming snapshot.
 It reports THREE outcomes: validated, not conformant, and validator
@@ -22,11 +22,20 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-VALIDATOR_RELPATH = Path("openxFactory") / "scripts" / "validate-ideation-dashboard-contracts.py"
+# RELATIVE TO THIS PRODUCT'S OWN ROOT — the repository this module ships in —
+# never to an aggregation checkout above it. openxFactory's § 5.2 shed
+# (`cc4ae9d3`) deleted `openxFactory/scripts/validate-ideation-dashboard-contracts.py`
+# and the carve moved the validator HERE: carve-manifest row
+# `scripts/validate-ideation-dashboard-contracts.py` -> `openxdox_code`, same
+# path. The aggregation-relative value this replaces named a file no post-shed
+# tree carries, so the only thing it could still find was a stale pre-shed copy
+# (split-opendox-two-layer-product § 8.9 residue (ii)).
+VALIDATOR_RELPATH = Path("scripts") / "validate-ideation-dashboard-contracts.py"
 
 
 class SnapshotInvalid(Exception):
@@ -58,16 +67,80 @@ def write_snapshot(snapshot: dict[str, Any], path: Path | str, boundary) -> Path
 
 # --------------------------- validator location ---------------------------
 
+# The explicit marker that makes a directory THIS product's root: the source
+# layout `<root>/src/openxdox/<this module>` plus a `<root>/pyproject.toml` whose
+# `[project] name` is this distribution's. It is read from where this module
+# actually sits — never from the cwd, a snapshot's directory, a corpus, or any
+# ancestor of them.
+PRODUCT_DISTRIBUTION = "openxdox"
+
+
+def product_root() -> Path | None:
+    """This product's own source tree, or None when the module is not running
+    from one (an installed wheel ships no `scripts/`, so it has no validator of
+    its own to offer, and it must not go looking for somebody else's).
+
+    NO WALK. The root is fixed arithmetic on this module's own resolved path —
+    `parents[2]` of `src/openxdox/snapshot.py` — confirmed by the explicit
+    marker above, so there is no ancestor for it to adopt."""
+    module = Path(__file__).resolve()
+    if module.parent.name != PRODUCT_DISTRIBUTION or module.parents[1].name != "src":
+        return None
+    root = module.parents[2]
+    try:
+        with (root / "pyproject.toml").open("rb") as fh:
+            name = tomllib.load(fh).get("project", {}).get("name")
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+    if not isinstance(name, str) or name.lower().replace("_", "-") != PRODUCT_DISTRIBUTION:
+        return None
+    return root
+
+
+def _inside(path: Path, root: Path) -> bool:
+    return Path(path).resolve().is_relative_to(root.resolve())
+
+
 def find_validator(start: Path | None = None) -> Path | None:
-    """Walk up from `start` (or cwd) to the aggregation checkout and return the
-    pinned validator, or None when no openxFactory checkout is reachable. Keeps
-    the module path-agnostic — no absolute path is baked in."""
-    base = (start or Path.cwd()).resolve()
-    for directory in [base, *base.parents]:
-        candidate = directory / VALIDATOR_RELPATH
-        if candidate.is_file():
-            return candidate
+    """THIS PRODUCT'S OWN validator, `product_root() / VALIDATOR_RELPATH`, or
+    None. It is looked for in exactly one place, and never above the product's
+    root: the parent walk this replaces ADOPTED whatever enclosing checkout
+    still carried a pre-shed copy (split-opendox-two-layer-product § 8.9
+    residue (iii) — a reader adopting its enclosing tree).
+
+    `start` keeps its declared signature (openDox's `consumer_reach` binds this
+    function by name) and now CONFINES instead of widening: a `start` outside
+    this product's own tree answers None, because nothing outside that tree is
+    ever consulted, and `start=None` asks from the module itself. A caller that
+    means a validator from anywhere else passes it explicitly —
+    `validate_snapshot(..., validator=...)`; none is ever inferred from where a
+    snapshot, a corpus or the cwd happens to sit."""
+    root = product_root()
+    if root is None:
+        return None
+    if start is not None and not _inside(Path(start), root):
+        return None
+    candidate = root / VALIDATOR_RELPATH
+    # `is_file()` follows a symlink, so containment is checked on the RESOLVED
+    # path as well: a `scripts/` link pointing out of the tree is refused.
+    if candidate.is_file() and _inside(candidate, root):
+        return candidate
     return None
+
+
+def _validator_not_found_reason(search_from: Path | None) -> str:
+    """Why `find_validator` answered None, in the three ways it can."""
+    root = product_root()
+    if root is None:
+        where = ("this openxdox is not running from a source checkout, so it "
+                 f"carries no {VALIDATOR_RELPATH} of its own")
+    elif search_from is not None and not _inside(Path(search_from), root):
+        where = (f"the search was confined to {search_from}, which lies outside "
+                 f"this product's own tree ({root})")
+    else:
+        where = f"{root / VALIDATOR_RELPATH} does not exist"
+    return (f"{where}; a validator in an enclosing checkout is never adopted — "
+            "pass validator= to use one explicitly")
 
 
 # --------------------------- validation ---------------------------
@@ -130,7 +203,7 @@ class ValidationResult:
 
     def summary(self) -> str:
         if self.validator is None:
-            return "validator not found (no reachable openxFactory checkout)"
+            return "validator not found (only this product's own tree is searched)"
         tail = (self.stdout or self.stderr).strip().splitlines()
         return tail[-1] if tail else f"returncode={self.returncode}"
 
@@ -160,11 +233,14 @@ def validate_snapshot(
     `result.outcome` is one of `VALIDATED`, `NOT_CONFORMANT`, or
     `VALIDATOR_UNAVAILABLE`; `result.ok` stays True only for `VALIDATED`."""
     path = Path(path).resolve()
-    validator = validator or find_validator(search_from or path.parent)
+    # The snapshot's own directory is NOT a search root any more: a snapshot
+    # written inside some other checkout must not choose that checkout's
+    # validator (§ 8.9 residue (iii)). `search_from`, when given, only confines.
+    validator = validator or find_validator(search_from)
     if validator is None:
         return ValidationResult(
             False, -1, "", "validator not found", None, VALIDATOR_UNAVAILABLE,
-            f"no {VALIDATOR_RELPATH} is reachable from this run")
+            _validator_not_found_reason(search_from))
     if not Path(validator).is_file():
         # Checked BEFORE launching, because the exit code cannot carry this one:
         # `python3 <a directory>` exits 1 — the validator's own findings code —
