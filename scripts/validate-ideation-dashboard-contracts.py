@@ -269,7 +269,18 @@ def build_registry() -> tuple[Registry, dict[str, dict]]:
     carve the ten are split across openXdox-spec, openDox-spec and openxFactory,
     and this product's own spec leg carries three of them; a run that meets any
     other kind has validated nothing and must say so, never pass (§ 8.9 residue
-    (i))."""
+    (i)).
+
+    A SCHEMAS_DIR that carries NONE of the ten is refused HERE, before any mode
+    runs, as a harness failure (exit 2). An empty registry validates nothing. A
+    directory sweep that met no recognized instance, or a register transition,
+    would otherwise reach a verdict having loaded no schema, and the sweep would
+    exit 0 (Copilot review of openXdox-code#28)."""
+    if not any((SCHEMAS_DIR / name).is_file() for name in SCHEMA_FILENAMES):
+        raise FileNotFoundError(
+            f"{SCHEMAS_DIR} carries none of the family's {len(SCHEMA_FILENAMES)} "
+            f"schemas ({CONTRACTS_SOURCE}), so nothing can be validated and no "
+            "mode may report success")
     resources = []
     docs: dict[str, dict] = {}
     for name in SCHEMA_FILENAMES:

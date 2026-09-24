@@ -207,6 +207,40 @@ def test_a_declared_directory_without_schemas_is_refused_by_name(tmp_path):
     assert f"CONTRACTS_DIR={empty}" in proc.stderr
 
 
+def test_no_mode_passes_having_loaded_no_schema(tmp_path):
+    """(i) FAIL CLOSED BEFORE ANY MODE RUNS (Copilot review of
+    openXdox-code#28, round 2).
+
+    Once `build_registry` skipped each schema the resolved directory does not
+    carry, a directory sweep that met no recognized instance could exit 0
+    having loaded no schema at all. It did so on an empty directory, and on a
+    directory holding only unrecognized YAML, whether nothing was resolved or
+    the declared `schemas/` carried none of the ten. `run_path` never reached a
+    kind to refuse.
+
+    Every mode is now a harness error, exit 2, naming the directory and the
+    channel. It covers four modes: both sweeps, a register transition, and the
+    default self-test. It covers two ways the ten can be missing: no contracts
+    resolved at all, and a `schemas/` of unrelated files."""
+    script = _script_in(tmp_path / "code")
+    empty = tmp_path / "sweep-empty"
+    empty.mkdir()
+    unrecognized = _write(tmp_path / "sweep-unrecognized" / "notes.yaml",
+                          {"schema_version": 1, "kind": "something-else"}).parent
+    register = _write(tmp_path / "register.yaml", {"possibles_register": []})
+    unrelated = tmp_path / "unrelated" / "contracts"
+    _write(unrelated / "schemas" / "unrelated.schema.yaml", {"type": "object"})
+    for contracts, schemas, channel in (
+            (None, tmp_path / "code" / "contracts" / "schemas", "CONTRACTS_DIR is not set"),
+            (unrelated, unrelated.resolve() / "schemas", f"CONTRACTS_DIR={unrelated}")):
+        for args in ((empty,), (unrecognized,), ("--transition", register, register), ()):
+            proc = _run(script, *args, cwd=tmp_path / "elsewhere", contracts_dir=contracts)
+            assert proc.returncode == 2, (contracts, args, proc.stdout + proc.stderr)
+            assert str(schemas) in proc.stderr, (contracts, args, proc.stderr)
+            assert channel in proc.stderr, (contracts, args, proc.stderr)
+            assert "0 error(s)" not in proc.stdout, (contracts, args, proc.stdout)
+
+
 def test_an_enclosing_assembly_root_is_never_read_by_position(tmp_path):
     """NO `../`. The code leg mounted in a full assembly root — lockstep pins
     naming it, and a spec leg beside it carrying the schema — but WITHOUT
