@@ -226,6 +226,46 @@ def test_an_enclosing_assembly_root_is_never_read_by_position(tmp_path):
     assert str(root / "spec") not in proc.stderr
 
 
+@pytest.mark.skipif(not hasattr(os, "symlink"), reason="no symlinks on this platform")
+def test_an_own_contracts_link_out_of_the_tree_is_refused(tmp_path):
+    """NO `../` BY LINK EITHER (Copilot review, openXdox-code#28). A code leg
+    whose `contracts/` is a LINK to the spec leg beside it would read that leg
+    by position under this tree's own name. The run refuses, naming the link,
+    with or without `CONTRACTS_DIR`, rather than reading it."""
+    script = _script_in(tmp_path / "code")
+    spec_contracts = _spec_contracts(tmp_path / "spec")
+    try:
+        (tmp_path / "code" / "contracts").symlink_to(spec_contracts, target_is_directory=True)
+    except OSError as exc:              # e.g. unprivileged Windows
+        pytest.skip(f"cannot create a symlink here: {exc}")
+    snap = _write(tmp_path / "out" / "s.yaml", _snapshot())
+    for declared in (None, spec_contracts):
+        proc = _run(script, snap, cwd=tmp_path, contracts_dir=declared)
+        assert proc.returncode == 2, (declared, proc.stdout + proc.stderr)
+        assert "outside this tree, so it is not read" in proc.stderr, proc.stderr
+        assert "0 error(s)" not in proc.stdout, proc.stdout
+
+
+@pytest.mark.skipif(not hasattr(os, "symlink"), reason="no symlinks on this platform")
+def test_a_real_schemas_directory_of_linked_files_is_still_its_own_tree(tmp_path):
+    """The confinement is on the DIRECTORY, not on each schema file.
+    openxFactory's `doxbench_contracts._composed_validator` builds a REAL
+    `contracts/schemas/` whose entries are links to the pinned files, and that
+    farm keeps validating (exit 0) with no `CONTRACTS_DIR` at all."""
+    farm = tmp_path / "farm"
+    script = _script_in(farm)
+    pinned = (_spec_contracts(tmp_path / "pinned") / "schemas"
+              / "ideation-dashboard-snapshot.schema.yaml")
+    (farm / "contracts" / "schemas").mkdir(parents=True)
+    try:
+        (farm / "contracts" / "schemas" / pinned.name).symlink_to(pinned)
+    except OSError as exc:              # e.g. unprivileged Windows
+        pytest.skip(f"cannot create a symlink here: {exc}")
+    proc = _run(script, _write(tmp_path / "out" / "s.yaml", _snapshot()), cwd=tmp_path)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert "0 error(s)" in proc.stdout
+
+
 def _family_names() -> list[str]:
     """The validator's own `SCHEMA_FILENAMES`, read from the script rather than
     restated here."""

@@ -128,7 +128,20 @@ ROOT = Path(__file__).resolve().parents[1]
 # enclosing tree). The packaged examples sit beside `contracts/` in each tree
 # that carries the family.
 _DECLARED_CONTRACTS = os.environ.get("CONTRACTS_DIR", "")
-if (ROOT / "contracts" / "schemas").is_dir():
+_OWN_SCHEMAS = ROOT / "contracts" / "schemas"
+# A `contracts/` or `contracts/schemas/` that is a LINK OUT OF THIS TREE is
+# somebody else's contracts under this tree's own name: the escaping-link case
+# `openxdox.snapshot.find_validator` refuses for `scripts/`. It is never read,
+# whatever CONTRACTS_DIR says, and the run fails closed naming it. The check is
+# on the DIRECTORY: a real one whose schema FILES are links (openxFactory's
+# composed farm) is still this tree's own.
+if _OWN_SCHEMAS.is_dir() and not _OWN_SCHEMAS.resolve().is_relative_to(ROOT):
+    print(f"ERROR harness failure: {_OWN_SCHEMAS} resolves to "
+          f"{_OWN_SCHEMAS.resolve()}, outside this tree, so it is not read; "
+          "remove the link and name the contracts directory with CONTRACTS_DIR",
+          file=sys.stderr)
+    sys.exit(2)
+if _OWN_SCHEMAS.is_dir():
     CONTRACTS, CONTRACTS_SOURCE = ROOT / "contracts", "this tree's own contracts/"
 elif _DECLARED_CONTRACTS:
     CONTRACTS = Path(_DECLARED_CONTRACTS).resolve()
