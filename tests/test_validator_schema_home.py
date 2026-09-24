@@ -281,6 +281,44 @@ def test_an_own_contracts_link_out_of_the_tree_is_refused(tmp_path):
 
 
 @pytest.mark.skipif(not hasattr(os, "symlink"), reason="no symlinks on this platform")
+def test_an_escaping_own_link_is_refused_whatever_it_reaches(tmp_path):
+    """NO `../` BY LINK, EVEN WHEN THE LINK LEADS NOWHERE USEFUL (Copilot review,
+    openXdox-code#28, round 3).
+
+    The escaping-link check used to run only when `contracts/schemas/` was a
+    directory. So a link that dangled, or that reached a directory with no
+    `schemas/`, was never examined. With a valid `CONTRACTS_DIR` the run then
+    validated against the declared directory (exit 0) and left the escaping
+    link silently in place.
+
+    Each of the three shapes is now refused before any directory is chosen,
+    with or without `CONTRACTS_DIR`:
+      * `contracts/` a dangling link out of the tree;
+      * `contracts/` a link to an outside directory that has no `schemas/`;
+      * a real `contracts/` whose `schemas/` is a dangling link out of it."""
+    spec_contracts = _spec_contracts(tmp_path / "spec")
+    snap = _write(tmp_path / "out" / "s.yaml", _snapshot())
+    (tmp_path / "bare-contracts").mkdir()
+    shapes = {
+        "dangling": ("contracts", tmp_path / "gone"),
+        "no-schemas": ("contracts", tmp_path / "bare-contracts"),
+        "schemas-dangling": ("contracts/schemas", tmp_path / "gone-schemas"),
+    }
+    for name, (link, target) in shapes.items():
+        script = _script_in(tmp_path / name)
+        (tmp_path / name / link).parent.mkdir(parents=True, exist_ok=True)
+        try:
+            (tmp_path / name / link).symlink_to(target, target_is_directory=True)
+        except OSError as exc:          # e.g. unprivileged Windows
+            pytest.skip(f"cannot create a symlink here: {exc}")
+        for declared in (spec_contracts, None):
+            proc = _run(script, snap, cwd=tmp_path, contracts_dir=declared)
+            assert proc.returncode == 2, (name, declared, proc.stdout + proc.stderr)
+            assert "outside this tree, so it is not read" in proc.stderr, (name, proc.stderr)
+            assert "0 error(s)" not in proc.stdout, (name, proc.stdout)
+
+
+@pytest.mark.skipif(not hasattr(os, "symlink"), reason="no symlinks on this platform")
 def test_a_real_schemas_directory_of_linked_files_is_still_its_own_tree(tmp_path):
     """The confinement is on the DIRECTORY, not on each schema file.
     openxFactory's `doxbench_contracts._composed_validator` builds a REAL

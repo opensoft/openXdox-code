@@ -128,19 +128,26 @@ ROOT = Path(__file__).resolve().parents[1]
 # enclosing tree). The packaged examples sit beside `contracts/` in each tree
 # that carries the family.
 _DECLARED_CONTRACTS = os.environ.get("CONTRACTS_DIR", "")
-_OWN_SCHEMAS = ROOT / "contracts" / "schemas"
+_OWN_CONTRACTS = ROOT / "contracts"
+_OWN_SCHEMAS = _OWN_CONTRACTS / "schemas"
 # A `contracts/` or `contracts/schemas/` that is a LINK OUT OF THIS TREE is
 # somebody else's contracts under this tree's own name: the escaping-link case
 # `openxdox.snapshot.find_validator` refuses for `scripts/`. It is never read,
-# whatever CONTRACTS_DIR says, and the run fails closed naming it. The check is
-# on the DIRECTORY: a real one whose schema FILES are links (openxFactory's
+# whatever CONTRACTS_DIR says, and the run fails closed naming it. That holds
+# whatever the link reaches: a directory with `schemas/`, one without, or
+# nothing at all (a dangling link). So each of the two NAMES is checked as it
+# resolves, before any directory is chosen, and not only when it is a
+# directory; otherwise a valid CONTRACTS_DIR would let an escaping link pass
+# unread (Copilot review of openXdox-code#28, round 3). The check is on the
+# two DIRECTORY names: a real one whose schema FILES are links (openxFactory's
 # composed farm) is still this tree's own.
-if _OWN_SCHEMAS.is_dir() and not _OWN_SCHEMAS.resolve().is_relative_to(ROOT):
-    print(f"ERROR harness failure: {_OWN_SCHEMAS} resolves to "
-          f"{_OWN_SCHEMAS.resolve()}, outside this tree, so it is not read; "
-          "remove the link and name the contracts directory with CONTRACTS_DIR",
-          file=sys.stderr)
-    sys.exit(2)
+for _own in (_OWN_CONTRACTS, _OWN_SCHEMAS):
+    if ((_own.is_symlink() or _own.exists())
+            and not _own.resolve().is_relative_to(ROOT)):
+        print(f"ERROR harness failure: {_own} resolves to {_own.resolve()}, "
+              "outside this tree, so it is not read; remove the link and name "
+              "the contracts directory with CONTRACTS_DIR", file=sys.stderr)
+        sys.exit(2)
 if _OWN_SCHEMAS.is_dir():
     CONTRACTS, CONTRACTS_SOURCE = ROOT / "contracts", "this tree's own contracts/"
 elif _DECLARED_CONTRACTS:
