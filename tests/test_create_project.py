@@ -8,9 +8,10 @@ already in another project is LEGAL — Brett's 2026-08-06 ruling), the
 agent-path rejection, and — the D2 boundary — the register file
 byte-identical after every call.
 
-Wire half: rides test_gate_routes' real-HTTP `_serving` harness — invalid
-bodies are 400, engine refusals are 409 carrying the engine's reason, the
-accept path returns the slugged id and record paths, and a serve whose
+Wire half: rides the real-HTTP `_serving` harness (`gate_routes_harness`, this
+leg's copy of the two names it took from openxFactory's `test_gate_routes`) —
+invalid bodies are 400, engine refusals are 409 carrying the engine's reason,
+the accept path returns the slugged id and record paths, and a serve whose
 checkout can reach no register refuses rather than assumes.
 """
 
@@ -23,7 +24,7 @@ import pytest
 import yaml
 
 from conftest import REPO_ROOT  # noqa: F401 (sys.path side effect)
-from test_gate_routes import _post, _serving
+from gate_routes_harness import _post, _serving
 
 from opendox.boundary import BoundaryViolation, HumanGate, OutputBoundary
 from openxdox.gate_console import GateConsole, GateRefused

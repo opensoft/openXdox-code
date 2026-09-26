@@ -11,7 +11,8 @@ register with the project's pending commissions applied oldest-first, a
 pending creation counts as the project existing, and same-second commissions
 land as distinct descriptors.
 
-Wire half: real-HTTP via test_gate_routes' `_serving`; plus the projection's
+Wire half: real-HTTP via `gate_routes_harness`'s `_serving` (this leg's copy
+of the harness openxFactory's `test_gate_routes` holds); plus the projection's
 `pending_edits` plane reporting every queued, undelivered edit.
 """
 
@@ -23,7 +24,7 @@ from pathlib import Path
 import pytest
 
 from conftest import REPO_ROOT  # noqa: F401 (sys.path side effect)
-from test_gate_routes import _post, _serving
+from gate_routes_harness import _post, _serving
 
 from opendox.boundary import BoundaryViolation, HumanGate, OutputBoundary
 from openxdox.gate_console import GateConsole, GateRefused
