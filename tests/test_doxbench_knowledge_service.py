@@ -11,10 +11,11 @@ route that has one and not the other; and "the editors are unaffected" is a
 claim about a request that still succeeds. Each of those passes trivially
 against a stubbed assembler and can only fail against a serve.
 
-The harness is IMPORTED from `test_doxbench_routes` rather than copied, for
-the reason `test_doxbench_composition.py` records: a second harness is a
-second set of behaviours to keep in step, and the two drifting is how a wiring
-defect hides.
+The harness is IMPORTED rather than copied, for the reason
+`test_doxbench_composition.py` records: a second harness is a second set of
+behaviours to keep in step, and the two drifting is how a wiring defect hides.
+It comes from `doxbench_routes_harness`, this leg's one copy of the names it
+takes from openxFactory's `test_doxbench_routes`, which stays there.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ from opendox import doxbench_telemetry as tel  # noqa: E402
 from opendox import serve as serve_mod  # noqa: E402
 from openxdox.doxbench_scope import ScopeKey  # noqa: E402
 
-from test_doxbench_routes import (  # noqa: E402
+from doxbench_routes_harness import (  # noqa: E402
     CHAT_ROUTE, OUTLINE_PATH, _assert_refusal, _capabilities, _catalog,
     _CatalogOnlyPort, _console_headers, _port, _post_turn, _request, _serving,
     _turn, _turn_v2, _UNSET, released_only,
@@ -118,7 +119,7 @@ def test_the_index_is_built_only_from_CONFINED_sources(tmp_path):
 
     Asserted rather than argued, because "the provider is handed the rail"
     only means anything if what it was given to search was confined too."""
-    from test_doxbench_routes import _handler_class, _serving
+    from doxbench_routes_harness import _handler_class, _serving
 
     with _serving(tmp_path,
                   knowledge_declaration=kn.SELF_HOSTED_LOCAL_EMBEDDED
@@ -154,7 +155,7 @@ def test_a_server_built_with_no_kwarg_binds_the_REAL_packet_assembler(tmp_path):
     entrypoint is allowed to pass the argument at all. The injection stays
     available to tests, which is what makes the leash testable end to end, but
     nothing in a shipped path can reach it."""
-    from test_doxbench_routes import _handler_class, _serving
+    from doxbench_routes_harness import _handler_class, _serving
 
     with _serving(tmp_path) as (httpd, _host, _port):
         bound = _handler_class(httpd).packet_assembler
@@ -711,7 +712,7 @@ def test_a_rejected_packet_leaks_nothing_into_the_refusal(tmp_path):
     status, payload, _port = _post_turn(
         tmp_path, _turn(), packet_assembler=assembler)
     assert status == 500
-    from test_doxbench_routes import _TURN_SENTINELS
+    from doxbench_routes_harness import _TURN_SENTINELS
     for sentinel in _TURN_SENTINELS:
         assert sentinel not in str(payload)
     assert "some-other-repo" not in str(payload)
@@ -826,7 +827,7 @@ def test_the_coverage_SHORTFALL_is_stated_on_a_real_route(tmp_path):
     """The branch itself, driven the way the reviewer's own repro drives it:
     squeeze the index bound on the live handler below the tile's staged-set
     size, so refs that ARE confined were never indexed."""
-    from test_doxbench_routes import (
+    from doxbench_routes_harness import (
         _capabilities, _console_headers, _handler_class, _request, _serving,
         CHAT_ROUTE,
     )
@@ -861,7 +862,7 @@ def test_an_unreadable_entry_does_not_consume_index_capacity(tmp_path):
     of 2 over three paths indexed ONE and never considered the readable
     document behind it — and the coverage line then blamed the index bound for
     an omission the bound had nothing to do with."""
-    from test_doxbench_routes import _handler_class, _serving
+    from doxbench_routes_harness import _handler_class, _serving
 
     with _serving(tmp_path,
                   knowledge_declaration=kn.SELF_HOSTED_LOCAL_EMBEDDED
@@ -878,7 +879,7 @@ def test_an_unreadable_entry_does_not_consume_index_capacity(tmp_path):
 def test_the_route_states_unreadable_and_beyond_bound_apart(tmp_path):
     """The same fix, seen where a human reads it: the packet's own
     declaration."""
-    from test_doxbench_routes import (
+    from doxbench_routes_harness import (
         _capabilities, _console_headers, _handler_class, _request, _serving,
         CHAT_ROUTE,
     )
@@ -1096,7 +1097,7 @@ def test_a_turn_records_one_content_free_usage_event(tmp_path):
     # CONTENT-FREE: no sentinel from the request survives anywhere in the
     # record, and the four fields this console cannot fill are DECLARED absent
     # rather than filled with something plausible.
-    from test_doxbench_routes import _TURN_SENTINELS
+    from doxbench_routes_harness import _TURN_SENTINELS
     for sentinel in _TURN_SENTINELS:
         assert sentinel not in str(emitted)
     for field in ("client", "domain", "bill_to", "customer_subject_ref"):
@@ -1109,7 +1110,7 @@ def test_a_turn_records_one_content_free_usage_event(tmp_path):
 
 
 def test_the_meter_is_bound_per_server_process(tmp_path):
-    from test_doxbench_routes import _serving, _handler_class
+    from doxbench_routes_harness import _serving, _handler_class
 
     with _serving(tmp_path) as (first, _host, _port):
         with _serving(tmp_path) as (second, _host2, _port2):

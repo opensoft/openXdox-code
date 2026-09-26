@@ -682,7 +682,7 @@ def test_a_builder_refusal_answers_on_the_routes_fixed_400_shape(
     # answered in the family its request arrived in, and they differed in exactly
     # one clause -- the `kind`. One family survives, so the distinction is gone
     # and the twins merged under the unqualified name.
-    from test_doxbench_routes import (  # noqa: E402
+    from doxbench_routes_harness import (  # noqa: E402
         _assert_refusal, _post_turn, _turn_v2,
     )
 
