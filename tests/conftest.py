@@ -222,9 +222,47 @@ SERVE_SURFACE_MODULES: tuple[str, ...] = (
 # CONTENT scans below (the credential-free walk, the hosted-session-arrival
 # scan, the no-implicit-push sweep) should see."
 
+# WHERE THE SERVE SURFACE LIVES AT THIS LEG (plan 034 task T040). The readers
+# below used to find all seven files in openxFactory's
+# `scripts/ideation_dashboard/`, a path this leg does not have. The carve split
+# them three ways, each by its own manifest destination row:
+#   * `serve.py`, `serve_wire.py`, `serve_workbench.py` and `serve_project.py`
+#     went to openDox, and this leg reads them through its PIN, in the
+#     installed `opendox` package — the same resolution `tests/opendox_bundle.py`
+#     makes for the bundle;
+#   * `serve_gate.py` and `serve_projection.py` came HERE, to `src/openxdox/`;
+#   * `serve_openxfactory_lanes.py`, openxFactory's own lane column, stayed in
+#     openxFactory (`not_moved`, `stays_openxfactory_adapter`).
+# So the lane column is the one file of the tuple this leg cannot read. It is
+# NAMED here rather than dropped from the tuple: the tuple stays the whole
+# surface, and a file missing for any other reason still refuses the read.
+SERVE_SURFACE_NOT_AT_THIS_LEG: tuple[str, ...] = ("serve_openxfactory_lanes.py",)
+
+
+def carved_module_path(name: str) -> Path:
+    """Where the pre-carve module `scripts/ideation_dashboard/<name>` lives at
+    this leg: in this leg's own `src/openxdox/`, or in the openDox it pins.
+
+    Refuses a name found in both homes or in neither, so a resolution can never
+    quietly pick one, and a module that moved again reads as a failure rather
+    than as a scan that got smaller."""
+    import opendox  # the PINNED openDox, resolved as `opendox_bundle.find()` does
+
+    homes = (REPO_ROOT / "src" / "openxdox" / name,
+             Path(opendox.__file__).resolve().parent / name)
+    found = [path for path in homes if path.is_file()]
+    if len(found) != 1:
+        raise FileNotFoundError(
+            f"{name}: expected in exactly one of this leg's src/openxdox/ and "
+            f"the pinned opendox package; found in {len(found)} of "
+            f"{[str(path) for path in homes]}")
+    return found[0]
+
 
 def serve_surface_paths() -> tuple[Path, ...]:
-    """Every file the dashboard serve is made of, in import-graph order.
+    """Every file the dashboard serve is made of that this leg can read, in
+    import-graph order: the tuple above less `SERVE_SURFACE_NOT_AT_THIS_LEG`,
+    each at its carved home (`carved_module_path`).
 
     Dependency-first: `serve_wire.py` imports no sibling; `serve_workbench.py`,
     `serve_project.py`, `serve_gate.py` and `serve_projection.py` each import
@@ -242,8 +280,8 @@ def serve_surface_paths() -> tuple[Path, ...]:
     substring/absence, or a `.index()` search that resolves within a single
     file's own content) — only the docstring claim above does.
     """
-    runtime = REPO_ROOT / "scripts" / "ideation_dashboard"
-    return tuple(runtime / name for name in SERVE_SURFACE_MODULES)
+    return tuple(carved_module_path(name) for name in SERVE_SURFACE_MODULES
+                 if name not in SERVE_SURFACE_NOT_AT_THIS_LEG)
 
 
 def serve_surface_source() -> str:

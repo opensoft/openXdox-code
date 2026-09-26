@@ -44,20 +44,41 @@ this file exists to catch, and it names no top-level package at all. All five
 spellings the package admits are read: absolute `from ideation_dashboard.X
 import`, `from scripts.ideation_dashboard.X import`, `from ideation_dashboard
 import X`, and relative `from . import X` / `from .X import`.
+
+AFTER THE CARVE (plan 034 task T040), the one package is two. The three
+openDox readers and the types module are openDox's, in the `opendox` this leg
+PINS; the authority is openXdox's own `openxdox`. So the package this parser
+means is BOTH halves together, and the absolute spellings it reads now include
+`opendox` and `openxdox` beside the pre-carve two. That is what keeps the
+direction check able to fail: an openDox reader importing
+`openxdox.doxbench_scope` names a module of the other half, and a parser that
+knew only openDox's half would walk straight past it.
 """
 
 from __future__ import annotations
 
 import ast
+from pathlib import Path
 
 import pytest
 
-from conftest import REPO_ROOT
+from conftest import REPO_ROOT  # noqa: F401  (sys.path side effect)
 
 from openxdox import doxbench_scope
 from opendox import doxbench_scope_types
 
-PACKAGE = REPO_ROOT / "scripts" / "ideation_dashboard"
+# THE PACKAGE, AS THE CARVE SPLIT IT. Each half is read where it is
+# installed: openDox's through this leg's PIN (the resolution
+# `tests/opendox_bundle.py` makes for the bundle), openXdox's in this leg's
+# own tree. The pre-carve path, `scripts/ideation_dashboard/`, is neither.
+OPENDOX_PACKAGE = Path(doxbench_scope_types.__file__).resolve().parent
+OPENXDOX_PACKAGE = Path(doxbench_scope.__file__).resolve().parent
+PACKAGES = (OPENDOX_PACKAGE, OPENXDOX_PACKAGE)
+
+#: Every absolute name the package has had: the pre-carve two, and the two
+#: halves it became.
+PACKAGE_NAMES = ("ideation_dashboard", "scripts.ideation_dashboard",
+                 "opendox", "openxdox")
 
 #: The openDox modules whose repoint IS split S-1. Each must import the types
 #: module and must not name the authority module.
@@ -71,9 +92,10 @@ MOVED_NAMES = (
 
 
 def _module(name, lineno):
-    """One edge, kept only when `name` is a MODULE of this package rather than
-    a name re-exported from `__init__` (`from . import GENERATOR_VERSION`)."""
-    if (PACKAGE / f"{name}.py").is_file():
+    """One edge, kept only when `name` is a MODULE of this package — of either
+    half of it — rather than a name re-exported from `__init__`
+    (`from . import GENERATOR_VERSION`)."""
+    if any((package / f"{name}.py").is_file() for package in PACKAGES):
         yield name, lineno
 
 
@@ -106,18 +128,18 @@ def _sibling_modules(path):
                 else:
                     for alias in node.names:                # from . import X
                         yield from _module(alias.name, node.lineno)
-            elif module in ("ideation_dashboard", "scripts.ideation_dashboard"):
+            elif module in PACKAGE_NAMES:
                 for alias in node.names:                    # from pkg import X
                     yield from _module(alias.name, node.lineno)
             else:
-                for prefix in ("ideation_dashboard.", "scripts.ideation_dashboard."):
+                for prefix in (f"{name}." for name in PACKAGE_NAMES):
                     if module.startswith(prefix):           # from pkg.X import a
                         yield from _module(module[len(prefix):].split(".")[0],
                                            node.lineno)
                         break
         elif isinstance(node, ast.Import):
             for alias in node.names:
-                for prefix in ("ideation_dashboard.", "scripts.ideation_dashboard."):
+                for prefix in (f"{name}." for name in PACKAGE_NAMES):
                     if alias.name.startswith(prefix):       # import pkg.X
                         yield from _module(alias.name[len(prefix):].split(".")[0],
                                            node.lineno)
@@ -127,7 +149,7 @@ def _sibling_modules(path):
 @pytest.mark.parametrize("module", REPOINTED)
 def test_openDox_readers_import_the_types_and_not_the_authority(module):
     """The removed edge stays removed, and the assertion is not vacuous."""
-    edges = list(_sibling_modules(PACKAGE / f"{module}.py"))
+    edges = list(_sibling_modules(OPENDOX_PACKAGE / f"{module}.py"))
     named = {target: line for target, line in edges}
     assert "doxbench_scope_types" in named, (
         f"{module}.py no longer imports doxbench_scope_types — this test has "
@@ -140,7 +162,7 @@ def test_openDox_readers_import_the_types_and_not_the_authority(module):
 
 def test_types_module_is_the_bottom_of_the_scope_graph():
     """No back-edge, by any of the five spellings — cycle and edge at once."""
-    edges = list(_sibling_modules(PACKAGE / "doxbench_scope_types.py"))
+    edges = list(_sibling_modules(OPENDOX_PACKAGE / "doxbench_scope_types.py"))
     assert not edges, (
         f"doxbench_scope_types imports {edges} from its own package; it must "
         f"import nothing from it, doxbench_scope least of all")
