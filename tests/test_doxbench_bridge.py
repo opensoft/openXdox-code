@@ -174,7 +174,7 @@ def test_the_de_facto_adapter_surface_is_declared_even_though_the_ban_is_not(
 
 
 def test_the_bridge_satisfies_the_port_without_growing_a_provider_verb(tmp_path):
-    from test_doxbench_model import FORBIDDEN_PORT_MEMBERS
+    from doxbench_port_ban import FORBIDDEN_PORT_MEMBERS
 
     bridge = _bridge(tmp_path)
     assert isinstance(bridge, WorkbenchModelPort)
@@ -417,7 +417,7 @@ def test_the_conversation_view_is_the_three_member_port_and_nothing_more(
         tmp_path):
     """C2's fix must not widen the port: `dispatch_turn` calls
     `port.dispatch(envelope)` and knows nothing of conversations."""
-    from test_doxbench_model import FORBIDDEN_PORT_MEMBERS
+    from doxbench_port_ban import FORBIDDEN_PORT_MEMBERS
 
     bridge = _bridge(tmp_path)
     view = bridge.for_conversation("c")
