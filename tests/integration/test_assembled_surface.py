@@ -55,12 +55,13 @@ Exclude it until T008's arc"): "The test leaves T042's integration step, with
 its stated reason: cli_gate imports openxFactory's doc_health at load time,
 which is R1Q6 (d)'s kind of exclusion. It runs again once the doc_health
 direction arc (T008) lands. F9.2 is unchanged." So `validate.yml`'s
-`integration (9.3)` step deselects the help-tree test and prints why, and
-F9.2, unchanged, still runs it and stays red on it until then. The second test
-below holds that exclusion to its reason: it passes only while the same child
-fails exactly the way the reason says, so once the arc lands it fails, and the
-pull request that clears the reason takes the exclusion out of `validate.yml`
-and that test with it.
+whole-suite `pytest` step deselects the help-tree test and prints why (T042's
+`integration (9.3)` step did, until T043 folded that step into the whole
+suite), and F9.2, unchanged, still runs it and stays red on it until then.
+The second test below holds that exclusion to its reason: it passes only
+while the same child fails exactly the way the reason says, so once the arc
+lands it fails, and the pull request that clears the reason takes the
+exclusion out of `validate.yml` and that test with it.
 
 A CREATED file: no carve-manifest row (RULED OQ-C). Its admission is a
 `created:` entry in openxFactory's `docs/opendox-carve-admissions.yaml` (T047).
@@ -238,7 +239,7 @@ def test_the_assembled_help_tree_is_the_31_entry_tree_the_manifest_records(
 
 def test_the_help_tree_is_left_out_only_while_its_stated_reason_holds(
         composition: Composition, tmp_path: Path) -> None:
-    """The required check leaves the test above out of its integration step,
+    """The required check leaves the test above out of its whole-suite run,
     with its stated reason, until the doc_health direction arc (T008) lands
     (RULED openxFactory#656 comment 5859927858). This test holds that
     exclusion to the reason. It builds the same assembled command line in the
@@ -256,7 +257,7 @@ def test_the_help_tree_is_left_out_only_while_its_stated_reason_holds(
         f"at {composition}: the assembled command line builds now, so the "
         f"help-tree test's stated reason for leaving the required check "
         f"({LEFT_OUT_REASON}) no longer holds. Take its `--deselect` out of "
-        "validate.yml's `integration (9.3)` step, and this test with it, so "
+        "validate.yml's whole-suite `pytest` step, and this test with it, so "
         "that it runs again (RULED openxFactory#656 comment 5859927858)")
     assert (_DOC_HEALTH_NOT_FOUND.fullmatch(last)
             and _THROUGH_CLI_GATE.search(done.stderr)), (
