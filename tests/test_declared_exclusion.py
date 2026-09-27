@@ -45,6 +45,7 @@ these files fail in a lone checkout.
 from __future__ import annotations
 
 import concurrent.futures
+import copy
 import os
 import re
 import subprocess
@@ -459,6 +460,12 @@ BROKEN_DECLARATIONS = {
         lambda d: d["reasons"][1].update(
             ruled="R1Q6 (d), openxFactory#656 comment 5817152735"),
         "is ruled by R1Q24 (a)"),
+    "an entry naming a reason that is not an id": (
+        lambda d: d["entries"][0].update(reasons=[[]]),
+        "names a reason that is not an id"),
+    "unknown keys of two types": (
+        lambda d: d.update({1: "one", "counts": d["count"]}),
+        "it has an unknown key: 'counts', 1"),
 }
 
 
@@ -509,6 +516,95 @@ def test_the_root_conftest_refuses_a_key_given_twice(breakage, request,
     with pytest.raises(root.DeclaredExclusionRefused,
                        match=re.escape(f"gives the key {key!r} twice")):
         root.load_declared_exclusion(broken)
+
+
+#: Values no rule expects, each put in every place the declaration has one.
+_ODD_VALUES = (None, 0, -1, 1.5, True, "", " ", "x\ny", [], [[]], [{}], {},
+               {"a": 1}, [1], ["doc_health", []], "doc_health")
+#: Keys no rule expects, one of each YAML scalar type, each added beside an
+#: unknown text key.
+_ODD_KEYS = (1, None, True, 1.5, "zz")
+#: libyaml's dumper where PyYAML has it, since the sweep dumps hundreds of
+#: variants. It writes what PyYAML's own dumper writes; only the loading has
+#: to be the root conftest's own.
+_DUMPER = getattr(yaml, "CSafeDumper", yaml.SafeDumper)
+
+
+def _places(node, where=()):
+    """Every place in the declaration: each mapping value, and the first
+    four items of each list, so every reason and its `only` among them."""
+    if isinstance(node, dict):
+        items = list(node.items())
+    elif isinstance(node, list):
+        items = list(enumerate(node[:4]))
+    else:
+        return
+    for step, value in items:
+        yield where + (step,)
+        yield from _places(value, where + (step,))
+
+
+def _at(node, where):
+    for step in where:
+        node = node[step]
+    return node
+
+
+def _cut_down(declaration: dict) -> dict:
+    """The committed declaration with its four reasons and, for each, only
+    the first entry that names it. Every rule still has something to hold,
+    a two-reason entry and `only` among them, and it loads in a fraction of
+    the time."""
+    cut = copy.deepcopy(declaration)
+    kept = []
+    for reason in cut["reasons"]:
+        first = next(entry for entry in cut["entries"]
+                     if reason["id"] in entry["reasons"])
+        if first not in kept:
+            kept.append(first)
+    cut["entries"] = sorted(kept, key=lambda entry: entry["path"])
+    cut["count"] = len(cut["entries"])
+    return cut
+
+
+def test_the_root_conftest_refuses_rather_than_crashes(request, tmp_path):
+    """A malformed declaration is REFUSED, naming its rule. Anything else it
+    raised would stop the run without saying which rule broke. So each odd
+    value goes in each place of a declaration cut down from the committed
+    one, and each odd key into each of its mappings, and every load must
+    return or refuse."""
+    root = _root_conftest(request.config)
+    base = _cut_down(_load())
+    broken = tmp_path / "declared_exclusion.yaml"
+    broken.write_text(yaml.safe_dump(base, sort_keys=False), encoding="utf-8")
+    assert root.load_declared_exclusion(broken) == base
+    variants = []
+    for where in _places(base):
+        for odd in _ODD_VALUES:
+            variant = copy.deepcopy(base)
+            _at(variant, where[:-1])[where[-1]] = copy.deepcopy(odd)
+            variants.append((f"{where} := {odd!r}", variant))
+    mappings = [()] + [where for where in _places(base)
+                       if isinstance(_at(base, where), dict)]
+    for where in mappings:
+        for key in _ODD_KEYS:
+            variant = copy.deepcopy(base)
+            _at(variant, where).update({key: 1, "zz-unknown": 1})
+            variants.append((f"{where} + key {key!r}", variant))
+    crashed = []
+    for label, variant in variants:
+        broken.write_text(yaml.dump(variant, Dumper=_DUMPER, sort_keys=False),
+                          encoding="utf-8")
+        try:
+            root.load_declared_exclusion(broken)
+        except root.DeclaredExclusionRefused:
+            continue
+        except Exception as exc:  # what escapes the refusal is the finding
+            crashed.append(f"{label}: {type(exc).__name__}: {exc}")
+    assert len(variants) > 500, len(variants)
+    assert crashed == [], (
+        f"{len(crashed)} of {len(variants)} declarations crash the loader "
+        "instead of being refused:\n" + "\n".join(crashed[:20]))
 
 
 def test_the_root_conftest_accepts_the_declaration_as_committed(request):

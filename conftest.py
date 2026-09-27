@@ -123,6 +123,13 @@ def _is_one_line(text: str) -> bool:
     return text.splitlines() == [text]
 
 
+def _unknown_keys(mapping: dict, known: set) -> str:
+    """The keys of `mapping` that `known` lacks, for a refusal to name. A YAML
+    key need not be text, and keys of two types do not sort. So each is named
+    by its repr, and the names are sorted, never the keys."""
+    return ", ".join(sorted(repr(key) for key in mapping if key not in known))
+
+
 class _KeyGivenTwice(Exception):
     """One mapping in the declaration gives the same key twice."""
 
@@ -181,8 +188,9 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
         refuse(f"it cannot be read ({exc})")
     if not isinstance(data, dict):
         refuse("it is not a mapping")
-    if set(data) - _TOP_KEYS:
-        refuse(f"it has an unknown key: {sorted(set(data) - _TOP_KEYS)}")
+    unknown = _unknown_keys(data, _TOP_KEYS)
+    if unknown:
+        refuse(f"it has an unknown key: {unknown}")
     if data.get("kind") != DECLARED_EXCLUSION_KIND:
         refuse(f"its kind must be {DECLARED_EXCLUSION_KIND!r}")
     if not (_is_integer(data.get("schema_version"))
@@ -200,9 +208,9 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
                 for field in _REASON_FIELDS)):
             refuse(f"the reason {reason!r} lacks one of "
                    f"{', '.join(_REASON_FIELDS)}")
-        if set(reason) - _REASON_KEYS:
-            refuse(f"the reason {reason['id']} has an unknown key: "
-                   f"{sorted(set(reason) - _REASON_KEYS)}")
+        unknown = _unknown_keys(reason, _REASON_KEYS)
+        if unknown:
+            refuse(f"the reason {reason['id']} has an unknown key: {unknown}")
         if not _REASON_ID.fullmatch(reason["id"]):
             refuse(f"the reason id {reason['id']!r} is not a lowercase token "
                    "(a letter, then letters, digits, - and _)")
@@ -231,9 +239,9 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
         if not (isinstance(entry, dict)
                 and isinstance(entry.get("path"), str)):
             refuse(f"the entry {entry!r} names no path")
-        if set(entry) - _ENTRY_KEYS:
-            refuse(f"{entry['path']} has an unknown key: "
-                   f"{sorted(set(entry) - _ENTRY_KEYS)}")
+        unknown = _unknown_keys(entry, _ENTRY_KEYS)
+        if unknown:
+            refuse(f"{entry['path']} has an unknown key: {unknown}")
         rel = PurePosixPath(entry["path"])
         if (rel.is_absolute() or ".." in rel.parts or len(rel.parts) != 2
                 or rel.parts[0] != "tests" or not rel.name.startswith("test_")
@@ -252,7 +260,10 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
         named = entry.get("reasons")
         if not isinstance(named, list) or not named:
             refuse(f"{entry['path']} carries no reason")
-        undeclared = [name for name in named if name not in ids]
+        if not all(isinstance(name, str) for name in named):
+            refuse(f"{entry['path']} names a reason that is not an id: "
+                   f"{named!r}")
+        undeclared =[name for name in named if name not in ids]
         if undeclared:
             refuse(f"{entry['path']} names {undeclared}, which is not a "
                    "declared reason")
