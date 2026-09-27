@@ -452,32 +452,26 @@ def runner_seams():
     seams. Imported inside the function so the patch targets are the modules the
     tests themselves hold.
 
-    TRANCHE NOTE (adopt-neutral-tooling-home tranche A): both seams live in the
-    `ideation_dashboard` package, which arrives with tranche B. Until it lands
-    in this repo there is nothing in-process that can speak `nlm` or `gh`, so a
-    missing package yields NO seams (layer 1's PATH shim still refuses the
-    binaries) rather than an import error in every test. The probe is
-    `find_spec`, not try/except ImportError, because this repo's own
-    `tests/ideation_dashboard/` suite directory forms a NAMESPACE package of
-    the same name once `tests/` is on `sys.path` — the failure mode is then
-    "cannot import name ... (unknown location)", not ModuleNotFoundError.
-    Self-healing: a regular package always beats a namespace portion, so the
-    moment tranche B lands `scripts/ideation_dashboard/`, `find_spec` resolves
-    its submodules and both seams are guarded again with no further edit —
-    and a landed package that fails to IMPORT still raises loudly."""
-    from importlib.util import find_spec
-
-    try:
-        dashboard_ready = all(
-            find_spec(f"ideation_dashboard.{name}") is not None
-            for name in ("session_pr", "workbench"))
-    except ModuleNotFoundError:
-        dashboard_ready = False
-    if not dashboard_ready:
-        return ()
-
-    from ideation_dashboard import session_pr as session_pr_mod
-    from ideation_dashboard import workbench as workbench_mod
+    AT THIS LEG BOTH SEAMS ARE THE PINNED openDox's, and they are imported with
+    no probe (plan 034 T041). openDox-code#51 made the same repair to its own
+    copy of this module for T035. openxFactory's copy probes
+    `ideation_dashboard.*` with `find_spec` and returns NO seams while that
+    package is absent, a guard from before the package reached openxFactory
+    (adopt-neutral-tooling-home tranche A). Carried here unchanged, the probe
+    named a package this leg does not have, so it always answered "absent" and
+    LAYER 2 WAS OFF in this suite: the carve manifest's row for this file
+    records both reaches as resolving "to nothing at a destination that lacks
+    them". Layer 1 was still on, and a non-zero exit is the very degradation the
+    notebook adapter swallows, so an escape through the default runner would
+    have passed. Turning the layer on here changed no test's outcome in the
+    whole suite, so no test was escaping. Both modules are the openDox this leg
+    pins, the same modules every test here drives, so a probe could only hide a
+    breakage: a seam module that fails to import now fails every test, loudly,
+    instead of switching the layer off in silence.
+    `tests/test_hermeticity_gate_verbs.py` holds the regression that needs the
+    layer: its unguarded create must RAISE."""
+    from opendox import session_pr as session_pr_mod
+    from opendox import workbench as workbench_mod
 
     return (
         (workbench_mod, "_default_runner", refuse_nlm),
