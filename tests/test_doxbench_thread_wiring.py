@@ -10,8 +10,10 @@ thread route serves it to the selector.
 WHY A REAL SERVE. Each of these is a WIRING claim — "the route supplies the
 threads", "the route writes the record", "the 409 arm is reachable" — and every
 one of them passes trivially against a stubbed assembler. The harness is
-IMPORTED from `test_doxbench_routes` for the reason that file's own siblings
-record: a second harness is a second set of behaviours to keep in step.
+IMPORTED for the reason `test_doxbench_routes`'s own siblings record: a second
+harness is a second set of behaviours to keep in step. It comes from
+`doxbench_routes_harness`, this leg's one copy of the names it takes from
+openxFactory's `test_doxbench_routes`.
 
 THE ONE SEAM THESE TESTS OVERRIDE, and why it is honest to: which directory is
 this scope's SESSION WORKTREE (`_session_worktree_for`). Building a live git
@@ -44,7 +46,7 @@ from opendox.doxbench_model import (  # noqa: E402
     ModelCatalog, ModelCatalogEntry,
 )
 
-from test_doxbench_routes import (  # noqa: E402
+from doxbench_routes_harness import (  # noqa: E402
     DOC_ALPHA, DOC_ZULU, OUTLINE_PATH, _buf, _capabilities, _catalog,
     _console_headers, _handler_class, _port, _request, _serving,
     _snapshot_with_editable, _turn_v2,

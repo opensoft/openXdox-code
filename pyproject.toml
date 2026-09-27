@@ -103,7 +103,7 @@ requires-python = ">=3.12"
 # PR) — and not an arbitrary choice: `Draft202012Validator`, the name
 # `gate_console.py:563` imports, was added in jsonschema 4.18.0.
 dependencies = [
-    "opendox @ git+https://github.com/opensoft/openDox-code@5c137a9049600afbcf93b2ac26baf3d229755f95",
+    "opendox @ git+https://github.com/opensoft/openDox-code@2d116415159b721b55613fe20a159afc46202d1f",
     "PyYAML>=6.0",
     "jsonschema>=4.18",
 ]
@@ -113,8 +113,25 @@ dependencies = [
 # home: `validate.yml` used to carry it as a literal in the install step and
 # now installs `.[test]`, so the range is declared once and the workflow reads
 # it, instead of two copies that can drift apart while both keep passing.
+#
+# `rfc3339-validator`, plan 034 task T040 (openxFactory
+# `specs/034-opendox-standalone-operation/`). jsonschema registers its
+# `date-time` format checker only when this package is importable, and the
+# validator this leg carries at `scripts/validate-ideation-dashboard-contracts.py`
+# refuses to run without that checker rather than validate with `date-time`
+# unenforced. So the suites that drive it fail closed without it: measured
+# over the whole suite at `e28930bf`, 23 red results asked for exactly this
+# package (21 in `tests/test_doxbench_blank_reason.py`, 2 in
+# `tests/test_snapshot.py`), and installing it cleared the 21.
+# It is a TEST dependency and stays out of `dependencies` for the reason the
+# jsonschema paragraph above gives: nothing under `src/` imports it, and the
+# validator script lands at the repository root, outside the package.
+# LOWER BOUND: `>=0.1.4`, derived the way PyYAML's was — what openxFactory
+# itself runs. Its validator-input lock pins `rfc3339-validator==0.1.4`
+# (`requirements/hermes-runtime-contracts.in`, which records the same reason).
 test = [
     "pytest>=8,<9",
+    "rfc3339-validator>=0.1.4",
 ]
 
 [build-system]

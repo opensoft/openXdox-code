@@ -174,7 +174,7 @@ def test_the_de_facto_adapter_surface_is_declared_even_though_the_ban_is_not(
 
 
 def test_the_bridge_satisfies_the_port_without_growing_a_provider_verb(tmp_path):
-    from test_doxbench_model import FORBIDDEN_PORT_MEMBERS
+    from doxbench_port_ban import FORBIDDEN_PORT_MEMBERS
 
     bridge = _bridge(tmp_path)
     assert isinstance(bridge, WorkbenchModelPort)
@@ -188,8 +188,11 @@ def test_the_bridge_satisfies_the_port_without_growing_a_provider_verb(tmp_path)
 def test_the_bridge_module_declares_no_credential_shaped_name():
     """Task 11.1's "holding no credential", asserted against the source rather
     than described: a bridge that grew a key field would fail here."""
-    source = (REPO_ROOT / "scripts" / "ideation_dashboard"
-              / "doxbench_bridge.py").read_text(encoding="utf-8")
+    # THE INSTALLED openDox's OWN MODULE, not the PRE-CARVE
+    # `scripts/ideation_dashboard/` path (plan 034 task T040): the module under
+    # test is openDox's, this file already imports it as `br`, and this leg
+    # reads openDox through its PIN (§ 3.4 slice S8's `MODULE_PATH` repair).
+    source = Path(br.__file__).read_text(encoding="utf-8")
     for forbidden in ("api_key", "apiKey", "ANTHROPIC_API_KEY", "OPENAI_API_KEY",
                       "bearer", "Authorization", "secret_key"):
         assert forbidden not in source, forbidden
@@ -417,7 +420,7 @@ def test_the_conversation_view_is_the_three_member_port_and_nothing_more(
         tmp_path):
     """C2's fix must not widen the port: `dispatch_turn` calls
     `port.dispatch(envelope)` and knows nothing of conversations."""
-    from test_doxbench_model import FORBIDDEN_PORT_MEMBERS
+    from doxbench_port_ban import FORBIDDEN_PORT_MEMBERS
 
     bridge = _bridge(tmp_path)
     view = bridge.for_conversation("c")

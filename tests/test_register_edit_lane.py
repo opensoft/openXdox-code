@@ -21,7 +21,7 @@ import pytest
 import yaml
 
 from conftest import REPO_ROOT  # noqa: F401 (sys.path side effect)
-from test_gate_routes import _post, _serving
+from gate_routes_harness import _post, _serving
 
 from opendox.boundary import HumanGate
 from openxdox.gate_console import GateConsole

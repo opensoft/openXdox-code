@@ -28,10 +28,12 @@ pinned here so the later slice has something to satisfy.
 from __future__ import annotations
 
 import dataclasses
+from pathlib import Path
 
 import pytest
 
 from conftest import REPO_ROOT  # noqa: F401  (sys.path side effect)
+from conftest import assert_not_at_this_leg, carved_module_path
 
 from opendox import doxbench_knowledge as kn  # noqa: E402
 from opendox import doxbench_packet as pk  # noqa: E402
@@ -40,8 +42,12 @@ from openxdox.doxbench_scope import (  # noqa: E402
     ScopeKey, ScopeProjection,
 )
 
-MODULE_PATH = (REPO_ROOT / "scripts" / "ideation_dashboard"
-               / "doxbench_packet.py")
+# THE INSTALLED openDox's OWN MODULE, not the PRE-CARVE
+# `scripts/ideation_dashboard/` path the carve left behind (plan 034 task T040;
+# § 3.4 slice S8 made the same repair in `test_doxbench_turns.py`). It is the
+# same resolution through the PIN that `tests/opendox_bundle.py` makes for the
+# bundle, on the module this file already imports as `pk`.
+MODULE_PATH = Path(pk.__file__)
 
 TILE = "demo-topic"
 OUTLINE = f"ideation/staging/{TILE}/{TILE}.md"
@@ -950,6 +956,17 @@ def test_the_watch_listed_candidate_is_recorded_with_gates_and_not_adopted():
     assert "sandboxed trial" in str(raised.value)
 
 
+#: THE ONE MODULE OF THE SWEEP BELOW THAT THIS LEG DOES NOT HAVE (plan 034 task
+#: T040). The carve left `doxbench_status_exemption.py`, openxFactory's
+#: status-exemption rail, in openxFactory (`not_moved`,
+#: `stays_openxfactory_adapter`), as `conftest.py`'s
+#: `SERVE_SURFACE_NOT_AT_THIS_LEG` records for the lane column. It stays in the
+#: sweep's tuple, which is only ever widened. `assert_not_at_this_leg` fails
+#: the sweep once the file is here, so skipping it can never hide code this
+#: leg carries, and any other missing module still refuses the read.
+SWEEP_NOT_AT_THIS_LEG: tuple[str, ...] = ("doxbench_status_exemption.py",)
+
+
 def test_no_watch_listed_candidate_is_depended_on_anywhere_in_this_slice():
     # WIDENED (never narrowed, per the conftest.py NO_IMPLICIT_PUSH_MODULES
     # rule this file's own sweep now follows): `doxbench_status_exemption.py`
@@ -957,11 +974,16 @@ def test_no_watch_listed_candidate_is_depended_on_anywhere_in_this_slice():
     # of `doxbench_packet.py` into it. Those lines were inside this scan's
     # coverage before the carve; leaving the new file off the tuple would let
     # that code walk out of the negative while the suite stayed green.
+    assert_not_at_this_leg(SWEEP_NOT_AT_THIS_LEG)
     for module in ("doxbench_packet.py", "doxbench_status_exemption.py",
                    "doxbench_knowledge.py", "doxbench_telemetry.py",
                    "doxbench_memory_gateway.py"):
-        source = (REPO_ROOT / "scripts" / "ideation_dashboard"
-                  / module).read_text(encoding="utf-8").lower()
+        if module in SWEEP_NOT_AT_THIS_LEG:
+            continue
+        # Each module at its carved home, not the pre-carve
+        # `scripts/ideation_dashboard/` path (plan 034 task T040).
+        source = carved_module_path(module).read_text(
+            encoding="utf-8").lower()
         assert "import headroom" not in source, module
         assert "headroomlabs" not in source, module
 

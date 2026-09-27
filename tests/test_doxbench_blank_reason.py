@@ -682,7 +682,7 @@ def test_a_builder_refusal_answers_on_the_routes_fixed_400_shape(
     # answered in the family its request arrived in, and they differed in exactly
     # one clause -- the `kind`. One family survives, so the distinction is gone
     # and the twins merged under the unqualified name.
-    from test_doxbench_routes import (  # noqa: E402
+    from doxbench_routes_harness import (  # noqa: E402
         _assert_refusal, _post_turn, _turn_v2,
     )
 
@@ -787,8 +787,10 @@ def test_every_textual_home_states_the_admission_rule():
     that: the normative manifest text still described the exclusion form after
     the code had been inverted)."""
     homes = {
-        "canonical": REPO_ROOT / "scripts" / "ideation_dashboard"
-        / "doxbench_packet.py",
+        # openDox's own module through the PIN, not the pre-carve
+        # `scripts/ideation_dashboard/` path (plan 034 task T040); this file
+        # already imports it as `pk`.
+        "canonical": Path(pk.__file__),
         "validator": REPO_ROOT / "scripts"
         / "validate-ideation-dashboard-contracts.py",
         "browser": CHAT_MODEL_JS,
