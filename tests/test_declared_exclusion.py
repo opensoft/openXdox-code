@@ -30,9 +30,12 @@ HOW A RED RESULT IS ATTRIBUTED. Each listed file runs in a child pytest of its
 own, from this checkout's root, with a JUnit report. Every failure and error
 in the report is read through its message and the lines pytest marks `E`. So
 source lines a traceback quotes are never read as evidence. Each reason has one
-piece of evidence, `EVIDENCE` below, and a red result must match exactly one of
-them. None is an unattributed failure. Two means the evidence has stopped
-telling the reasons apart, and it is refused as well.
+piece of evidence, `EVIDENCE` below: its cause as raised, and only when that
+cause is all the result shows. A red result must match exactly one of them.
+None is an unattributed failure, and so is a declared cause shown beside
+anything else. Two would mean the evidence had stopped telling the reasons
+apart, and that is refused as well, though the evidence as written leaves no
+result that two reasons can take.
 
 THE LONE CHECKOUT. The child's environment drops `PYTHONPATH`,
 `CONTRACTS_DIR`, `PYTEST_ADDOPTS` and `PYTEST_PLUGINS`, which could otherwise
@@ -90,37 +93,52 @@ REASONS = {reason["id"]: reason for reason in DECLARATION.get("reasons") or []}
 
 
 # ---------------------------------------------------------------------------
-# THE EVIDENCE: what a red result of each reason says.
+# THE EVIDENCE: what a red result of each reason says, and nothing else.
+#
+# Each reason's evidence is its cause AS RAISED: the exception with its
+# message, or the refusal in its raiser's own words. The same words quoted in
+# some other failure are not evidence. And a reason accounts for the whole
+# result: every missing module, missing file and refusal the result shows must
+# be its own. A result that shows its reason's cause beside anything else is
+# unattributed, so an unrelated failure cannot ride along under a declared
+# reason. So no two reasons can take one result.
 # ---------------------------------------------------------------------------
 
-_DOC_HEALTH = re.compile(r"No module named 'doc_health(?:\.[\w.]+)?'")
+#: `doc_health`, or one of its modules, as the import raises it missing.
+_DOC_HEALTH = re.compile(
+    r"ModuleNotFoundError: No module named 'doc_health(?:\.[\w.]+)?'")
+#: Any module any line reports missing.
+_ANY_MODULE = re.compile(r"No module named '(?P<module>[^']+)'")
 
 #: The refusal openDox's status-exemption seam raises when nothing is
-#: registered (plan 034 T027, openDox-code#41): `StatusExemptionNotRegistered`,
-#: and the `AttributeError` the module raises for a rail name, which quotes it.
-_RAIL = ("no status-exemption rail is registered at openDox's "
-         "status-exemption seam")
+#: registered (plan 034 T027, openDox-code#41). The `AttributeError` the module
+#: raises for a rail name chains it, so it shows there too.
+_RAIL = re.compile(
+    r"StatusExemptionNotRegistered: no status-exemption rail is registered "
+    r"at openDox's status-exemption seam")
+#: The refusal's words, however they arrive.
+_ANY_RAIL = "no status-exemption rail is registered"
 
-#: A missing path, as `open()` and the interpreter each report one.
+#: A missing file as `open()` raises it, or a script the interpreter cannot
+#: open.
 _MISSING = re.compile(
+    r"(?:FileNotFoundError: \[Errno 2\] No such file or directory: "
+    r"|can't open file )'(?P<path>[^']+)'")
+#: Any path any line reports missing.
+_ANY_MISSING = re.compile(
     r"(?:No such file or directory: |can't open file )'(?P<path>[^']+)'")
 
-#: The consumer validator's own refusal when neither a `contracts/` in its
-#: tree nor `CONTRACTS_DIR` supplies its schemas (C3's openXdox-code#28).
-_CONSUMER_SCHEMAS = "CONTRACTS_DIR is not set"
-
-
-def _reaches_doc_health(text: str) -> bool:
-    """`ModuleNotFoundError: No module named 'doc_health'`: openxFactory's
-    corpus machinery, which `src/openxdox/generator.py`, `gate_console.py`
-    and the rest import at module level."""
-    return _DOC_HEALTH.search(text) is not None
-
-
-def _needs_the_rail(text: str) -> bool:
-    """openDox's status-exemption seam refused: no rail is registered."""
-    return _RAIL in text
-
+#: The consumer validator's refusal when neither this tree's `contracts/` nor
+#: `CONTRACTS_DIR` supplies its schemas, in the words of this checkout's
+#: `scripts/validate-ideation-dashboard-contracts.py` (C3's openXdox-code#28).
+#: It names this checkout's own `contracts/schemas`, and why nothing is there.
+_CONSUMER_SCHEMAS = re.compile(
+    re.escape(f"ERROR harness failure: {LEG_ROOT / 'contracts' / 'schemas'}"
+              " carries none of the family's ") + r"\d+"
+    + re.escape(" schemas (this tree carries no contracts/ and CONTRACTS_DIR "
+                "is not set;"))
+#: The refusal's condition, however it arrives.
+_ANY_CONSUMER = "CONTRACTS_DIR is not set"
 
 #: The contract files the listed contracts files read, where the contract
 #: family looks for them. Its files take `Path(__file__).parents[2]` for
@@ -139,23 +157,66 @@ _CONTRACT_FILES = frozenset({
 })
 
 
-def _reads_openxfactory_contracts(text: str) -> bool:
-    """One of `_CONTRACT_FILES` is missing. A relative path is the child's,
-    which runs from this checkout's root. Any other missing file, even one
-    beside those in the same `contracts/`, is some other defect, and it is
-    not this reason."""
-    for match in _MISSING.finditer(text):
+def _missing_paths(text: str, pattern: re.Pattern = _ANY_MISSING) -> set:
+    """Each path `pattern` finds, resolved. A relative path is the child's,
+    which runs from this checkout's root."""
+    paths = set()
+    for match in pattern.finditer(text):
         path = Path(match.group("path"))
         if not path.is_absolute():
             path = LEG_ROOT / path
-        if path.resolve() in _CONTRACT_FILES:
-            return True
-    return False
+        paths.add(path.resolve())
+    return paths
+
+
+def _signals(text: str) -> dict:
+    """Everything a red result shows that some reason could account for: its
+    missing modules and missing files, and whether it carries the rail's
+    refusal or the consumer's."""
+    return {"modules": set(_ANY_MODULE.findall(text)),
+            "files": _missing_paths(text),
+            "rail": _ANY_RAIL in text,
+            "consumer": _ANY_CONSUMER in text}
+
+
+def _is_doc_health(module: str) -> bool:
+    return module == "doc_health" or module.startswith("doc_health.")
+
+
+def _reaches_doc_health(text: str) -> bool:
+    """openxFactory's corpus machinery, which `src/openxdox/generator.py`,
+    `gate_console.py` and the rest import at module level, raised missing,
+    and no other module, file or refusal."""
+    shown = _signals(text)
+    return (_DOC_HEALTH.search(text) is not None
+            and all(_is_doc_health(module) for module in shown["modules"])
+            and not (shown["files"] or shown["rail"] or shown["consumer"]))
+
+
+def _needs_the_rail(text: str) -> bool:
+    """openDox's status-exemption seam refused, with no rail registered, and
+    nothing else is missing."""
+    shown = _signals(text)
+    return (_RAIL.search(text) is not None
+            and not (shown["modules"] or shown["files"] or shown["consumer"]))
+
+
+def _reads_openxfactory_contracts(text: str) -> bool:
+    """A contract file of `_CONTRACT_FILES`, raised missing, and every file
+    the result shows missing is one of them. Any other missing file, even one
+    beside those in the same `contracts/`, is some other defect."""
+    shown = _signals(text)
+    return (bool(_missing_paths(text, _MISSING))
+            and shown["files"] <= _CONTRACT_FILES
+            and not (shown["modules"] or shown["rail"] or shown["consumer"]))
 
 
 def _needs_the_consumer_schemas(text: str) -> bool:
-    """The consumer validator found no schemas, and says why."""
-    return _CONSUMER_SCHEMAS in text
+    """The consumer validator refused for want of its schemas, in its own
+    words, and nothing else is missing."""
+    shown = _signals(text)
+    return (_CONSUMER_SCHEMAS.search(text) is not None
+            and not (shown["modules"] or shown["files"] or shown["rail"]))
 
 
 EVIDENCE = {
@@ -170,39 +231,92 @@ def _missing(path) -> str:
     return f"FileNotFoundError: [Errno 2] No such file or directory: '{path}'"
 
 
-#: What the contracts evidence must and must not take for its reason: each
-#: path the contract files' runs show, and missing files that only look like
-#: them, beside them in the same directories among them.
-CONTRACT_EVIDENCE_CASES = {
+_DOC_HEALTH_RAISED = "ModuleNotFoundError: No module named 'doc_health'"
+_RAIL_RAISED = ("opendox.doxbench_packet.StatusExemptionNotRegistered: no "
+                "status-exemption rail is registered at openDox's "
+                "status-exemption seam (opendox.doxbench_packet), so no "
+                "source can be marked")
+_CONSUMER_RAISED = (
+    f"AssertionError: ERROR harness failure: {LEG_ROOT / 'contracts'}"
+    "/schemas carries none of the family's 10 schemas (this tree carries no "
+    "contracts/ and CONTRACTS_DIR is not set; export it as the spec leg's "
+    "contracts directory), so nothing can be validated")
+_GATE_INTENT = (LEG_ROOT.parent / "contracts" / "schemas"
+                / "gate-intent.schema.yaml")
+
+#: What each reason's evidence must take, and must not. Each real shape the
+#: listed files' runs show is taken by its reason. The same words quoted
+#: elsewhere, a cause beside an unrelated one, and look-alike paths are taken
+#: by none.
+EVIDENCE_CASES = {
+    "doc_health, raised": (_DOC_HEALTH_RAISED, "doc_health"),
+    "a doc_health module, raised": (
+        "ModuleNotFoundError: No module named 'doc_health.corpus'",
+        "doc_health"),
+    "doc_health's words in an assertion": (
+        "AssertionError: No module named 'doc_health'", None),
+    "doc_health beside an unrelated missing module": (
+        _DOC_HEALTH_RAISED
+        + "\nModuleNotFoundError: No module named 'yaml_extra'", None),
+    "doc_health beside an unrelated missing file": (
+        _DOC_HEALTH_RAISED + "\n" + _missing("/tmp/t041-x.yaml"), None),
+    "the rail's refusal, raised": (_RAIL_RAISED, "status-exemption-rail"),
+    "the AttributeError that chains the rail's refusal": (
+        _RAIL_RAISED + "\nAttributeError: module 'opendox.doxbench_packet' "
+        "has no attribute 'is_compression_exempt': the status-exemption rail "
+        "cannot answer it (no status-exemption rail is registered at "
+        "openDox's status-exemption seam)", "status-exemption-rail"),
+    "the rail's words in another error": (
+        "RuntimeError: no status-exemption rail is registered at openDox's "
+        "status-exemption seam", None),
+    "the rail's refusal beside an unrelated missing file": (
+        _RAIL_RAISED + "\n" + _missing("/tmp/t041-x.yaml"), None),
     "the gate-intent schema above the checkout": (
-        _missing(LEG_ROOT.parent / "contracts" / "schemas"
-                 / "gate-intent.schema.yaml"), True),
+        _missing(_GATE_INTENT), "openxfactory-contracts"),
     "the project-register schema above the checkout": (
         _missing(LEG_ROOT.parent / "contracts" / "schemas"
-                 / "project-register.schema.yaml"), True),
+                 / "project-register.schema.yaml"), "openxfactory-contracts"),
+    "the validator above the checkout, as the interpreter reports it": (
+        f"AssertionError: /usr/bin/python3: can't open file "
+        f"'{_CONTRACT_VALIDATOR}': [Errno 2] No such file or directory",
+        "openxfactory-contracts"),
+    "the checkout's own contracts/manifest.yaml": (
+        _missing(LEG_ROOT / "contracts" / "manifest.yaml"),
+        "openxfactory-contracts"),
+    "the same, as the child's relative path": (
+        _missing("contracts/manifest.yaml"), "openxfactory-contracts"),
+    "a known schema beside an unrelated missing file": (
+        _missing(_GATE_INTENT) + "\n" + _missing("/tmp/t041-x.yaml"), None),
+    "a known schema's path in an assertion": (
+        f"AssertionError: No such file or directory: '{_GATE_INTENT}'", None),
     "an unrelated file in the contracts/ above the checkout": (
-        _missing(LEG_ROOT.parent / "contracts" / "unrelated.yaml"), False),
+        _missing(LEG_ROOT.parent / "contracts" / "unrelated.yaml"), None),
     "an unrelated schema beside the known ones": (
         _missing(LEG_ROOT.parent / "contracts" / "schemas"
-                 / "unrelated.schema.yaml"), False),
+                 / "unrelated.schema.yaml"), None),
     "an unrelated file in the checkout's own contracts/": (
-        _missing(LEG_ROOT / "contracts" / "unrelated.yaml"), False),
-    "the validator above the checkout": (
-        f"can't open file '{_CONTRACT_VALIDATOR}': [Errno 2]", True),
-    "the checkout's own contracts/manifest.yaml": (
-        _missing(LEG_ROOT / "contracts" / "manifest.yaml"), True),
-    "the same, as the child's relative path": (
-        _missing("contracts/manifest.yaml"), True),
+        _missing(LEG_ROOT / "contracts" / "unrelated.yaml"), None),
     "a contracts/ directory in /tmp": (
-        _missing("/tmp/contracts/manifest.yaml"), False),
+        _missing("/tmp/contracts/manifest.yaml"), None),
     "a contracts/ directory beside the checkout's tree": (
         _missing(LEG_ROOT.parent / "elsewhere" / "contracts" / "x.yaml"),
-        False),
+        None),
     "a contracts/ directory inside the checkout's src/": (
-        _missing(LEG_ROOT / "src" / "contracts" / "x.yaml"), False),
+        _missing(LEG_ROOT / "src" / "contracts" / "x.yaml"), None),
     "a validator of the same name elsewhere": (
         "can't open file '/tmp/scripts/validate-ideation-dashboard-"
-        "contracts.py': [Errno 2]", False),
+        "contracts.py': [Errno 2]", None),
+    "the consumer validator's refusal": (_CONSUMER_RAISED,
+                                         "consumer-schemas"),
+    "CONTRACTS_DIR's words in an unrelated assertion": (
+        "AssertionError: CONTRACTS_DIR is not set", None),
+    "the refusal for another tree's schemas": (
+        _CONSUMER_RAISED.replace(str(LEG_ROOT), "/tmp/other-tree"), None),
+    "the consumer's refusal beside an unrelated missing module": (
+        _CONSUMER_RAISED + "\nModuleNotFoundError: No module named 'foo'",
+        None),
+    "two reasons' causes in one result": (
+        _DOC_HEALTH_RAISED + "\n" + _RAIL_RAISED, None),
 }
 
 
@@ -386,18 +500,15 @@ def test_every_entry_names_a_test_file_this_checkout_carries():
         "this module checks the exclusion, and cannot be excluded by it")
 
 
-@pytest.mark.parametrize("case", sorted(CONTRACT_EVIDENCE_CASES))
-def test_the_contracts_evidence_is_the_known_contract_files_alone(case):
-    """A missing file counts as openxFactory's contracts only if it is one of
-    the contract files the listed files read. Otherwise a listed contracts
-    file that gained an unrelated missing file, even one in the same
-    `contracts/`, would have that failure hidden under its reason. No other
-    reason's evidence takes these either."""
-    text, expected = CONTRACT_EVIDENCE_CASES[case]
-    assert _reads_openxfactory_contracts(text) is expected, text
-    others = [reason for reason, matches in EVIDENCE.items()
-              if reason != "openxfactory-contracts" and matches(text)]
-    assert others == [], others
+@pytest.mark.parametrize("case", sorted(EVIDENCE_CASES))
+def test_the_evidence_takes_each_cause_as_raised_and_alone(case):
+    """Each reason takes its cause as raised, and only when that cause is
+    all the result shows. Otherwise a listed file that gained an unrelated
+    failure could have it hidden under a declared reason: a quoted phrase, an
+    unrelated missing file beside a known one, or a look-alike path."""
+    text, expected = EVIDENCE_CASES[case]
+    taken = [reason for reason, matches in EVIDENCE.items() if matches(text)]
+    assert taken == ([expected] if expected else []), (text, taken)
 
 
 # ---------------------------------------------------------------------------
