@@ -237,6 +237,20 @@ jobs:
       # and the one test that step leaves out until T008 is deselected, which
       # no report counts.
       #
+      # RE-PINNED BY plan 034 T043 (box 9.2: the whole suite, less the
+      # declared exclusion), the same way: run 36356408029 (2026-09-27)
+      # measured `890a4809`, the head before this change, at openDox-code
+      # `2d116415`: selected 890, passed 880, skipped 10, failures 0, errors 0.
+      # The floors RISE from 574 and 568, because this job now collects every
+      # test file the declaration does not list: the sixteen the list named
+      # (564 tests, unchanged), `tests/integration/` (10, with the one test the
+      # step leaves out deselected), and the eight other files under `tests/`
+      # that the list never ran (316). EXPECT_SKIPPED moves from 6 to 10, WITH
+      # the reason: the four new skips are
+      # `tests/test_aggregation_register_instance.py`'s, one of those eight,
+      # and the six are unchanged. The margin is zero, as #25 set it, and
+      # restoring it is plan 034 T044's (9.4, this leg's half).
+      #
       # THE SKIPS ARE NAMED, which is why the exact pin is safe to take. SIX
       # are the three seam suites' `doc_health` pairs, the six this file has
       # always named and 9.4 asks about: two each in
@@ -261,10 +275,10 @@ jobs:
           # FLOORS - may only RISE, and only with the reason in the commit
           # message. Set to the measured values, which this suite has
           # actually met on CI rather than an aspiration.
-          MIN_SELECTED: "574"
-          MIN_PASSED: "568"
+          MIN_SELECTED: "890"
+          MIN_PASSED: "880"
           # EXACT - the load-bearing number.
-          EXPECT_SKIPPED: "6"
+          EXPECT_SKIPPED: "10"
         run: |
           python3 - <<'PY' > triple.env
           import xml.etree.ElementTree as ET, pathlib
