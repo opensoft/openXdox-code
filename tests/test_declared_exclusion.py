@@ -1249,6 +1249,12 @@ BROKEN_DECLARATIONS = {
         lambda d: d.update(reasons=[]), "which is not a declared reason"),
     "no entries while reasons remain": (
         lambda d: d.update(entries=[], count=0), "is named by no entry"),
+    "an only given as null": (
+        lambda d: d["reasons"][0].update(only=None),
+        "only is not a list of paths"),
+    "a note given as null": (
+        lambda d: d["entries"][0].update(note=None),
+        "note is not a line of text"),
 }
 
 
@@ -1346,6 +1352,10 @@ _ODD_VALUES = (None, 0, -1, 1.5, True, "", " ", "x\ny", [], [[]], [{}], {},
 #: Keys no rule expects, one of each YAML scalar type, each added beside an
 #: unknown text key.
 _ODD_KEYS = (1, None, True, 1.5, "zz")
+#: The places that take free text, where one line of any text is well formed.
+_TEXT_PLACES = {"reason", "open_until", "note"}
+#: What an optional key holds while the sample does not give it.
+_ABSENT = object()
 #: libyaml's dumper where PyYAML has it, since the sweep dumps hundreds of
 #: variants. It writes what PyYAML's own dumper writes; only the loading has
 #: to be the root conftest's own.
@@ -1372,11 +1382,22 @@ def _at(node, where):
     return node
 
 
+def _well_formed(value, place, was) -> bool:
+    """Whether a value put in a place is still well formed there: the value
+    the place already held, or one line of text where free text goes."""
+    if was is not _ABSENT and type(value) is type(was) and value == was:
+        return True
+    return (place in _TEXT_PLACES and isinstance(value, str)
+            and bool(value.strip()) and value.splitlines() == [value])
+
+
 def test_the_root_conftest_refuses_rather_than_crashes(request, tmp_path):
     """A malformed declaration is REFUSED, naming its rule. Anything else it
-    raised would stop the run without saying which rule broke. So each odd
-    value goes in each place of the sample, and each odd key into each of
-    its mappings, and every load must return or refuse."""
+    raised would stop the run without saying which rule broke, and loading
+    it would exclude a set nobody declared. So each odd value goes in each
+    place of the sample, each optional key it lacks is given each odd value,
+    and each odd key goes into each of its mappings. Every load must refuse,
+    unless the value is still well formed where it went."""
     root = _root_conftest(request.config)
     base = _sample()
     broken = tmp_path / "declared_exclusion.yaml"
@@ -1387,16 +1408,29 @@ def test_the_root_conftest_refuses_rather_than_crashes(request, tmp_path):
         for odd in _ODD_VALUES:
             variant = copy.deepcopy(base)
             _at(variant, where[:-1])[where[-1]] = copy.deepcopy(odd)
-            variants.append((f"{where} := {odd!r}", variant))
+            variants.append((f"{where} := {odd!r}", variant,
+                             _well_formed(odd, where[-1], _at(base, where))))
+    optional = ([(("reasons", number), "only")
+                 for number, reason in enumerate(base["reasons"])
+                 if "only" not in reason]
+                + [(("entries", number), "note")
+                   for number, entry in enumerate(base["entries"])
+                   if "note" not in entry])
+    for where, key in optional:
+        for odd in _ODD_VALUES:
+            variant = copy.deepcopy(base)
+            _at(variant, where)[key] = copy.deepcopy(odd)
+            variants.append((f"{where} + {key} {odd!r}", variant,
+                             _well_formed(odd, key, _ABSENT)))
     mappings = [()] + [where for where in _places(base)
                        if isinstance(_at(base, where), dict)]
     for where in mappings:
         for key in _ODD_KEYS:
             variant = copy.deepcopy(base)
             _at(variant, where).update({key: 1, "zz-unknown": 1})
-            variants.append((f"{where} + key {key!r}", variant))
-    crashed = []
-    for label, variant in variants:
+            variants.append((f"{where} + key {key!r}", variant, False))
+    crashed, loaded = [], []
+    for label, variant, well_formed in variants:
         broken.write_text(yaml.dump(variant, Dumper=_DUMPER, sort_keys=False),
                           encoding="utf-8")
         try:
@@ -1405,10 +1439,16 @@ def test_the_root_conftest_refuses_rather_than_crashes(request, tmp_path):
             continue
         except Exception as exc:  # what escapes the refusal is the finding
             crashed.append(f"{label}: {type(exc).__name__}: {exc}")
+            continue
+        if not well_formed:
+            loaded.append(label)
     assert len(variants) > 500, len(variants)
     assert crashed == [], (
         f"{len(crashed)} of {len(variants)} declarations crash the loader "
         "instead of being refused:\n" + "\n".join(crashed[:20]))
+    assert loaded == [], (
+        f"{len(loaded)} of {len(variants)} malformed declarations load "
+        "instead of being refused:\n" + "\n".join(loaded[:20]))
 
 
 def test_the_root_conftest_accepts_the_declaration_as_committed(request):
