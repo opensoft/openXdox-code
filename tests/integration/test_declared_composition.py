@@ -65,15 +65,22 @@ REFUSED_NAMES = ("skip", "skipif", "skipunless", "importorskip", "xfail",
 COLLECTION_SETTINGS = ("python_files", "python_classes", "python_functions")
 
 #: What the child does not inherit: `PYTHONPATH`, which a lone checkout does not
-#: have, and `PYTEST_ADDOPTS`, which could narrow what it collects.
-SCRUBBED_ENVIRONMENT = ("PYTHONPATH", "PYTEST_ADDOPTS")
+#: have, and `PYTEST_ADDOPTS` and `PYTEST_PLUGINS`, which could change what it
+#: collects. `tests/test_declared_exclusion.py` gives its own children the
+#: same scrub.
+SCRUBBED_ENVIRONMENT = ("PYTHONPATH", "PYTEST_ADDOPTS", "PYTEST_PLUGINS")
+#: What the child is given: plugin autoloading off, so the collection it
+#: reports is pytest's own plugins and this directory, and no installed plugin
+#: can add items, fixtures or hooks to it.
+CHILD_ENVIRONMENT = {"PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"}
 
 #: The child: pytest collects this directory, and each item is reported with
-#: whether pytest hands it `composition` as an argument of its own. That needs
-#: both halves: its function has a parameter of that name with no default
-#: (pytest does not fill a parameter that has one), and pytest resolves the
-#: fixture for it. The conftest chain is off, because what is audited is what
-#: this directory holds.
+#: whether pytest hands it `composition` as an argument of its own, and with
+#: the names of the marks pytest finds on it. Taking the fixture needs both
+#: halves: its function has a parameter of that name with no default (pytest
+#: does not fill a parameter that has one), and pytest resolves the fixture
+#: for it. The conftest chain is off, because what is audited is what this
+#: directory holds.
 _COLLECT = r'''
 import inspect, json, sys
 
@@ -97,7 +104,9 @@ class Audit:
                                                 parameter.VAR_KEYWORD)
                      and "composition" in getattr(item, "fixturenames", ()))
             self.items.append({"nodeid": item.nodeid, "path": str(item.path),
-                               "takes": takes})
+                               "takes": takes,
+                               "marks": sorted({mark.name for mark
+                                                in item.iter_markers()})})
 
 
 audit = Audit()
@@ -122,6 +131,7 @@ def _collected(composition: Composition, config) -> list[dict]:
             args += ["-o", f"{name}={' '.join(values)}"]
         env = {key: value for key, value in os.environ.items()
                if key not in SCRUBBED_ENVIRONMENT}
+        env.update(CHILD_ENVIRONMENT)
         with tempfile.TemporaryDirectory() as scratch:
             report = Path(scratch) / "collected.json"
             done = subprocess.run(
@@ -143,6 +153,61 @@ def _collected(composition: Composition, config) -> list[dict]:
 
 def _refused(name: str) -> bool:
     return name.lower() in REFUSED_NAMES
+
+
+#: The no-argument `str` methods a constant string expression may use, so that
+#: `"SK".lower()` is read as the string it makes.
+_STRING_METHODS = ("lower", "upper", "casefold", "strip", "lstrip", "rstrip",
+                   "capitalize", "swapcase", "title")
+
+#: The longest string a repetition is folded into; a longer one is left
+#: unread rather than built.
+_FOLD_LIMIT = 256
+
+
+def _folded(node):
+    """The string a CONSTANT string expression makes, or None if the node is
+    not one. That is a string literal, `+` of two of them, `*` by an integer
+    literal, an f-string of them, `sep.join([...])` of them, and the case
+    methods above. So `getattr(pytest, "s" + "kip")` is read as what it
+    reaches."""
+    if isinstance(node, ast.Constant):
+        return node.value if isinstance(node.value, str) else None
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        left, right = _folded(node.left), _folded(node.right)
+        return None if left is None or right is None else left + right
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult):
+        for text, count in ((node.left, node.right), (node.right, node.left)):
+            value = _folded(text)
+            if (value is not None and isinstance(count, ast.Constant)
+                    and type(count.value) is int
+                    and 0 <= len(value) * count.value <= _FOLD_LIMIT):
+                return value * count.value
+        return None
+    if isinstance(node, ast.JoinedStr):
+        parts = []
+        for part in node.values:
+            if isinstance(part, ast.FormattedValue):
+                if part.conversion != -1 or part.format_spec is not None:
+                    return None
+                part = part.value
+            value = _folded(part)
+            if value is None:
+                return None
+            parts.append(value)
+        return "".join(parts)
+    if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+            and not node.keywords):
+        base = _folded(node.func.value)
+        if base is None:
+            return None
+        if (node.func.attr == "join" and len(node.args) == 1
+                and isinstance(node.args[0], (ast.List, ast.Tuple))):
+            items = [_folded(item) for item in node.args[0].elts]
+            return None if None in items else base.join(items)
+        if node.func.attr in _STRING_METHODS and not node.args:
+            return getattr(base, node.func.attr)()
+    return None
 
 
 def test_the_composition_names_one_full_commit_pin_and_installs_it(
@@ -197,12 +262,21 @@ def test_every_test_here_names_the_pin_it_composes_at(
 
 
 def test_nothing_here_skips_or_expects_a_failure(
-        composition: Composition) -> None:
+        composition: Composition, request) -> None:
     """Rule 2: at the declared composition a skip is a composition that is
     missing, and F9.2 runs every file here. So no code here names a way to
     skip or to expect a failure, from pytest or from `unittest`, by any
     alias: not as an attribute, not as an imported name, and not as a string
-    that reaches one. Only `REFUSED_NAMES` itself may spell them."""
+    that reaches one, a constant string expression included. Only
+    `REFUSED_NAMES` itself may spell them. And no item pytest collects here
+    carries a skip or xfail mark, however the mark was spelled, as pytest's
+    own collection reports it.
+
+    A name computed at run time from something that is not a constant is past
+    what any reading of source can see. It is not past the required check:
+    JUnit reports every skip and every xfail as skipped, and the triple pins
+    SKIPPED exactly, so such a test here refuses `validate`'s `Pin the
+    triple` all the same."""
     reached = []
     for path in sorted(HERE.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"), str(path))
@@ -225,9 +299,14 @@ def test_nothing_here_skips_or_expects_a_failure(
                             reached.append(f"{where} imports {alias.name}")
             elif isinstance(node, ast.Name) and _refused(node.id):
                 reached.append(f"{where} names {node.id}")
-            elif (isinstance(node, ast.Constant) and isinstance(node.value, str)
-                  and _refused(node.value) and id(node) not in spelled_here):
-                reached.append(f"{where} spells {node.value!r}")
+            elif id(node) not in spelled_here:
+                value = _folded(node)
+                if value is not None and _refused(value):
+                    reached.append(f"{where} spells {value!r}")
+    for item in _collected(composition, request.config):
+        for name in item["marks"]:
+            if _refused(name):
+                reached.append(f"{item['nodeid']} is marked {name}")
     assert sorted(set(reached)) == [], (
         f"at {composition}: a declared integration test may not skip or "
         f"expect a failure, because the composition is what this directory "
