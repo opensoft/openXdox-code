@@ -329,6 +329,7 @@ def test_every_entry_names_a_test_file_this_checkout_carries():
     assert paths == sorted(paths), "the entries are not in path order"
     for path in paths:
         rel = PurePosixPath(path)
+        assert path == rel.as_posix(), f"{path} is not written plainly"
         assert rel.parts[:1] == ("tests",) and len(rel.parts) == 2, path
         assert rel.name.startswith("test_") and rel.suffix == ".py", path
         assert (LEG_ROOT / rel).is_file(), f"{path} is not in this checkout"
@@ -341,15 +342,31 @@ def test_every_entry_names_a_test_file_this_checkout_carries():
 # ---------------------------------------------------------------------------
 
 def test_the_root_conftest_admits_the_same_four_reasons(request):
-    """The conftest refuses any other reason at load. This holds its list and
-    this module's to one set, so neither can admit a fifth alone."""
+    """The conftest refuses any other reason at load, and a reason whose
+    `ruled` does not start with its ruling. This holds its table and this
+    module's to one, so neither can admit a fifth, or re-rule one, alone."""
     root = _root_conftest(request.config)
-    assert set(root.ADMITTED_REASONS) == set(RULED_REASONS)
+    assert dict(root.ADMITTED_REASONS) == RULED_REASONS
+
+
+def test_the_root_conftest_names_this_module_as_the_check(request):
+    """The conftest refuses an entry naming the check, since excluding it
+    would drop the check, and its own refusal of that, from every run."""
+    root = _root_conftest(request.config)
+    assert root.DECLARED_EXCLUSION_CHECK == THIS_FILE
 
 
 def test_the_root_conftest_derives_collect_ignore_from_the_file(request):
     root = _root_conftest(request.config)
     assert root.collect_ignore == [entry["path"] for entry in ENTRIES]
+
+
+def _with_entry(declaration: dict, entry: dict) -> None:
+    """Add an entry where path order puts it, and move the count with it, so
+    only the rule under test is broken."""
+    declaration["entries"].append(entry)
+    declaration["entries"].sort(key=lambda listed: listed["path"])
+    declaration["count"] = len(declaration["entries"])
 
 
 #: Each rule the root conftest holds the declaration to, broken once, with the
@@ -423,6 +440,25 @@ BROKEN_DECLARATIONS = {
     "a reason text broken by a carriage return": (
         lambda d: d["reasons"][0].update(reason="one\rtwo"),
         "is not one line"),
+    "the check listed as an entry": (
+        lambda d: _with_entry(d, {"path": THIS_FILE,
+                                  "reasons": ["doc_health"]}),
+        "is the check that holds this declaration"),
+    "a file listed again under another spelling": (
+        lambda d: _with_entry(d, {"path": "tests/./test_canvas.py",
+                                  "reasons": ["doc_health"]}),
+        "is not written plainly"),
+    "a path with a doubled slash": (
+        lambda d: d["entries"][0].update(
+            path=d["entries"][0]["path"].replace("tests/", "tests//")),
+        "is not written plainly"),
+    "an only listing a file twice": (
+        lambda d: d["reasons"][-1]["only"].append("tests/test_snapshot.py"),
+        "only lists a file twice"),
+    "a reason citing another ruling": (
+        lambda d: d["reasons"][1].update(
+            ruled="R1Q6 (d), openxFactory#656 comment 5817152735"),
+        "is ruled by R1Q24 (a)"),
 }
 
 

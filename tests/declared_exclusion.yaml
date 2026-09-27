@@ -29,14 +29,17 @@
 #   * `schema_version` is the integer 1, and `count` is an integer equal to the
 #     number of `entries`. No mapping gives a key twice, since YAML would keep
 #     only the last.
-#   * Each entry names an existing `tests/test_*.py` file, once, in path order,
-#     and one or more of the declared `reasons` by id. An optional `note` says
-#     why an entry is unusual. No other key is read, so none is allowed.
-#   * `reasons` are drawn from the four the rulings admit, and no other. A
-#     fifth needs a ruling first. An id is one lowercase token, and each
-#     reason's texts, like each note, are one line. Every declared reason is
-#     named by at least one entry, and `only` lists exactly the files that name
-#     its reason.
+#   * Each entry names an existing `tests/test_*.py` file, written plainly
+#     (`tests/<name>`), once, in path order, and one or more of the declared
+#     `reasons` by id. An optional `note` says why an entry is unusual. No
+#     other key is read, so none is allowed. `tests/test_declared_exclusion.py`
+#     is never an entry, since it is the check that holds this file.
+#   * `reasons` are drawn from the four the rulings admit, and no other, and
+#     each one's `ruled` starts with the ruling that admits it. A fifth needs
+#     a ruling first. An id is one lowercase token, and each reason's texts,
+#     like each note, are one line. Every declared reason is named by at least
+#     one entry, and `only` lists exactly the files that name its reason, each
+#     once.
 #   * An entry leaves in the pull request that clears its reason, and the count
 #     moves with it. A reason leaves with its last entry.
 #

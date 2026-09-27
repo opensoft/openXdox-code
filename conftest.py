@@ -90,12 +90,21 @@ _REASON_KEYS = {*_REASON_FIELDS, "only"}
 _ENTRY_KEYS = {"path", "reasons", "note"}
 #: A reason id is printed in a comma-separated list, so it is one plain token.
 _REASON_ID = re.compile(r"[a-z][a-z0-9_-]*")
-#: The reasons the rulings admit, and no other: R1Q6 (d) (`doc_health`,
+#: The reasons the rulings admit, and no other, each with the ruling that
+#: admits it, which its `ruled` text starts with: R1Q6 (d) (`doc_health`,
 #: openxFactory#656 comment 5817152735); R1Q24 (a) (the rail and the
 #: contracts) and R1Q25 (b) (the consumer's schemas), comment 5850003126. A
 #: fifth needs a ruling before it needs a line here.
-ADMITTED_REASONS = ("doc_health", "status-exemption-rail",
-                    "openxfactory-contracts", "consumer-schemas")
+ADMITTED_REASONS = {
+    "doc_health": "R1Q6 (d)",
+    "status-exemption-rail": "R1Q24 (a)",
+    "openxfactory-contracts": "R1Q24 (a)",
+    "consumer-schemas": "R1Q25 (b)",
+}
+#: The check that holds this declaration to its word. Listed as an entry, it
+#: would drop out of every run that loads this conftest, and so would the
+#: check's own refusal of that.
+DECLARED_EXCLUSION_CHECK = "tests/test_declared_exclusion.py"
 
 
 class DeclaredExclusionRefused(Exception):
@@ -206,6 +215,10 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
         if multiline:
             refuse(f"the reason {reason['id']}'s {', '.join(multiline)} is "
                    "not one line, and the run prints each reason on one line")
+        ruling = ADMITTED_REASONS[reason["id"]]
+        if not reason["ruled"].startswith(ruling):
+            refuse(f"the reason {reason['id']} is ruled by {ruling}, but its "
+                   f"ruled reads {reason['ruled']!r}")
         ids.append(reason["id"])
     if len(set(ids)) != len(ids):
         refuse("a reason id is declared twice")
@@ -226,6 +239,14 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
                 or rel.parts[0] != "tests" or not rel.name.startswith("test_")
                 or rel.suffix != ".py"):
             refuse(f"{entry['path']} is not a tests/test_*.py path")
+        if entry["path"] != rel.as_posix():
+            refuse(f"{entry['path']} is not written plainly, as "
+                   f"{rel.as_posix()}, so one file could be listed twice "
+                   "under two spellings")
+        if entry["path"] == DECLARED_EXCLUSION_CHECK:
+            refuse(f"{entry['path']} is the check that holds this "
+                   "declaration, and as an entry it would drop out of every "
+                   "run that loads this conftest")
         if not (_LEG_ROOT / rel).is_file():
             refuse(f"{entry['path']} names no file in this checkout")
         named = entry.get("reasons")
@@ -259,7 +280,9 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
         if not (isinstance(only, list) and only
                 and all(isinstance(item, str) for item in only)):
             refuse(f"the reason {reason['id']}'s only is not a list of paths")
-        absent = [item for item in only if item not in naming]
+        if len(set(only)) != len(only):
+            refuse(f"the reason {reason['id']}'s only lists a file twice")
+        absent =[item for item in only if item not in naming]
         if absent:
             refuse(f"the reason {reason['id']} is for {only} alone, but "
                    f"{absent} is not an entry that names it")
