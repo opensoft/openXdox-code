@@ -132,6 +132,10 @@ _CONTRACT_MISSING = re.compile(
 _CONTRACT_UNRUN = re.compile(
     r"AssertionError: \S+: can't open file '(?P<path>[^']+)': \[Errno 2\] "
     r"No such file or directory\n")
+#: pytest's account of that assertion: the subprocess whose exit status it
+#: read. A bare assertion that quotes the same words has none.
+_ASSERTED_ON_A_PROCESS = re.compile(
+    r"^E\s+\+\s+where \d+ = CompletedProcess\(", re.MULTILINE)
 
 #: The consumer validator's refusal when neither this tree's `contracts/` nor
 #: `CONTRACTS_DIR` supplies its schemas, in the words of this checkout's
@@ -144,9 +148,19 @@ _CONSUMER_REFUSAL = (
     + re.escape(" schemas (this tree carries no contracts/ and CONTRACTS_DIR "
                 "is not set;"))
 _CONSUMER_ASSERTED = re.compile("AssertionError: " + _CONSUMER_REFUSAL)
+#: pytest's account of the assertion on the validator's result: a harness
+#: failure, exit 2.
+_ASSERTED_ON_A_HARNESS_FAILURE = re.compile(
+    r"^E\s+\+\s+where False = ValidationResult\(ok=False, returncode=2, ",
+    re.MULTILINE)
 _CONSUMER_UNEXPECTED = re.compile(
     r"AssertionError: Regex pattern did not match\.\n Regex: [^\n]*\n "
     r"Input: [\"'][^\n]*?" + _CONSUMER_REFUSAL)
+#: The refusal as `openxdox.snapshot` raises it, which pytest then matched
+#: against the refusal the test expected.
+_CONSUMER_RAISED = re.compile(
+    r"^E\s+openxdox\.snapshot\.SnapshotInvalid: [^\n]*?" + _CONSUMER_REFUSAL,
+    re.MULTILINE)
 
 #: What any reason could account for, however it arrives: a missing module,
 #: a missing file, and either refusal's words.
@@ -245,7 +259,8 @@ def _reads_openxfactory_contracts(final: str, text: str) -> bool:
     if missing:
         named = _resolved(missing.group("path")) in _CONTRACT_FILES
     elif unrun:
-        named = _resolved(unrun.group("path")) == _CONTRACT_VALIDATOR
+        named = (_resolved(unrun.group("path")) == _CONTRACT_VALIDATOR
+                 and _ASSERTED_ON_A_PROCESS.search(text) is not None)
     else:
         return False
     shown = _signals(text)
@@ -255,10 +270,15 @@ def _reads_openxfactory_contracts(final: str, text: str) -> bool:
 
 def _needs_the_consumer_schemas(final: str, text: str) -> bool:
     """The consumer validator refused for want of its schemas, in its own
-    words, and nothing else is missing."""
+    words, and nothing else is missing. Its refusal reaches the test inside
+    an assertion, so pytest's account of the assertion must show the
+    validator's result, or the `SnapshotInvalid` that carried it."""
     shown = _signals(text)
-    return ((_CONSUMER_ASSERTED.match(final)
-             or _CONSUMER_UNEXPECTED.match(final)) is not None
+    asserted = (_CONSUMER_ASSERTED.match(final) is not None
+                and _ASSERTED_ON_A_HARNESS_FAILURE.search(text) is not None)
+    unexpected = (_CONSUMER_UNEXPECTED.match(final) is not None
+                  and _CONSUMER_RAISED.search(text) is not None)
+    return ((asserted or unexpected)
             and not (shown["modules"] or shown["files"] or shown["rail"]))
 
 
@@ -320,11 +340,36 @@ _GATE_INTENT = (LEG_ROOT.parent / "contracts" / "schemas"
 _UNRELATED = "AssertionError: an unrelated failure"
 
 
-def _unrun(path) -> tuple:
+def _unrun(path, *, asserted_on_the_process: bool = True) -> tuple:
+    """The validator's test asserting on the exit status of a run the
+    interpreter could not start. Without pytest's `where` line, it is a bare
+    assertion quoting the same words."""
     message = (f"AssertionError: /usr/bin/python3: can't open file "
                f"'{path}': [Errno 2] No such file or directory\n  \n"
                "assert 2 == 0")
-    return message, [f"E   {line}" for line in message.splitlines()]
+    e_lines = [f"E   {line}" for line in message.splitlines()]
+    if asserted_on_the_process:
+        e_lines.append(f"E    +  where 2 = CompletedProcess(args=['python3', "
+                       f"'{path}'], returncode=2).returncode")
+    return message, e_lines
+
+
+def _after(exception: str, result: tuple) -> tuple:
+    """`result`, with `exception` raised before it in the same test."""
+    message, e_lines = result
+    return message, [f"E   {exception}", *e_lines]
+
+
+def _asserted_on_the_validator(cause: str, *, with_result: bool = True):
+    """The snapshot test asserting on the consumer validator's result.
+    Without pytest's `where` line, it is a bare assertion quoting the same
+    words."""
+    message = f"AssertionError: {cause}\n\nassert False"
+    e_lines = [f"E   {line}" for line in message.splitlines()]
+    if with_result:
+        e_lines.append("E    +  where False = ValidationResult(ok=False, "
+                       f"returncode=2, stdout='', stderr='{cause}').ok")
+    return message, e_lines
 
 
 #: What each reason's evidence must take, and must not. Each shape the
@@ -354,6 +399,8 @@ EVIDENCE_CASES = {
     "the rail's refusal": (_raised(_RAIL_CAUSE), "status-exemption-rail"),
     "the AttributeError that carries the rail's refusal": (
         _raised(_RAIL_CAUSE, _RAIL_ATTRIBUTE), "status-exemption-rail"),
+    "the rail's whole refusal quoted in an assertion": (
+        _raised("AssertionError: " + _RAIL_CAUSE), None),
     "the rail's words in another error": (
         _raised("RuntimeError: no status-exemption rail is registered at "
                 "openDox's status-exemption seam (opendox.doxbench_packet)"),
@@ -378,6 +425,10 @@ EVIDENCE_CASES = {
         "openxfactory-contracts"),
     "the validator, which the interpreter cannot open": (
         _unrun(_CONTRACT_VALIDATOR), "openxfactory-contracts"),
+    "the validator's words in a bare assertion": (
+        _unrun(_CONTRACT_VALIDATOR, asserted_on_the_process=False), None),
+    "a known schema's whole exception quoted in an assertion": (
+        _raised("AssertionError: " + _missing(_GATE_INTENT)), None),
     "a known schema, then an unrelated missing file while handling it": (
         _raised(_missing(_GATE_INTENT), _missing("/tmp/t041-x.yaml")), None),
     "a known schema after an unrelated missing file": (
@@ -408,25 +459,31 @@ EVIDENCE_CASES = {
     "a contracts/ directory inside the checkout's src/": (
         _raised(_missing(LEG_ROOT / "src" / "contracts" / "x.yaml")), None),
     "the consumer validator's refusal, asserted on": (
-        _raised("AssertionError: " + _CONSUMER_CAUSE), "consumer-schemas"),
+        _asserted_on_the_validator(_CONSUMER_CAUSE), "consumer-schemas"),
+    "the consumer's refusal in a bare assertion": (
+        _asserted_on_the_validator(_CONSUMER_CAUSE, with_result=False),
+        None),
     "the refusal where another refusal was expected": (
         _raised("openxdox.snapshot.SnapshotInvalid: /tmp/x/bad.json: "
                 + _CONSUMER_CAUSE,
                 "AssertionError: Regex pattern did not match.\n Regex: "
                 "'dangling|unknown document'\n Input: \"/tmp/x/bad.json: "
                 + _CONSUMER_CAUSE + "\""), "consumer-schemas"),
+    "a regex mismatch quoting the refusal, with nothing raising it": (
+        _raised("AssertionError: Regex pattern did not match.\n Regex: "
+                "'dangling|unknown document'\n Input: \"/tmp/x/bad.json: "
+                + _CONSUMER_CAUSE + "\""), None),
     "CONTRACTS_DIR's words in an unrelated assertion": (
         _raised("AssertionError: CONTRACTS_DIR is not set"), None),
     "the refusal for another tree's schemas": (
-        _raised("AssertionError: "
-                + _CONSUMER_CAUSE.replace(str(LEG_ROOT), "/tmp/other")),
-        None),
+        _asserted_on_the_validator(
+            _CONSUMER_CAUSE.replace(str(LEG_ROOT), "/tmp/other")), None),
     "the refusal, then an unrelated failure": (
         _raised("AssertionError: " + _CONSUMER_CAUSE,
                 "RuntimeError: unrelated"), None),
     "the refusal after an unrelated missing module": (
-        _raised("ModuleNotFoundError: No module named 'foo'",
-                "AssertionError: " + _CONSUMER_CAUSE), None),
+        _after("ModuleNotFoundError: No module named 'foo'",
+               _asserted_on_the_validator(_CONSUMER_CAUSE)), None),
     "two reasons' causes in one result": (
         _raised(_DOC_HEALTH_CAUSE, _RAIL_CAUSE), None),
 }
@@ -846,15 +903,22 @@ UNREADABLE = {
     "YAML nested past the recursion limit": (
         lambda committed: b"schema_version: " + b"[" * 5000 + b"]" * 5000
         + b"\n"),
+    "a list for a key": (
+        lambda committed: b"? [a, b]\n: 1\n" + committed),
+    "a mapping for a key inside an entry": (
+        lambda committed: committed.replace(
+            b"{path: tests/test_canvas.py, reasons: [doc_health]}",
+            b"{path: tests/test_canvas.py, reasons: [doc_health], "
+            b"? {a: 1} : x}", 1)),
 }
 
 
 @pytest.mark.parametrize("breakage", sorted(UNREADABLE))
 def test_the_root_conftest_refuses_a_file_it_cannot_read(breakage, request,
                                                          tmp_path):
-    """Bytes that are not UTF-8, and nesting deeper than the parser can
-    follow, are refused as unreadable, as a missing file is. Neither crashes
-    the conftest."""
+    """Bytes that are not UTF-8, nesting deeper than the parser can follow,
+    and a key YAML cannot hash are refused as unreadable, as a missing file
+    is. None of them crashes the conftest."""
     root = _root_conftest(request.config)
     broken = tmp_path / "declared_exclusion.yaml"
     broken.write_bytes(UNREADABLE[breakage](DECLARATION_FILE.read_bytes()))
