@@ -52,8 +52,8 @@ THE RULES OF THIS DIRECTORY, and why each is a rule here:
    module imports the ones it uses.
 
 `tests/integration/test_declared_composition.py` holds the directory to all
-three, reading pytest's own collection settings, so a file or a test pytest
-would collect here cannot pass unexamined.
+three. It reads rule 1 from pytest's own collection of the directory, so a
+file or a test that pytest collects here cannot pass unexamined.
 
 A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
 (RULED OQ-C). Its admission is a `created:` entry in openxFactory's
