@@ -22,9 +22,10 @@ deleted", read one step earlier. The shape is restated; the corpus is not
 copied.
 
 A CREATED FILE: no row in `docs/opendox-carve-manifest.yaml` (RULED OQ-C). It
-stands alone under `--noconftest`, which is what `.github/workflows/validate.yml`
-runs, and it imports nothing beyond `pytest`, the standard library, the PINNED
-`opendox` interface and this package.
+stands alone under `--noconftest`, which is how `.github/workflows/validate.yml`
+ran it until plan 034 T043 put the whole suite on that check, and it imports
+nothing beyond `pytest`, the standard library, the PINNED `opendox` interface
+and this package.
 """
 
 from __future__ import annotations

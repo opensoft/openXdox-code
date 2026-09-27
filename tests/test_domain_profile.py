@@ -41,12 +41,13 @@ def profile() -> dp.DomainProfile:
 def unregistered_profile():
     """Run one test with NO domain profile registered, then restore it.
 
-    Declared HERE and not in `tests/conftest.py` deliberately: this module runs
+    Declared HERE and not in `tests/conftest.py` deliberately: this module ran
     under `validate`'s `--noconftest` invocation, beside the other shape
-    assertions, so it may not depend on a conftest being collected. Restoring
-    whatever was registered means a run that DID come through the root
-    `conftest.py` — the host's process-start registration — is left exactly as
-    it was found.
+    assertions, until plan 034 T043, and it still stands alone under that flag,
+    so it may not depend on a conftest being collected. Restoring whatever was
+    registered means a run that DID come through the root `conftest.py` — the
+    host's process-start registration, which `validate`'s whole-suite run makes
+    since T043 — is left exactly as it was found.
     """
     previous = dp.current() if dp.is_registered() else None
     dp.unregister()

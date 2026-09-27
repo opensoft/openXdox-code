@@ -10,9 +10,11 @@ module.
 
 A CREATED FILE: no row in `docs/opendox-carve-manifest.yaml` (RULED OQ-C, the
 manifest declares what LEAVES openxFactory). It stands alone under
-`--noconftest`, which is what `.github/workflows/validate.yml` runs
-(`tests/conftest.py` reaches two packages this leg does not carry), and it
-imports nothing beyond `pytest`, the standard library and this package.
+`--noconftest`, which is how `.github/workflows/validate.yml` ran it until plan
+034 T043, while `tests/conftest.py` reached two packages this leg does not
+carry. That check now runs it in the whole suite, with the conftest chain in
+play. It imports nothing beyond `pytest`, the standard library and this
+package.
 
 THE PROFILE THIS EXERCISES `from_profile` AGAINST is the vendored
 `tests/fixtures/openxfactory-engineering-profile.yaml` -- the same fixture

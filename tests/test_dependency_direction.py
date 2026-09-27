@@ -19,9 +19,11 @@ tree rather than one re-derived from a thread each time.
 
 A CREATED FILE: no row in `docs/opendox-carve-manifest.yaml` (RULED OQ-C, the
 manifest declares what LEAVES openxFactory). Run by `.github/workflows/
-validate.yml` beside `test_leg_shape.py`; it is a SHAPE assertion authored at
-this leg, and adding it does not un-narrow RULED Q-L8 (b′) — the carved suites
-stay out of `validate` until the BUILD arc makes them runnable.
+validate.yml`, at first beside `test_leg_shape.py` on its named list; it is a
+SHAPE assertion authored at this leg, and adding it did not un-narrow RULED
+Q-L8 (b′). Since plan 034 T043 that check runs the whole suite less its
+declared exclusion, so the carved suites run there too, all but the files the
+declaration lists.
 """
 
 from __future__ import annotations

@@ -974,8 +974,9 @@ def test_the_replayed_shell_statements_are_the_pinned_bundles(bundle) -> None:
 # These live HERE rather than in a new file on purpose: a created file at this leg
 # needs an admission row in openxFactory's `docs/opendox-carve-admissions.yaml`
 # (RULED OQ-C), and adding one is not a pin bump's act. This module is already
-# admitted, already on `validate.yml`'s list, and already owns the fixture whose
-# probes the decision gates.
+# admitted, was already on `validate.yml`'s list (the list plan 034 T043
+# replaced with the whole suite), and already owns the fixture whose probes the
+# decision gates.
 # ---------------------------------------------------------------------------
 
 import opendox_bundle as _ob  # noqa: E402  (a helper import, never OPENDOX_WEB)
