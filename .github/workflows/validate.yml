@@ -540,6 +540,32 @@ jobs:
           tests/test_domain_corpus_adapter.py
           --noconftest
 
+      # THE DECLARED INTEGRATION SUITE — plan 034 task T042 (openxFactory
+      # `specs/034-opendox-standalone-operation/`), box 9.3 of the ratified
+      # `add-neutral-product-standalone-operability`: "Behaviours needing both
+      # legs become declared INTEGRATION tests naming the pin they compose at
+      # ... They live in openXdox-code's `tests/integration/` ... They sit
+      # inside the whole suite that 9.2's required check runs, so CI runs them
+      # without a file list."
+      #
+      # UNTIL T043 IT IS A STEP OF ITS OWN, because the step above is not yet
+      # that whole suite: it names sixteen files and switches the conftest chain
+      # off. So this step runs the DIRECTORY, never a list of its files, with
+      # the chain in play, which is how F9.2 runs each of them and how the whole
+      # suite will. T043 replaces the step above with the whole suite less the
+      # declared exclusion, which collects this directory itself, and this step
+      # and its report leave in the same act.
+      #
+      # NOTHING HERE SKIPS (`tests/integration/declared_composition.py`, rule
+      # 2): a test that cannot reach the pinned openDox fails, naming what it
+      # read. So this step adds no skip to the triple below, and a skip here
+      # moves the exact pin.
+      - name: integration (9.3)
+        run: >-
+          python -m pytest -q
+          --junitxml=integration-report.xml
+          tests/integration
+
       # -----------------------------------------------------------------------
       # THE PINNED TRIPLE — `split-opendox-two-layer-product` § 5.4 FLOOR
       # PART 2, clause (d), THIS LEG'S HALF.
@@ -556,6 +582,13 @@ jobs:
       # So this is openXdox-code's OWN triple. The openDox leg has its own
       # pin in its own file (openDox-code#29 -> 373b05aa); neither can move
       # the other, and clause (d) says why a sum was rejected.
+      #
+      # TWO REPORTS, SUMMED, since plan 034 T042 (the shape openDox-code's own
+      # required job had until its T036): the named list's `pytest-report.xml`
+      # and the integration directory's `integration-report.xml`. A single
+      # `--junitxml` path would have the second run overwrite the first, so
+      # each step writes its own, and a report that did not appear is a
+      # refusal, not a smaller sum.
       #
       # WHAT IS PINNED IS WHAT THIS JOB COLLECTS, AND THAT IS THE LIST ABOVE
       # — 16 named files under `--noconftest`, never a directory, while 85
@@ -621,21 +654,24 @@ jobs:
         run: |
           python3 - <<'PY' > triple.env
           import xml.etree.ElementTree as ET, pathlib
-          f = pathlib.Path("pytest-report.xml")
-          if not f.exists():
-              # A REPORT THAT DID NOT APPEAR IS A REFUSAL, NOT A ZERO. A
-              # pytest step that died before writing XML would otherwise
-              # present an empty suite to the floors below.
-              print("MISSING=pytest-report.xml")
-              print("SELECTED=0"); print("SKIPPED=0")
-              print("FAILURES=0"); print("ERRORS=0"); print("PASSED=0")
-              raise SystemExit(0)
+          REPORTS = ("pytest-report.xml", "integration-report.xml")
           tot = {"tests": 0, "skipped": 0, "failures": 0, "errors": 0}
-          root = ET.parse(f).getroot()
-          suites = root.iter("testsuite") if root.tag == "testsuites" else [root]
-          for ts in suites:
-              for k in tot:
-                  tot[k] += int(ts.get(k, 0))
+          missing = []
+          for name in REPORTS:
+              f = pathlib.Path(name)
+              if not f.exists():
+                  missing.append(name)
+                  continue
+              root = ET.parse(f).getroot()
+              suites = root.iter("testsuite") if root.tag == "testsuites" else [root]
+              for ts in suites:
+                  for k in tot:
+                      tot[k] += int(ts.get(k, 0))
+          if missing:
+              # A REPORT THAT DID NOT APPEAR IS A REFUSAL, NOT A SMALLER SUM.
+              # A pytest step that died before writing XML would otherwise
+              # take its tests out of every number below in silence.
+              print("MISSING=" + ",".join(missing))
           print(f"SELECTED={tot['tests']}")
           print(f"SKIPPED={tot['skipped']}")
           print(f"FAILURES={tot['failures']}")
@@ -646,7 +682,7 @@ jobs:
           echo "triple: selected=$SELECTED passed=$PASSED skipped=$SKIPPED failures=$FAILURES errors=$ERRORS"
           echo "pins:   selected>=$MIN_SELECTED (margin $((SELECTED - MIN_SELECTED))) passed>=$MIN_PASSED (margin $((PASSED - MIN_PASSED))) skipped==$EXPECT_SKIPPED"
           rc=0
-          [ -z "${MISSING:-}" ] || { echo "::error::JUnit report missing ($MISSING) — a report that did not appear is a refusal, not a zero. The pytest step above did not write one, so every number below is empty rather than small"; rc=1; }
+          [ -z "${MISSING:-}" ] || { echo "::error::JUnit report(s) missing: $MISSING — a report that did not appear is a refusal, not a smaller sum. A step that failed to write one has taken its tests out of every number below"; rc=1; }
           [ "$SELECTED" -ge "$MIN_SELECTED" ] || { echo "::error::selected $SELECTED is BELOW the floor $MIN_SELECTED — tests stopped being collected. Find them; do not lower the floor"; rc=1; }
           [ "$PASSED" -ge "$MIN_PASSED" ] || { echo "::error::passed $PASSED is BELOW the floor $MIN_PASSED — find the tests that stopped passing or stopped being collected; do not lower the floor"; rc=1; }
           [ "$SKIPPED" = "$EXPECT_SKIPPED" ] || { echo "::error::skipped $SKIPPED, pinned exactly $EXPECT_SKIPPED — a named file that silently turned into skips is exactly what this pin exists to catch. The six expected are the three seam suites' doc_health pairs. If the change is intended, move the pin WITH the reason"; rc=1; }
