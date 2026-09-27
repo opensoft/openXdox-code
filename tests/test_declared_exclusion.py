@@ -122,30 +122,33 @@ def _needs_the_rail(text: str) -> bool:
     return _RAIL in text
 
 
-#: Where the contract family looks for openxFactory's contracts. Its files
-#: take `Path(__file__).parents[2]` for openxFactory's root, which from this
-#: checkout's `tests/` is the directory above the checkout, and they read the
-#: `contracts/` and the validator there. `test_doxbench_blank_reason.py` reads
-#: `contracts/manifest.yaml` at the checkout's own root instead.
-_CONTRACT_TREES = (LEG_ROOT.parent / "contracts", LEG_ROOT / "contracts")
+#: The contract files the listed contracts files read, where the contract
+#: family looks for them. Its files take `Path(__file__).parents[2]` for
+#: openxFactory's root, which from this checkout's `tests/` is the directory
+#: above the checkout. `test_doxbench_blank_reason.py` reads
+#: `contracts/manifest.yaml` at the checkout's own root instead. These are
+#: every path the five contracts files report missing, each run alone. A path
+#: a new run shows joins this list in the pull request that quotes that run.
 _CONTRACT_VALIDATOR = (LEG_ROOT.parent / "scripts"
                        / "validate-ideation-dashboard-contracts.py")
+_CONTRACT_FILES = frozenset({
+    LEG_ROOT.parent / "contracts" / "schemas" / "gate-intent.schema.yaml",
+    LEG_ROOT.parent / "contracts" / "schemas" / "project-register.schema.yaml",
+    _CONTRACT_VALIDATOR,
+    LEG_ROOT / "contracts" / "manifest.yaml",
+})
 
 
 def _reads_openxfactory_contracts(text: str) -> bool:
-    """A contract file of openxFactory's is missing where the contract family
-    looks for it: under one of `_CONTRACT_TREES`, or the validator
-    `_CONTRACT_VALIDATOR`. A relative path is the child's, which runs from
-    this checkout's root. A missing file anywhere else, a `contracts/`
-    directory elsewhere included, is some other defect, and it is not this
-    reason."""
+    """One of `_CONTRACT_FILES` is missing. A relative path is the child's,
+    which runs from this checkout's root. Any other missing file, even one
+    beside those in the same `contracts/`, is some other defect, and it is
+    not this reason."""
     for match in _MISSING.finditer(text):
         path = Path(match.group("path"))
         if not path.is_absolute():
             path = LEG_ROOT / path
-        path = path.resolve()
-        if path == _CONTRACT_VALIDATOR or any(
-                path.is_relative_to(tree) for tree in _CONTRACT_TREES):
+        if path.resolve() in _CONTRACT_FILES:
             return True
     return False
 
@@ -167,13 +170,23 @@ def _missing(path) -> str:
     return f"FileNotFoundError: [Errno 2] No such file or directory: '{path}'"
 
 
-#: What the contracts evidence must and must not take for its reason: the
-#: three shapes the contract files' runs show, and missing files that only
-#: look like them.
+#: What the contracts evidence must and must not take for its reason: each
+#: path the contract files' runs show, and missing files that only look like
+#: them, beside them in the same directories among them.
 CONTRACT_EVIDENCE_CASES = {
-    "a schema above the checkout": (
+    "the gate-intent schema above the checkout": (
         _missing(LEG_ROOT.parent / "contracts" / "schemas"
                  / "gate-intent.schema.yaml"), True),
+    "the project-register schema above the checkout": (
+        _missing(LEG_ROOT.parent / "contracts" / "schemas"
+                 / "project-register.schema.yaml"), True),
+    "an unrelated file in the contracts/ above the checkout": (
+        _missing(LEG_ROOT.parent / "contracts" / "unrelated.yaml"), False),
+    "an unrelated schema beside the known ones": (
+        _missing(LEG_ROOT.parent / "contracts" / "schemas"
+                 / "unrelated.schema.yaml"), False),
+    "an unrelated file in the checkout's own contracts/": (
+        _missing(LEG_ROOT / "contracts" / "unrelated.yaml"), False),
     "the validator above the checkout": (
         f"can't open file '{_CONTRACT_VALIDATOR}': [Errno 2]", True),
     "the checkout's own contracts/manifest.yaml": (
@@ -374,11 +387,12 @@ def test_every_entry_names_a_test_file_this_checkout_carries():
 
 
 @pytest.mark.parametrize("case", sorted(CONTRACT_EVIDENCE_CASES))
-def test_the_contracts_evidence_is_openxfactory_s_trees_alone(case):
-    """A missing file counts as openxFactory's contracts only where the
-    contract family looks for them. Anywhere else, a listed contracts file
-    that gained an unrelated missing file would have that failure hidden
-    under its reason. No other reason's evidence takes these either."""
+def test_the_contracts_evidence_is_the_known_contract_files_alone(case):
+    """A missing file counts as openxFactory's contracts only if it is one of
+    the contract files the listed files read. Otherwise a listed contracts
+    file that gained an unrelated missing file, even one in the same
+    `contracts/`, would have that failure hidden under its reason. No other
+    reason's evidence takes these either."""
     text, expected = CONTRACT_EVIDENCE_CASES[case]
     assert _reads_openxfactory_contracts(text) is expected, text
     others = [reason for reason, matches in EVIDENCE.items()
