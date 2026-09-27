@@ -439,6 +439,11 @@ EVIDENCE_CASES = {
         _raised(_RAIL_CAUSE, _RAIL_ATTRIBUTE), "status-exemption-rail"),
     "the rail's whole refusal quoted in an assertion": (
         _raised("AssertionError: " + _RAIL_CAUSE), None),
+    "the rail's refusal raised by another module's class of that name": (
+        _raised("other.StatusExemptionNotRegistered: " + _RAIL_REFUSAL), None),
+    "the rail's AttributeError from another module": (
+        _raised(_RAIL_ATTRIBUTE.replace("module 'opendox.doxbench_packet'",
+                                        "module 'other.packet'")), None),
     "the rail's refusal, with text after it": (
         _raised(_RAIL_CAUSE + " And an unrelated diagnostic."), None),
     "the rail's AttributeError, with text after it": (
