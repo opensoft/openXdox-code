@@ -69,7 +69,8 @@ _domain_profile.register(_domain_profile.load(DOMAIN_PROFILE_FIXTURE))
 #     name it, and each file with its reasons. It prints under `-q` as well.
 #     A listed file the run collected all the same, because the command line
 #     names it, is printed as collected, not as left out of the run.
-#     `pytest_collectstart` below notes each one as the run collects it.
+#     `pytest_collectstart` below notes each one as the run collects it. Once
+#     the list is emptied, the run prints that nothing is left out.
 #
 # The declaration is held to its rules when it loads, and a broken rule
 # REFUSES the run, naming the rule. A declaration that loaded anyway would
@@ -209,9 +210,11 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
         refuse("its schema_version must be the integer 1, not "
                f"{data.get('schema_version')!r}")
 
+    # No reasons and no entries, with a count of 0, is the list emptied: the
+    # state that ends the extraction. It loads, and excludes nothing.
     reasons = data.get("reasons")
-    if not isinstance(reasons, list) or not reasons:
-        refuse("it declares no reasons")
+    if not isinstance(reasons, list):
+        refuse("its reasons are not a list")
     ids: list[str] = []
     for reason in reasons:
         if not (isinstance(reason, dict) and all(
@@ -353,16 +356,23 @@ def _are(n: int) -> str:
     return f"{n} is" if n == 1 else f"{n} are"
 
 
-def pytest_terminal_summary(terminalreporter):
-    """Report the declared exclusion as an OPEN extraction (FR-006), each
+#: The title the run reports the exclusion under while any file is listed,
+#: and the one once the list is empty.
+EXCLUSION_TITLE = "open extraction: the declared exclusion"
+EMPTY_EXCLUSION_TITLE = "the declared exclusion"
+
+
+def exclusion_summary(declaration: dict, collected=frozenset()) -> tuple:
+    """The exclusion as a run reports it: its title, then its lines, each
     listed file as left out of the run or, if the run collected it all the
-    same, as collected."""
-    entries = DECLARED_EXCLUSION["entries"]
+    same, as collected. An emptied list reports that nothing is left out."""
+    entries = declaration["entries"]
     where = DECLARED_EXCLUSION_FILE.relative_to(_LEG_ROOT).as_posix()
-    collected = terminalreporter.config.stash.get(_COLLECTED_ANYWAY, set())
-    write = terminalreporter.write_line
-    terminalreporter.write_sep("=", "open extraction: the declared exclusion")
-    count = DECLARED_EXCLUSION["count"]
+    count = declaration["count"]
+    if not entries:
+        return EMPTY_EXCLUSION_TITLE, [
+            f"declared exclusion: {_files(count)}, listed in {where}. "
+            "Nothing is left out of this run, and no extraction is open."]
     if collected:
         head = (f"declared exclusion: {_files(count)}, listed in {where}. "
                 f"{_are(count - len(collected))} left out of this run, and "
@@ -372,13 +382,25 @@ def pytest_terminal_summary(terminalreporter):
     else:
         head = (f"declared exclusion: {_files(count)}, listed in {where} and "
                 "left out of this run.")
-    write(head + " It is an OPEN extraction: each file runs again once its "
-          "reason is cleared.")
-    for reason in DECLARED_EXCLUSION["reasons"]:
+    lines = [head + " It is an OPEN extraction: each file runs again once "
+             "its reason is cleared."]
+    for reason in declaration["reasons"]:
         named = sum(reason["id"] in entry["reasons"] for entry in entries)
-        write(f"  reason {reason['id']} ({_files(named)}): "
-              f"{reason['reason']}; open until {reason['open_until']}; "
-              f"ruled {reason['ruled']}")
+        lines.append(f"  reason {reason['id']} ({_files(named)}): "
+                     f"{reason['reason']}; open until {reason['open_until']}; "
+                     f"ruled {reason['ruled']}")
     for entry in entries:
         shown = "collected" if entry["path"] in collected else "excluded"
-        write(f"  {shown} {entry['path']}: {', '.join(entry['reasons'])}")
+        lines.append(f"  {shown} {entry['path']}: "
+                     f"{', '.join(entry['reasons'])}")
+    return EXCLUSION_TITLE, lines
+
+
+def pytest_terminal_summary(terminalreporter):
+    """Report the declared exclusion (FR-006): an OPEN extraction while any
+    file is listed."""
+    collected = terminalreporter.config.stash.get(_COLLECTED_ANYWAY, set())
+    title, lines = exclusion_summary(DECLARED_EXCLUSION, collected)
+    terminalreporter.write_sep("=", title)
+    for line in lines:
+        terminalreporter.write_line(line)
