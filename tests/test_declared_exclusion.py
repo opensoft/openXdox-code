@@ -858,57 +858,116 @@ def test_every_entry_carries_its_reason():
                 f"the reason {reason['id']} states no {field}")
 
 
+def _reported(out: str, title: str) -> list:
+    """The lines a run printed under the exclusion's title: its first line
+    and the indented ones after it."""
+    lines = out.splitlines()
+    starts = [number for number, line in enumerate(lines)
+              if re.fullmatch(rf"=+ {re.escape(title)} =+", line)]
+    assert len(starts) == 1, (title, out[-3000:])
+    reported = []
+    for line in lines[starts[0] + 1:]:
+        if reported and line.startswith("  "):
+            reported.append(line)
+        elif not reported and line.startswith("declared exclusion: "):
+            reported.append(line)
+        else:
+            break
+    return reported
+
+
+def _count_of_files() -> str:
+    count = DECLARATION["count"]
+    return f"{count} file{'' if count == 1 else 's'}"
+
+
 def test_a_run_that_loads_the_root_conftest_prints_the_exclusion(
-        collect_only_run):
+        collect_only_run, request):
     """The run prints the exclusion as an OPEN extraction: the count, each
     reason with its text, and each file with its reasons. Checked on a
     collect-only run of the whole suite, which loads the root conftest and
     prints what every run prints."""
-    out = collect_only_run.stdout
-    assert re.search(r"^=+ open extraction: the declared exclusion =+$", out,
-                     re.MULTILINE), out[-3000:]
-    count = DECLARATION["count"]
-    assert (f"declared exclusion: {count} file{'' if count == 1 else 's'}, "
-            f"listed in tests/declared_exclusion.yaml and left out of this "
-            f"run. It is an OPEN extraction") in out, out[-3000:]
+    title, lines = _root_conftest(request.config).exclusion_summary(
+        DECLARATION)
+    assert _reported(collect_only_run.stdout, title) == lines, (
+        collect_only_run.stdout[-3000:])
+    assert lines[0].startswith(
+        f"declared exclusion: {_count_of_files()}, listed in "
+        "tests/declared_exclusion.yaml"), lines[0]
+    if ENTRIES:
+        assert title == "open extraction: the declared exclusion", title
+        assert lines[0].endswith(
+            " and left out of this run. It is an OPEN extraction: each file "
+            "runs again once its reason is cleared."), lines[0]
     for reason in REASONS.values():
         named = sum(reason["id"] in entry["reasons"] for entry in ENTRIES)
         assert (f"  reason {reason['id']} ({named} "
                 f"file{'' if named == 1 else 's'}): {reason['reason']}; "
                 f"open until {reason['open_until']}; ruled {reason['ruled']}"
-                ) in out, reason["id"]
-    printed = re.findall(r"^  excluded (\S+): (.+)$", out, re.MULTILINE)
+                ) in lines, reason["id"]
+    printed = [re.fullmatch(r"  excluded (\S+): (.+)", line).groups()
+               for line in lines if line.startswith("  excluded ")]
     assert printed == [(entry["path"], ", ".join(entry["reasons"]))
                        for entry in ENTRIES], printed
-    assert not re.search(r"^  collected ", out, re.MULTILINE), out[-3000:]
+    assert not [line for line in lines if line.startswith("  collected ")]
 
 
-def test_a_run_that_names_a_listed_file_prints_it_as_collected(named_run):
+def test_a_run_that_names_a_listed_file_prints_it_as_collected(named_run,
+                                                               request):
     """A file named on the command line is collected, listed or not, and the
     run prints it as collected, not as left out. The count and the rest of
     the list are printed as in any run, and the rest as left out."""
     out = named_run.stdout
-    assert NAMED, ("the declaration lists no file, so there is none to name. "
-                   "This check leaves with the last entry.")
     for path in NAMED:
         assert (re.search(rf"^{re.escape(path)}::", out, re.MULTILINE)
                 or re.search(rf"^ERROR {re.escape(path)}(?: - .*)?$", out,
                              re.MULTILINE)), (
             f"{path}, named on the command line, was not collected",
             out[-3000:])
-    count = DECLARATION["count"]
-    assert (f"declared exclusion: {count} file{'' if count == 1 else 's'}, "
-            f"listed in tests/declared_exclusion.yaml. "
-            f"{_are(count - len(NAMED))} left out of this run, and "
-            f"{_are(len(NAMED))} collected all the same, since pytest "
-            "collects a file named on the command line whatever "
-            "collect_ignore says. It is an OPEN extraction") in out, (
-        out[-3000:])
-    printed = re.findall(r"^  (excluded|collected) (\S+): (.+)$", out,
-                         re.MULTILINE)
+    title, lines = _root_conftest(request.config).exclusion_summary(
+        DECLARATION, set(NAMED))
+    assert _reported(out, title) == lines, out[-3000:]
+    if NAMED:
+        count = DECLARATION["count"]
+        assert lines[0] == (
+            f"declared exclusion: {_count_of_files()}, listed in "
+            f"tests/declared_exclusion.yaml. {_are(count - len(NAMED))} left "
+            f"out of this run, and {_are(len(NAMED))} collected all the "
+            "same, since pytest collects a file named on the command line "
+            "whatever collect_ignore says. It is an OPEN extraction: each "
+            "file runs again once its reason is cleared."), lines[0]
+    printed = [re.fullmatch(r"  (excluded|collected) (\S+): (.+)", line)
+               .groups() for line in lines
+               if re.match(r"  (?:excluded|collected) ", line)]
     assert printed == [
         ("collected" if entry["path"] in NAMED else "excluded", entry["path"],
          ", ".join(entry["reasons"])) for entry in ENTRIES], printed
+
+
+#: The list emptied: no reasons, no entries, and a count of 0.
+EMPTIED = {"schema_version": 1, "kind": "declared-test-exclusion",
+           "count": 0, "reasons": [], "entries": []}
+
+
+def test_the_root_conftest_accepts_the_emptied_list(request, tmp_path):
+    """The list emptied is the state that ends the extraction, where
+    requirement 9 is met. It loads, so the whole suite runs, and nothing is
+    excluded."""
+    root = _root_conftest(request.config)
+    emptied = tmp_path / "declared_exclusion.yaml"
+    emptied.write_text(yaml.safe_dump(EMPTIED, sort_keys=False),
+                       encoding="utf-8")
+    assert root.load_declared_exclusion(emptied) == EMPTIED
+
+
+def test_the_emptied_list_is_reported_as_nothing_left_out(request):
+    """Batch B's assertions still hold at a count of 0. The count equals the
+    entries, and the run prints `declared exclusion: 0 files, listed in
+    tests/declared_exclusion.yaml`, with no file excluded."""
+    title, lines = _root_conftest(request.config).exclusion_summary(EMPTIED)
+    assert (title, lines) == ("the declared exclusion", [
+        "declared exclusion: 0 files, listed in tests/declared_exclusion.yaml."
+        " Nothing is left out of this run, and no extraction is open."])
 
 
 # ---------------------------------------------------------------------------
@@ -1001,6 +1060,60 @@ def test_the_root_conftest_derives_collect_ignore_from_the_file(request):
     assert root.collect_ignore == [entry["path"] for entry in ENTRIES]
 
 
+#: A declaration that keeps every rule, for the cases below that break one
+#: rule at a time. It holds the four reasons, a two-reason entry with a note,
+#: and the consumer's `only`, and it lists real test files of this checkout.
+#: It does not depend on what the committed declaration lists, so the cases
+#: still hold once that list is emptied.
+SAMPLE_TEXT = """\
+schema_version: 1
+kind: declared-test-exclusion
+
+count: 4
+
+reasons:
+  - id: doc_health
+    reason: "a sample of the doc_health reason"
+    ruled: "R1Q6 (d), openxFactory#656 comment 5817152735"
+    open_until: "the doc_health direction arc (plan 034 T008)"
+  - id: status-exemption-rail
+    reason: "a sample of the rail's reason"
+    ruled: "R1Q24 (a), openxFactory#656 comment 5850003126"
+    open_until: "the doc_health direction arc (plan 034 T008)"
+  - id: openxfactory-contracts
+    reason: "a sample of the contracts' reason"
+    ruled: "R1Q24 (a), openxFactory#656 comment 5850003126"
+    open_until: "the doc_health direction arc (plan 034 T008)"
+  - id: consumer-schemas
+    reason: "a sample of the consumer's reason"
+    ruled: "R1Q25 (b), openxFactory#656 comment 5850003126"
+    open_until: "7.3, the consumer's validator lookup (plan 034 T061)"
+    only: [tests/test_snapshot.py]
+
+entries:
+  - {path: tests/test_canvas.py, reasons: [doc_health]}
+  - {path: tests/test_doxbench_packet.py,
+     reasons: [doc_health, status-exemption-rail],
+     note: "two reasons, each checked"}
+  - {path: tests/test_project_schema_election.py,
+     reasons: [openxfactory-contracts]}
+  - {path: tests/test_snapshot.py, reasons: [consumer-schemas]}
+"""
+
+
+def _sample() -> dict:
+    return yaml.safe_load(SAMPLE_TEXT)
+
+
+def test_the_root_conftest_accepts_the_sample(request, tmp_path):
+    """The sample keeps every rule, so each case below breaks only its
+    own."""
+    root = _root_conftest(request.config)
+    sample = tmp_path / "declared_exclusion.yaml"
+    sample.write_text(SAMPLE_TEXT, encoding="utf-8")
+    assert root.load_declared_exclusion(sample) == _sample()
+
+
 def _with_entry(declaration: dict, entry: dict) -> None:
     """Add an entry where path order puts it, and move the count with it, so
     only the rule under test is broken."""
@@ -1022,8 +1135,8 @@ def _consumer_schemas_on(declaration: dict, only: list, *,
     declaration["reasons"][-1]["only"] = only
 
 
-#: Each rule the root conftest holds the declaration to, broken once, with the
-#: words its refusal must use to name that rule.
+#: Each rule the root conftest holds the declaration to, broken once in the
+#: sample, with the words its refusal must use to name that rule.
 BROKEN_DECLARATIONS = {
     "count off by one": (
         lambda d: d.update(count=d["count"] + 1), "its count is"),
@@ -1130,6 +1243,12 @@ BROKEN_DECLARATIONS = {
     "the consumer's schemas without their only": (
         lambda d: d["reasons"][-1].pop("only"),
         "is ruled for ['tests/test_snapshot.py'] alone"),
+    "reasons that are not a list": (
+        lambda d: d.update(reasons={}), "its reasons are not a list"),
+    "no reasons while entries remain": (
+        lambda d: d.update(reasons=[]), "which is not a declared reason"),
+    "no entries while reasons remain": (
+        lambda d: d.update(entries=[], count=0), "is named by no entry"),
 }
 
 
@@ -1138,7 +1257,7 @@ def test_the_root_conftest_refuses_a_declaration_that_breaks_a_rule(
         breakage, request, tmp_path):
     root = _root_conftest(request.config)
     mutate, rule = BROKEN_DECLARATIONS[breakage]
-    data = _load()
+    data = _sample()
     mutate(data)
     broken = tmp_path / "declared_exclusion.yaml"
     broken.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
@@ -1147,7 +1266,7 @@ def test_the_root_conftest_refuses_a_declaration_that_breaks_a_rule(
 
 
 #: A key given twice in one mapping, which plain YAML settles by keeping the
-#: last: an edit of the committed text, and the key its refusal must name.
+#: last: an edit of the sample's text, and the key its refusal must name.
 KEYS_GIVEN_TWICE = {
     "a second entries list": (
         lambda text: text + ("entries:\n"
@@ -1171,9 +1290,8 @@ def test_the_root_conftest_refuses_a_key_given_twice(breakage, request,
     undeclared. The root conftest refuses them instead."""
     root = _root_conftest(request.config)
     edit, key = KEYS_GIVEN_TWICE[breakage]
-    text = DECLARATION_FILE.read_text(encoding="utf-8")
-    edited = edit(text)
-    assert edited != text, "the edit no longer applies to the committed text"
+    edited = edit(SAMPLE_TEXT)
+    assert edited != SAMPLE_TEXT, "the edit no longer applies to the sample"
     assert isinstance(yaml.safe_load(edited), dict)
     broken = tmp_path / "declared_exclusion.yaml"
     broken.write_text(edited, encoding="utf-8")
@@ -1182,17 +1300,17 @@ def test_the_root_conftest_refuses_a_key_given_twice(breakage, request,
         root.load_declared_exclusion(broken)
 
 
-#: Files the loader cannot read, each made from the committed file's bytes.
+#: Files the loader cannot read, each made from the sample's bytes.
 UNREADABLE = {
     "a file that is not UTF-8": (
-        lambda committed: committed + b"\n# \xff\xfe\n"),
+        lambda sample: sample + b"\n# \xff\xfe\n"),
     "YAML nested past the recursion limit": (
-        lambda committed: b"schema_version: " + b"[" * 5000 + b"]" * 5000
+        lambda sample: b"schema_version: " + b"[" * 5000 + b"]" * 5000
         + b"\n"),
     "a list for a key": (
-        lambda committed: b"? [a, b]\n: 1\n" + committed),
+        lambda sample: b"? [a, b]\n: 1\n" + sample),
     "a mapping for a key inside an entry": (
-        lambda committed: committed.replace(
+        lambda sample: sample.replace(
             b"{path: tests/test_canvas.py, reasons: [doc_health]}",
             b"{path: tests/test_canvas.py, reasons: [doc_health], "
             b"? {a: 1} : x}", 1)),
@@ -1206,8 +1324,11 @@ def test_the_root_conftest_refuses_a_file_it_cannot_read(breakage, request,
     and a key YAML cannot hash are refused as unreadable, as a missing file
     is. None of them crashes the conftest."""
     root = _root_conftest(request.config)
+    sample = SAMPLE_TEXT.encode("utf-8")
+    unreadable = UNREADABLE[breakage](sample)
+    assert unreadable != sample, "the edit no longer applies to the sample"
     broken = tmp_path / "declared_exclusion.yaml"
-    broken.write_bytes(UNREADABLE[breakage](DECLARATION_FILE.read_bytes()))
+    broken.write_bytes(unreadable)
     with pytest.raises(root.DeclaredExclusionRefused, match="cannot be read"):
         root.load_declared_exclusion(broken)
 
@@ -1251,31 +1372,13 @@ def _at(node, where):
     return node
 
 
-def _cut_down(declaration: dict) -> dict:
-    """The committed declaration with its four reasons and, for each, only
-    the first entry that names it. Every rule still has something to hold,
-    a two-reason entry and `only` among them, and it loads in a fraction of
-    the time."""
-    cut = copy.deepcopy(declaration)
-    kept = []
-    for reason in cut["reasons"]:
-        first = next(entry for entry in cut["entries"]
-                     if reason["id"] in entry["reasons"])
-        if first not in kept:
-            kept.append(first)
-    cut["entries"] = sorted(kept, key=lambda entry: entry["path"])
-    cut["count"] = len(cut["entries"])
-    return cut
-
-
 def test_the_root_conftest_refuses_rather_than_crashes(request, tmp_path):
     """A malformed declaration is REFUSED, naming its rule. Anything else it
     raised would stop the run without saying which rule broke. So each odd
-    value goes in each place of a declaration cut down from the committed
-    one, and each odd key into each of its mappings, and every load must
-    return or refuse."""
+    value goes in each place of the sample, and each odd key into each of
+    its mappings, and every load must return or refuse."""
     root = _root_conftest(request.config)
-    base = _cut_down(_load())
+    base = _sample()
     broken = tmp_path / "declared_exclusion.yaml"
     broken.write_text(yaml.safe_dump(base, sort_keys=False), encoding="utf-8")
     assert root.load_declared_exclusion(broken) == base

@@ -8,7 +8,9 @@
 # than that declares what it leaves out, with the count and the reason, and
 # reports it as an OPEN extraction (FR-006). This file is that declaration.
 # Nothing in it is closed. Each entry stays open until its reason is cleared,
-# and requirement 9 is met for this leg only once the list is empty.
+# and requirement 9 is met for this leg only once the list is empty. The
+# emptied list is `count: 0` with no reasons and no entries. The root
+# conftest loads it, excludes nothing, and prints that nothing is left out.
 #
 # WHO READS IT.
 #   * The repository-root `conftest.py`. It derives `collect_ignore` from
