@@ -1632,12 +1632,15 @@ def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) ->
 # number is not carried here. What is true at any head is the command:
 #   git diff main -- tests/test_gate_loop_probes.py | grep -c '^+def test_'
 #   git diff main -- tests/test_gate_loop_views.py  | grep -c '^+def test_'
-# (37 in this file and 6 in the views file at THIS head — 19 decision/read cases,
-# 13 `installed_commit` parser tests and 5 call-site tests here; `validate.yml`'s
-# record block carries the total, 43. The review of `fd3af6a` caught this pair
-# reading 25 and 6, and the review of `de7d966` moved it again by asking for the
-# two undeclared-pin tests: a count written in prose is stale one round later,
-# which is why the commands are printed above it every time.)
+# (37 in this file and 6 in the views file at the head that added them, #21's,
+# squashed as `2529c10` — 19 decision/read cases, 13 `installed_commit` parser
+# tests and 5 call-site tests here; `validate.yml`'s record block carried the
+# total, 43, until plan 034 T043 replaced that block, and
+# `git show d84b5048:.github/workflows/validate.yml` still shows it. The review
+# of `fd3af6a` caught this pair reading 25 and 6, and the review of `de7d966`
+# moved it again by asking for the two undeclared-pin tests: a count written in
+# prose is stale one round later, which is why the commands are printed above it
+# every time.)
 # It is exactly the silent green this whole guard exists to break, reached one
 # level further out each round — and the review of `b22a6fd` caught the quoted
 # count going stale three rounds after the quotation.
