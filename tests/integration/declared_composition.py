@@ -26,12 +26,10 @@ THE RULES OF THIS DIRECTORY, and why each is a rule here:
    below, which fails unless this checkout IS the declared composition,
    records the pin on the run's report (`composes_at`, a property of the JUnit
    test suite), and returns it, so every assertion message can say which
-   openDox it measured. The pin is read from `pyproject.toml` and never written
-   into a test. That keeps one declaration: when a later task moves the pin (T059,
-   T086), every test here follows it without an edit, and fails if the
-   installed openDox did not follow too.
-   `tests/integration/test_declared_composition.py` holds every test here to
-   this rule.
+   openDox it measured. The pin is read from `pyproject.toml` and never
+   written into a test. That keeps one declaration: when a later task moves
+   the pin (T059, T086), every test here follows it without an edit, and fails
+   if the installed openDox did not follow too.
 
 2. NOTHING HERE SKIPS. Elsewhere in this leg a missing bundle may lawfully
    skip, because a consumer may pin a different openDox (RULED
@@ -49,6 +47,10 @@ THE RULES OF THIS DIRECTORY, and why each is a rule here:
    `integration` sorts before every `test_*.py` beside it, so that would be all
    of them. The fixtures live in this plain module instead, and each test
    module imports the ones it uses.
+
+`tests/integration/test_declared_composition.py` holds the directory to all
+three, reading pytest's own collection settings, so a file or a test pytest
+would collect here cannot pass unexamined.
 
 A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
 (RULED OQ-C). Its admission is a `created:` entry in openxFactory's
