@@ -184,8 +184,11 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
     except _KeyGivenTwice as exc:
         refuse(f"it gives the key {exc.key!r} twice in one mapping (line "
                f"{exc.line}), and YAML would keep only the last")
-    except (OSError, _yaml.YAMLError) as exc:
-        refuse(f"it cannot be read ({exc})")
+    except (OSError, UnicodeDecodeError, RecursionError,
+            _yaml.YAMLError) as exc:
+        # Not there, not UTF-8, nested deeper than the parser can follow, or
+        # not YAML: each is refused as unreadable, and none is a crash.
+        refuse(f"it cannot be read ({type(exc).__name__}: {exc})")
     if not isinstance(data, dict):
         refuse("it is not a mapping")
     unknown = _unknown_keys(data, _TOP_KEYS)

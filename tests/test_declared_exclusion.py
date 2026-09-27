@@ -518,6 +518,36 @@ def test_the_root_conftest_refuses_a_key_given_twice(breakage, request,
         root.load_declared_exclusion(broken)
 
 
+#: Files the loader cannot read, each made from the committed file's bytes.
+UNREADABLE = {
+    "a file that is not UTF-8": (
+        lambda committed: committed + b"\n# \xff\xfe\n"),
+    "YAML nested past the recursion limit": (
+        lambda committed: b"schema_version: " + b"[" * 5000 + b"]" * 5000
+        + b"\n"),
+}
+
+
+@pytest.mark.parametrize("breakage", sorted(UNREADABLE))
+def test_the_root_conftest_refuses_a_file_it_cannot_read(breakage, request,
+                                                         tmp_path):
+    """Bytes that are not UTF-8, and nesting deeper than the parser can
+    follow, are refused as unreadable, as a missing file is. Neither crashes
+    the conftest."""
+    root = _root_conftest(request.config)
+    broken = tmp_path / "declared_exclusion.yaml"
+    broken.write_bytes(UNREADABLE[breakage](DECLARATION_FILE.read_bytes()))
+    with pytest.raises(root.DeclaredExclusionRefused, match="cannot be read"):
+        root.load_declared_exclusion(broken)
+
+
+def test_the_root_conftest_refuses_a_file_that_is_not_there(request,
+                                                            tmp_path):
+    root = _root_conftest(request.config)
+    with pytest.raises(root.DeclaredExclusionRefused, match="cannot be read"):
+        root.load_declared_exclusion(tmp_path / "declared_exclusion.yaml")
+
+
 #: Values no rule expects, each put in every place the declaration has one.
 _ODD_VALUES = (None, 0, -1, 1.5, True, "", " ", "x\ny", [], [[]], [{}], {},
                {"a": 1}, [1], ["doc_health", []], "doc_health")
