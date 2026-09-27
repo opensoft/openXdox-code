@@ -75,6 +75,7 @@ _domain_profile.register(_domain_profile.load(DOMAIN_PROFILE_FIXTURE))
 # `--noconftest` skips all of this. So a run that must report the exclusion,
 # as FR-006 requires, is one that loads this conftest.
 # ---------------------------------------------------------------------------
+import re  # noqa: E402
 from pathlib import PurePosixPath  # noqa: E402
 from typing import NoReturn  # noqa: E402
 
@@ -83,11 +84,22 @@ import yaml as _yaml  # noqa: E402
 _LEG_ROOT = Path(__file__).resolve().parent
 DECLARED_EXCLUSION_FILE = _LEG_ROOT / "tests" / "declared_exclusion.yaml"
 DECLARED_EXCLUSION_KIND = "declared-test-exclusion"
+_TOP_KEYS = {"schema_version", "kind", "count", "reasons", "entries"}
 _REASON_FIELDS = ("id", "reason", "ruled", "open_until")
+_REASON_KEYS = {*_REASON_FIELDS, "only"}
+_ENTRY_KEYS = {"path", "reasons", "note"}
+#: A reason id is printed in a comma-separated list, so it is one plain token.
+_REASON_ID = re.compile(r"[a-z][a-z0-9_-]*")
 
 
 class DeclaredExclusionRefused(Exception):
     """`tests/declared_exclusion.yaml` breaks one of its own rules."""
+
+
+def _is_integer(value) -> bool:
+    """An integer as YAML writes one. Not a `bool`, which Python counts as an
+    `int`, and not a float, which compares equal to one."""
+    return type(value) is int
 
 
 def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
@@ -107,10 +119,14 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
         refuse(f"it cannot be read ({exc})")
     if not isinstance(data, dict):
         refuse("it is not a mapping")
-    if (data.get("kind") != DECLARED_EXCLUSION_KIND
-            or data.get("schema_version") != 1):
-        refuse(f"its kind must be {DECLARED_EXCLUSION_KIND!r}, at "
-               "schema_version 1")
+    if set(data) - _TOP_KEYS:
+        refuse(f"it has an unknown key: {sorted(set(data) - _TOP_KEYS)}")
+    if data.get("kind") != DECLARED_EXCLUSION_KIND:
+        refuse(f"its kind must be {DECLARED_EXCLUSION_KIND!r}")
+    if not (_is_integer(data.get("schema_version"))
+            and data["schema_version"] == 1):
+        refuse("its schema_version must be the integer 1, not "
+               f"{data.get('schema_version')!r}")
 
     reasons = data.get("reasons")
     if not isinstance(reasons, list) or not reasons:
@@ -122,6 +138,12 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
                 for field in _REASON_FIELDS)):
             refuse(f"the reason {reason!r} lacks one of "
                    f"{', '.join(_REASON_FIELDS)}")
+        if set(reason) - _REASON_KEYS:
+            refuse(f"the reason {reason['id']} has an unknown key: "
+                   f"{sorted(set(reason) - _REASON_KEYS)}")
+        if not _REASON_ID.fullmatch(reason["id"]):
+            refuse(f"the reason id {reason['id']!r} is not a lowercase token "
+                   "(a letter, then letters, digits, - and _)")
         ids.append(reason["id"])
     if len(set(ids)) != len(ids):
         refuse("a reason id is declared twice")
@@ -134,6 +156,9 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
         if not (isinstance(entry, dict)
                 and isinstance(entry.get("path"), str)):
             refuse(f"the entry {entry!r} names no path")
+        if set(entry) - _ENTRY_KEYS:
+            refuse(f"{entry['path']} has an unknown key: "
+                   f"{sorted(set(entry) - _ENTRY_KEYS)}")
         rel = PurePosixPath(entry["path"])
         if (rel.is_absolute() or ".." in rel.parts or len(rel.parts) != 2
                 or rel.parts[0] != "tests" or not rel.name.startswith("test_")
@@ -150,6 +175,9 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
                    "declared reason")
         if len(set(named)) != len(named):
             refuse(f"{entry['path']} names one reason twice")
+        note = entry.get("note")
+        if note is not None and not (isinstance(note, str) and note.strip()):
+            refuse(f"{entry['path']}'s note is not a line of text")
         paths.append(entry["path"])
     if len(set(paths)) != len(paths):
         refuse("a file is listed twice")
@@ -157,22 +185,31 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
         refuse("its entries are not in path order")
 
     for reason in reasons:
+        naming = [entry["path"] for entry in entries
+                  if reason["id"] in entry["reasons"]]
+        if not naming:
+            refuse(f"the reason {reason['id']} is named by no entry. A "
+                   "cleared reason leaves the declaration with its last entry")
         only = reason.get("only")
         if only is None:
             continue
-        if not (isinstance(only, list)
-                and all(isinstance(path, str) for path in only)):
+        if not (isinstance(only, list) and only
+                and all(isinstance(item, str) for item in only)):
             refuse(f"the reason {reason['id']}'s only is not a list of paths")
-        outside = [entry["path"] for entry in entries
-                   if reason["id"] in entry["reasons"]
-                   and entry["path"] not in only]
+        absent = [item for item in only if item not in naming]
+        if absent:
+            refuse(f"the reason {reason['id']} is for {only} alone, but "
+                   f"{absent} is not an entry that names it")
+        outside = [item for item in naming if item not in only]
         if outside:
             refuse(f"the reason {reason['id']} is for {only} alone, but "
                    f"{outside} name it")
 
-    if data.get("count") != len(entries):
-        refuse(f"its count is {data.get('count')!r}, but it lists "
-               f"{len(entries)} entries")
+    count = data.get("count")
+    if not _is_integer(count):
+        refuse(f"its count must be an integer, not {count!r}")
+    if count != len(entries):
+        refuse(f"its count is {count!r}, but it lists {len(entries)} entries")
     return data
 
 

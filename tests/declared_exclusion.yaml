@@ -26,14 +26,17 @@
 #     request that clears the reason.
 #
 # THE RULES.
-#   * `count` equals the number of `entries`.
+#   * `schema_version` is the integer 1, and `count` is an integer equal to the
+#     number of `entries`.
 #   * Each entry names an existing `tests/test_*.py` file, once, in path order,
 #     and one or more of the declared `reasons` by id. An optional `note` says
-#     why an entry is unusual.
-#   * `reasons` are the four the rulings admit, and no other. A fifth needs a
-#     ruling first. `only` limits a reason to the files it names.
+#     why an entry is unusual. No other key is read, so none is allowed.
+#   * `reasons` are drawn from the four the rulings admit, and no other. A
+#     fifth needs a ruling first. An id is one lowercase token. Every declared
+#     reason is named by at least one entry, and `only` lists exactly the files
+#     that name its reason.
 #   * An entry leaves in the pull request that clears its reason, and the count
-#     moves with it.
+#     moves with it. A reason leaves with its last entry.
 #
 # HOW IT IS WRITTEN. From a run of each file alone at the openDox this leg
 # pins, not from a list. The pull request that changes an entry quotes that

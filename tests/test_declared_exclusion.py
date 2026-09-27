@@ -250,6 +250,8 @@ def _root_conftest(config):
 # ---------------------------------------------------------------------------
 
 def test_the_count_equals_the_entries():
+    assert type(DECLARATION["count"]) is int, (
+        f"count must be an integer, not {DECLARATION['count']!r}")
     assert DECLARATION["count"] == len(ENTRIES), (
         f"count is {DECLARATION['count']}, but {len(ENTRIES)} entries are "
         "listed. The count moves with the entries, in the same pull request.")
@@ -297,22 +299,28 @@ def test_a_run_that_loads_the_root_conftest_prints_the_exclusion(
 # The declaration's own rules.
 # ---------------------------------------------------------------------------
 
-def test_the_reasons_are_the_four_the_rulings_admit():
-    assert set(REASONS) == set(RULED_REASONS), sorted(REASONS)
-    for reason_id, ruling in RULED_REASONS.items():
-        assert REASONS[reason_id]["ruled"].startswith(ruling), (
-            reason_id, REASONS[reason_id]["ruled"])
+def test_the_reasons_are_drawn_from_the_four_the_rulings_admit():
+    """All four are declared while each has an entry. A reason leaves with
+    its last entry (`consumer-schemas` with T061's), and a fifth needs a
+    ruling before it needs a line in `RULED_REASONS`."""
+    assert set(REASONS) <= set(RULED_REASONS), sorted(REASONS)
+    for reason_id, reason in REASONS.items():
+        assert reason["ruled"].startswith(RULED_REASONS[reason_id]), (
+            reason_id, reason["ruled"])
     assert set(EVIDENCE) == set(RULED_REASONS), (
         "each admitted reason needs its evidence in this module")
 
 
 def test_the_consumer_schemas_are_tests_test_snapshot_py_s_alone():
     """R1Q25 (b): one narrow exclusion, for one schema-reading suite, until
-    7.3 lands (T061 clears the entry)."""
-    assert REASONS["consumer-schemas"].get("only") == ["tests/test_snapshot.py"]
+    7.3 lands. T061 clears the entry, and the reason leaves with it."""
     naming = [entry["path"] for entry in ENTRIES
               if "consumer-schemas" in entry["reasons"]]
-    assert naming in ([], ["tests/test_snapshot.py"]), naming
+    if "consumer-schemas" not in REASONS:
+        assert naming == [], naming
+        return
+    assert REASONS["consumer-schemas"].get("only") == ["tests/test_snapshot.py"]
+    assert naming == ["tests/test_snapshot.py"], naming
 
 
 def test_every_entry_names_a_test_file_this_checkout_carries():
@@ -365,6 +373,37 @@ BROKEN_DECLARATIONS = {
         "is for ['tests/test_snapshot.py'] alone"),
     "a different kind": (
         lambda d: d.update(kind="something-else"), "its kind must be"),
+    "schema_version true": (
+        lambda d: d.update(schema_version=True),
+        "schema_version must be the integer 1"),
+    "schema_version 1.0": (
+        lambda d: d.update(schema_version=1.0),
+        "schema_version must be the integer 1"),
+    "count as a float": (
+        lambda d: d.update(count=float(d["count"])),
+        "count must be an integer"),
+    "count as a string": (
+        lambda d: d.update(count=str(d["count"])),
+        "count must be an integer"),
+    "a reason id that is not a token": (
+        lambda d: d["reasons"][0].update(id="doc health"),
+        "is not a lowercase token"),
+    "an only naming a file that does not name the reason": (
+        lambda d: d["reasons"][-1]["only"].append("tests/test_canvas.py"),
+        "is not an entry that names it"),
+    "a reason no entry names": (
+        lambda d: d.update(
+            entries=[e for e in d["entries"]
+                     if "consumer-schemas" not in e["reasons"]],
+            count=d["count"] - 1),
+        "is named by no entry"),
+    "an unknown key on an entry": (
+        lambda d: d["entries"][0].update(reason=["doc_health"]),
+        "has an unknown key"),
+    "an unknown key at the top": (
+        lambda d: d.update(counts=d["count"]), "has an unknown key"),
+    "a note that is not text": (
+        lambda d: d["entries"][0].update(note=5), "is not a line of text"),
 }
 
 
