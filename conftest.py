@@ -67,6 +67,9 @@ _domain_profile.register(_domain_profile.load(DOMAIN_PROFILE_FIXTURE))
 #   * `pytest_terminal_summary` below prints the exclusion at the end of the
 #     run as an OPEN extraction: the count, each reason with how many files
 #     name it, and each file with its reasons. It prints under `-q` as well.
+#     A listed file the run collected all the same, because the command line
+#     names it, is printed as collected, not as left out of the run.
+#     `pytest_collectstart` below notes each one as the run collects it.
 #
 # The declaration is held to its rules when it loads, and a broken rule
 # REFUSES the run, naming the rule. A declaration that loaded anyway would
@@ -79,6 +82,7 @@ import re  # noqa: E402
 from pathlib import PurePosixPath  # noqa: E402
 from typing import NoReturn  # noqa: E402
 
+import pytest  # noqa: E402
 import yaml as _yaml  # noqa: E402
 
 _LEG_ROOT = Path(__file__).resolve().parent
@@ -326,25 +330,55 @@ DECLARED_EXCLUSION = load_declared_exclusion()
 
 collect_ignore = [entry["path"] for entry in DECLARED_EXCLUSION["entries"]]
 
+#: Each listed file by where it is, so the run knows one when it collects it.
+_LISTED_FILES = {(_LEG_ROOT / entry["path"]).resolve(): entry["path"]
+                 for entry in DECLARED_EXCLUSION["entries"]}
+#: The listed files this run collected all the same.
+_COLLECTED_ANYWAY = pytest.StashKey[set]()
+
+
+def pytest_collectstart(collector):
+    """Note each listed file the run collects all the same: pytest collects a
+    file named on the command line whatever `collect_ignore` says."""
+    listed = _LISTED_FILES.get(Path(collector.path).resolve())
+    if listed is not None:
+        collector.config.stash.setdefault(_COLLECTED_ANYWAY, set()).add(listed)
+
 
 def _files(n: int) -> str:
     return f"{n} file" if n == 1 else f"{n} files"
 
 
+def _are(n: int) -> str:
+    return f"{n} is" if n == 1 else f"{n} are"
+
+
 def pytest_terminal_summary(terminalreporter):
-    """Report the declared exclusion as an OPEN extraction (FR-006)."""
+    """Report the declared exclusion as an OPEN extraction (FR-006), each
+    listed file as left out of the run or, if the run collected it all the
+    same, as collected."""
     entries = DECLARED_EXCLUSION["entries"]
     where = DECLARED_EXCLUSION_FILE.relative_to(_LEG_ROOT).as_posix()
+    collected = terminalreporter.config.stash.get(_COLLECTED_ANYWAY, set())
     write = terminalreporter.write_line
     terminalreporter.write_sep("=", "open extraction: the declared exclusion")
     count = DECLARED_EXCLUSION["count"]
-    write(f"declared exclusion: {_files(count)}, listed in {where} and left "
-          "out of this run. It is an OPEN extraction: each file runs again "
-          "once its reason is cleared.")
+    if collected:
+        head = (f"declared exclusion: {_files(count)}, listed in {where}. "
+                f"{_are(count - len(collected))} left out of this run, and "
+                f"{_are(len(collected))} collected all the same, since pytest "
+                "collects a file named on the command line whatever "
+                "collect_ignore says.")
+    else:
+        head = (f"declared exclusion: {_files(count)}, listed in {where} and "
+                "left out of this run.")
+    write(head + " It is an OPEN extraction: each file runs again once its "
+          "reason is cleared.")
     for reason in DECLARED_EXCLUSION["reasons"]:
         named = sum(reason["id"] in entry["reasons"] for entry in entries)
         write(f"  reason {reason['id']} ({_files(named)}): "
               f"{reason['reason']}; open until {reason['open_until']}; "
               f"ruled {reason['ruled']}")
     for entry in entries:
-        write(f"  excluded {entry['path']}: {', '.join(entry['reasons'])}")
+        shown = "collected" if entry["path"] in collected else "excluded"
+        write(f"  {shown} {entry['path']}: {', '.join(entry['reasons'])}")

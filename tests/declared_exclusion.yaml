@@ -15,9 +15,10 @@
 #     `entries`, so a run that loads it collects the whole suite less these
 #     files, with no second list to keep. At the end of that run it prints the
 #     exclusion as an open extraction: the count, each reason, and each file
-#     with its reasons. It refuses to load a declaration that breaks a rule
-#     below, so a malformed one stops the run rather than excluding the wrong
-#     set.
+#     with its reasons. A file named on the command line is collected all the
+#     same, and printed as collected rather than left out. It refuses to load
+#     a declaration that breaks a rule below, so a malformed one stops the run
+#     rather than excluding the wrong set.
 #   * `tests/test_declared_exclusion.py`. It holds each file to its entry: the
 #     file, run ALONE, must fail, and every red result it shows must be caused
 #     by one of the reasons its entry names, each of them at least once. So the

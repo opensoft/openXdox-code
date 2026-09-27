@@ -14,7 +14,9 @@ than convenient:
     R1Q25 (b)), and the consumer's schemas are `tests/test_snapshot.py`'s
     alone;
   * the root conftest derives `collect_ignore` from the file, refuses a file
-    that breaks a rule, and the whole suite collects less exactly these files;
+    that breaks a rule, and the whole suite collects less exactly these files,
+    while a listed file named on the command line is collected and printed as
+    collected;
   * each listed file, RUN ALONE, fails, and every red result it shows is
     caused by one of the reasons its entry names, each of them at least once.
 
@@ -28,15 +30,17 @@ checked (`tests/test_doxbench_packet.py` and
 
 HOW A RED RESULT IS ATTRIBUTED. Each listed file runs in a child pytest of its
 own, from this checkout's root, with a JUnit report. Every failure and error
-in the report is read through its message and the lines pytest marks `E`. So
-source lines a traceback quotes are never read as evidence. Each reason has one
+in the report is read through its message, the lines pytest marks `E`, and
+the lines pytest joins one exception of a chain to the next with. So source
+lines a traceback quotes are never read as evidence. Each reason has one
 piece of evidence, `EVIDENCE` below. It takes a result only when the result's
 final exception, the one that ended the test, IS the reason's cause, and the
-cause is all the result shows. A red result must be taken by exactly one
-reason. None is an unattributed failure, and so is a cause followed or joined
-by anything else. Two would mean the evidence had stopped telling the reasons
-apart, and that is refused as well, though the evidence as written leaves no
-result that two reasons can take.
+cause is all the result shows: any exception before it in the chain is one
+the cause itself comes with. A red result must be taken by exactly one
+reason. None is an unattributed failure, and so is a cause followed, joined
+or preceded by anything else. Two would mean the evidence had stopped telling
+the reasons apart, and that is refused as well, though the evidence as
+written leaves no result that two reasons can take.
 
 THE LONE CHECKOUT. The child's environment drops `PYTHONPATH`,
 `CONTRACTS_DIR`, `PYTEST_ADDOPTS` and `PYTEST_PLUGINS`, which could otherwise
@@ -99,21 +103,27 @@ REASONS = {reason["id"]: reason for reason in DECLARATION.get("reasons") or []}
 # A red result is judged by its FINAL exception, the one that ended the test,
 # and by everything else it shows. The final exception must BE the reason's
 # cause, in a shape its raiser gives it, not merely quote it. And the reason
-# must account for the whole result: every missing module, missing file and
-# refusal the result shows must be its own. So a cause followed by an
-# unrelated failure, a cause beside an unrelated one, and a cause's words
-# quoted in some other failure are each unattributed, and no two reasons can
-# take one result. The shapes are the ones the 66 listed files' 233 red
-# results take when each file runs alone.
+# must account for the whole result. Every exception pytest shows before the
+# final one, in the chain it joins them in, must be one the cause comes with:
+# none, except the rail's refusal under the AttributeError raised from it and
+# the consumer's SnapshotInvalid under pytest's report that it did not match.
+# And every missing module, missing file and refusal the result shows must be
+# its own. So a cause followed by an unrelated failure, a cause raised while
+# an unrelated exception was being handled, a cause beside an unrelated one,
+# and a cause's words quoted in some other failure are each unattributed, and
+# no two reasons can take one result. The shapes are the ones the 66 listed
+# files' 233 red results take when each file runs alone.
 # ---------------------------------------------------------------------------
 
 #: `doc_health`, or one of its modules, raised missing.
 _DOC_HEALTH = re.compile(
     r"ModuleNotFoundError: No module named 'doc_health(?:\.[\w.]+)?'")
 
-#: The `AttributeError` openDox raises for a rail name read from
-#: `opendox.doxbench_packet` while no rail is registered, up to the refusal
-#: it carries.
+#: The refusal as openDox raises it, up to its words.
+_RAIL_RAISED = "opendox.doxbench_packet.StatusExemptionNotRegistered: "
+#: The `AttributeError` openDox raises, from that refusal, for a rail name
+#: read from `opendox.doxbench_packet` while no rail is registered, up to the
+#: refusal it carries.
 _RAIL_THROUGH_ATTRIBUTE = (
     r"AttributeError: module 'opendox\.doxbench_packet' has no attribute "
     r"'\w+': the status-exemption rail cannot answer it \(")
@@ -172,10 +182,11 @@ _CONSUMER_UNEXPECTED = re.compile(
     r"Input: \"[^\n\"]*: " + _CONSUMER_REFUSAL
     + r"(?:\\n" + _CONSUMER_REFUSAL + r")*\"")
 #: The refusal as `openxdox.snapshot` raises it, which pytest then matched
-#: against the refusal the test expected.
+#: against the refusal the test expected: the snapshot it refused, then the
+#: validator's refusal, line by line, as the `Input:` above repeats it.
 _CONSUMER_RAISED = re.compile(
-    r"^E\s+openxdox\.snapshot\.SnapshotInvalid: [^\n]*?" + _CONSUMER_REFUSAL,
-    re.MULTILINE)
+    r"openxdox\.snapshot\.SnapshotInvalid: [^\n\"]*: " + _CONSUMER_REFUSAL
+    + r"(?:\n" + _CONSUMER_REFUSAL + r")*")
 
 #: What any reason could account for, however it arrives: a missing module,
 #: a missing file, and either refusal's words.
@@ -204,25 +215,51 @@ _CONTRACT_FILES = frozenset({
 #: A setup or teardown error, as JUnit wraps its exception.
 _WRAPPED = re.compile(r'failed on (?:setup|teardown) with "(?P<inner>.*)"',
                       re.DOTALL)
-#: An `E` line that opens an exception: a class name, dotted or not, and its
-#: message.
-_OPENS_AN_EXCEPTION = re.compile(
-    r"E\s+(?P<exception>(?:[a-z_]\w*\.)*[A-Z]\w*(?:: .*)?)")
+#: The lines pytest joins one exception of a chain to the next with: after
+#: `raise ... from`, and after an exception raised while another was being
+#: handled. Each stands alone on its line, which no quoted source line does,
+#: since pytest indents those.
+_DIRECT_CAUSE = ("The above exception was the direct cause of the following "
+                 "exception:")
+_DURING_HANDLING = ("During handling of the above exception, another "
+                    "exception occurred:")
+_JOINS = (_DIRECT_CAUSE, _DURING_HANDLING)
 
 
-def _final_exception(message: str, e_lines: list) -> str:
+def _unmarked(e_lines: list) -> str:
+    """One exception's `E` lines as its own text, without the mark and the
+    indentation pytest gives each of them."""
+    if not e_lines:
+        return ""
+    body = e_lines[0][1:]
+    mark = "E" + " " * (len(body) - len(body.lstrip(" ")))
+    return "\n".join(line[len(mark):] if line.startswith(mark)
+                     else line[1:].lstrip(" ") for line in e_lines)
+
+
+def _exceptions(lines: list) -> list:
+    """Each exception a red result shows, in the order pytest shows them, so
+    the one that ended the test last. An exception pytest shows no `E` line
+    for is still one, with no text, which no reason takes as its own."""
+    shown = [[]]
+    for line in lines:
+        if line in _JOINS:
+            shown.append([])
+        else:
+            shown[-1].append(line)
+    return [_unmarked(e_lines) for e_lines in shown]
+
+
+def _final_exception(message: str, lines: list) -> str:
     """The exception that ended the test. JUnit's `message` holds it, wrapped
     for a setup or teardown error. A collection failure's `message` names
-    none, and there it is the last exception the `E` lines open."""
+    none, and there it is the last exception the lines show, whole."""
     wrapped = _WRAPPED.fullmatch(message)
     if wrapped:
         return wrapped.group("inner")
     if message and message != "collection failure":
         return message
-    opened = [found.group("exception")
-              for found in map(_OPENS_AN_EXCEPTION.fullmatch, e_lines)
-              if found]
-    return opened[-1] if opened else ""
+    return _exceptions(lines)[-1]
 
 
 def _resolved(shown: str) -> Path:
@@ -245,36 +282,39 @@ def _is_doc_health(module: str) -> bool:
     return module == "doc_health" or module.startswith("doc_health.")
 
 
-def _reaches_doc_health(final: str, text: str) -> bool:
+def _reaches_doc_health(final: str, before: list, text: str) -> bool:
     """openxFactory's corpus machinery, which `src/openxdox/generator.py`,
     `gate_console.py` and the rest import at module level, raised missing,
-    and no other module, file or refusal."""
+    on its own, and no other module, file or refusal."""
     shown = _signals(text)
-    return (_DOC_HEALTH.fullmatch(final) is not None
+    return (_DOC_HEALTH.fullmatch(final) is not None and not before
             and all(_is_doc_health(module) for module in shown["modules"])
             and not (shown["files"] or shown["rail"] or shown["consumer"]))
 
 
-def _needs_the_rail(final: str, text: str) -> bool:
+def _needs_the_rail(final: str, before: list, text: str) -> bool:
     """openDox's status-exemption seam refused, with no rail registered, in
-    its own words and nothing after them, and nothing else is missing."""
+    its own words and nothing after them: raised on its own, or under the
+    AttributeError raised from it. And nothing else is missing."""
     refusal = _rail_refusal()
     if refusal is None:
         return False
-    whole = (final == ("opendox.doxbench_packet.StatusExemptionNotRegistered: "
-                       + refusal)
-             or re.fullmatch(_RAIL_THROUGH_ATTRIBUTE + re.escape(refusal)
-                             + r"\)", final) is not None)
+    raised = _RAIL_RAISED + refusal
+    carried = re.fullmatch(_RAIL_THROUGH_ATTRIBUTE + re.escape(refusal)
+                           + r"\)", final) is not None
+    whole = ((final == raised and before == [])
+             or (carried and before == [raised]))
     shown = _signals(text)
     return whole and not (shown["modules"] or shown["files"]
                           or shown["consumer"])
 
 
-def _reads_openxfactory_contracts(final: str, text: str) -> bool:
+def _reads_openxfactory_contracts(final: str, before: list,
+                                  text: str) -> bool:
     """A contract file of `_CONTRACT_FILES` raised missing, or the validator
-    unrun, and every file the result shows missing is one of them. Any other
-    missing file, even one beside those in the same `contracts/`, is some
-    other defect."""
+    unrun, on its own, and every file the result shows missing is one of
+    them. Any other missing file, even one beside those in the same
+    `contracts/`, is some other defect."""
     missing = _CONTRACT_MISSING.fullmatch(final)
     unrun = _CONTRACT_UNRUN.fullmatch(final)
     if missing:
@@ -284,19 +324,22 @@ def _reads_openxfactory_contracts(final: str, text: str) -> bool:
     else:
         return False
     shown = _signals(text)
-    return (named and shown["files"] <= _CONTRACT_FILES
+    return (named and not before and shown["files"] <= _CONTRACT_FILES
             and not (shown["modules"] or shown["rail"] or shown["consumer"]))
 
 
-def _needs_the_consumer_schemas(final: str, text: str) -> bool:
+def _needs_the_consumer_schemas(final: str, before: list,
+                                text: str) -> bool:
     """The consumer validator refused for want of its schemas, in its own
     words, and nothing else is missing. Its refusal reaches the test inside
     an assertion, so pytest's account of the assertion must show the
-    validator's result, or the `SnapshotInvalid` that carried it."""
+    validator's result, on its own, or come under the `SnapshotInvalid` that
+    carried the refusal and nothing else."""
     shown = _signals(text)
-    asserted = _CONSUMER_ASSERTED.fullmatch(final) is not None
+    asserted = _CONSUMER_ASSERTED.fullmatch(final) is not None and not before
     unexpected = (_CONSUMER_UNEXPECTED.fullmatch(final) is not None
-                  and _CONSUMER_RAISED.search(text) is not None)
+                  and len(before) == 1
+                  and _CONSUMER_RAISED.fullmatch(before[0]) is not None)
     return ((asserted or unexpected)
             and not (shown["modules"] or shown["files"] or shown["rail"]))
 
@@ -309,13 +352,15 @@ EVIDENCE = {
 }
 
 
-def _taken(message: str, e_lines: list) -> list:
-    """The reasons that take a red result, given JUnit's `message` and the
-    lines pytest marks `E`. As written, at most one."""
-    final = _final_exception(message, e_lines)
-    text = "\n".join([message, *e_lines])
+def _taken(message: str, lines: list) -> list:
+    """The reasons that take a red result, given JUnit's `message`, the lines
+    pytest marks `E` and the lines it joins a chain's exceptions with. As
+    written, at most one."""
+    final = _final_exception(message, lines)
+    before = _exceptions(lines)[:-1]
+    text = "\n".join([message, *lines])
     return sorted(reason for reason, matches in EVIDENCE.items()
-                  if matches(final, text))
+                  if matches(final, before, text))
 
 
 # The cases the evidence is held to, each shaped as JUnit reports it.
@@ -324,10 +369,15 @@ def _missing(path) -> str:
     return f"FileNotFoundError: [Errno 2] No such file or directory: '{path}'"
 
 
-def _raised(*exceptions: str) -> tuple:
-    """A test that raised each exception in turn, the last one ending it."""
-    return exceptions[-1], [f"E   {line}" for exception in exceptions
-                            for line in exception.splitlines()]
+def _raised(*exceptions: str, join: str = _DURING_HANDLING) -> tuple:
+    """A test that raised each exception in turn, each while handling the one
+    before it, or from it if `join` says so, the last one ending it."""
+    lines = []
+    for number, exception in enumerate(exceptions):
+        if number:
+            lines.append(join)
+        lines.extend(f"E   {line}" for line in exception.splitlines())
+    return exceptions[-1], lines
 
 
 def _at_setup(exception: str) -> tuple:
@@ -335,8 +385,9 @@ def _at_setup(exception: str) -> tuple:
 
 
 def _at_collection(*exceptions: str) -> tuple:
-    return "collection failure", [f"E   {exception}"
-                                  for exception in exceptions]
+    """A module that raised each exception in turn as it was imported, which
+    JUnit reports with a `message` that names none of them."""
+    return "collection failure", _raised(*exceptions)[1]
 
 
 _DOC_HEALTH_CAUSE = "ModuleNotFoundError: No module named 'doc_health'"
@@ -355,6 +406,7 @@ _CONSUMER_CAUSE = (
 _GATE_INTENT = (LEG_ROOT.parent / "contracts" / "schemas"
                 / "gate-intent.schema.yaml")
 _UNRELATED = "AssertionError: an unrelated failure"
+_OTHER = "KeyError: 'an unrelated key'"
 
 
 def _unrun(path, *, asserted_on_the_process: bool = True,
@@ -373,9 +425,11 @@ def _unrun(path, *, asserted_on_the_process: bool = True,
 
 
 def _after(exception: str, result: tuple) -> tuple:
-    """`result`, with `exception` raised before it in the same test."""
-    message, e_lines = result
-    return message, [f"E   {exception}", *e_lines]
+    """`result`, raised while `exception` was being handled in the same
+    test."""
+    message, lines = result
+    return message, [*(f"E   {line}" for line in exception.splitlines()),
+                     _DURING_HANDLING, *lines]
 
 
 def _asserted_on_the_validator(cause: str, *, with_result: bool = True,
@@ -395,23 +449,24 @@ def _asserted_on_the_validator(cause: str, *, with_result: bool = True,
 def _unexpected(cause: str, *, raised: bool = True,
                 trailing: str = "") -> tuple:
     """The snapshot test meeting the refusal where it expected another, as
-    pytest reports it: the `SnapshotInvalid` raised, and the pattern that
-    did not match it. Without the raise, it is a bare assertion quoting the
-    same words."""
+    pytest reports it: the `SnapshotInvalid` raised, and, while it was being
+    handled, the pattern that did not match it. Without the raise, it is a
+    bare assertion quoting the same words."""
     carried = f"/tmp/x/bad.json: {cause}"
     message = ("AssertionError: Regex pattern did not match.\n Regex: "
                "'dangling|unknown document'\n Input: "
                f"\"{carried}\\n{cause}{trailing}\"")
-    e_lines = [f"E   {line}" for line in message.splitlines()]
+    lines = [f"E   {line}" for line in message.splitlines()]
     if raised:
-        e_lines.insert(0, f"E   openxdox.snapshot.SnapshotInvalid: {carried}")
-    return message, e_lines
+        return _after(f"openxdox.snapshot.SnapshotInvalid: {carried}\n"
+                      f"{cause}{trailing}", (message, lines))
+    return message, lines
 
 
 #: What each reason's evidence must take, and must not. Each shape the
-#: listed files' runs show is taken by its reason. A cause followed or joined
-#: by an unrelated failure, its words quoted elsewhere, and look-alike paths
-#: are taken by none.
+#: listed files' runs show is taken by its reason. A cause followed, joined or
+#: preceded by an unrelated failure, its words quoted elsewhere, and
+#: look-alike paths are taken by none.
 EVIDENCE_CASES = {
     "doc_health, at collection": (
         _at_collection(_DOC_HEALTH_CAUSE), "doc_health"),
@@ -436,7 +491,8 @@ EVIDENCE_CASES = {
         _raised(_missing("/tmp/t041-x.yaml"), _DOC_HEALTH_CAUSE), None),
     "the rail's refusal": (_raised(_RAIL_CAUSE), "status-exemption-rail"),
     "the AttributeError that carries the rail's refusal": (
-        _raised(_RAIL_CAUSE, _RAIL_ATTRIBUTE), "status-exemption-rail"),
+        _raised(_RAIL_CAUSE, _RAIL_ATTRIBUTE, join=_DIRECT_CAUSE),
+        "status-exemption-rail"),
     "the rail's whole refusal quoted in an assertion": (
         _raised("AssertionError: " + _RAIL_CAUSE), None),
     "the rail's refusal raised by another module's class of that name": (
@@ -447,8 +503,8 @@ EVIDENCE_CASES = {
     "the rail's refusal, with text after it": (
         _raised(_RAIL_CAUSE + " And an unrelated diagnostic."), None),
     "the rail's AttributeError, with text after it": (
-        _raised(_RAIL_CAUSE, _RAIL_ATTRIBUTE + " And an unrelated diagnostic."),
-        None),
+        _raised(_RAIL_CAUSE, _RAIL_ATTRIBUTE + " And an unrelated diagnostic.",
+                join=_DIRECT_CAUSE), None),
     "the rail's words in another error": (
         _raised("RuntimeError: no status-exemption rail is registered at "
                 "openDox's status-exemption seam (opendox.doxbench_packet)"),
@@ -540,6 +596,42 @@ EVIDENCE_CASES = {
                _asserted_on_the_validator(_CONSUMER_CAUSE)), None),
     "two reasons' causes in one result": (
         _raised(_DOC_HEALTH_CAUSE, _RAIL_CAUSE), None),
+    "doc_health, raised while handling an unrelated exception": (
+        _raised(_OTHER, _DOC_HEALTH_CAUSE), None),
+    "doc_health, raised from an unrelated exception": (
+        _raised(_OTHER, _DOC_HEALTH_CAUSE, join=_DIRECT_CAUSE), None),
+    "doc_health at collection, raised while handling an unrelated exception": (
+        _at_collection(_OTHER, _DOC_HEALTH_CAUSE), None),
+    "doc_health, after an exception pytest shows no E line for": (
+        (_DOC_HEALTH_CAUSE, [_DURING_HANDLING, f"E   {_DOC_HEALTH_CAUSE}"]),
+        None),
+    "the rail's refusal, raised while handling an unrelated exception": (
+        _raised(_OTHER, _RAIL_CAUSE), None),
+    "the rail's AttributeError with no refusal before it": (
+        _raised(_RAIL_ATTRIBUTE), None),
+    "the rail's AttributeError, raised from an unrelated exception": (
+        _raised(_OTHER, _RAIL_ATTRIBUTE, join=_DIRECT_CAUSE), None),
+    "the rail's AttributeError, from a refusal raised while handling an "
+    "unrelated exception": (
+        _raised(_OTHER, _RAIL_CAUSE, _RAIL_ATTRIBUTE), None),
+    "the rail's AttributeError, from a refusal with text after it": (
+        _raised(_RAIL_CAUSE + " And an unrelated diagnostic.", _RAIL_ATTRIBUTE,
+                join=_DIRECT_CAUSE), None),
+    "a known schema, missing while handling an unrelated exception": (
+        _raised(_OTHER, _missing(_GATE_INTENT)), None),
+    "the validator, missing at setup while handling an unrelated exception": (
+        _after(_OTHER, _at_setup(_missing(_CONTRACT_VALIDATOR))), None),
+    "the validator unrun, while handling an unrelated exception": (
+        _after(_OTHER, _unrun(_CONTRACT_VALIDATOR)), None),
+    "the refusal asserted on, while handling an unrelated exception": (
+        _after(_OTHER, _asserted_on_the_validator(_CONSUMER_CAUSE)), None),
+    "the unexpected refusal, its SnapshotInvalid raised while handling an "
+    "unrelated exception": (
+        _after(_OTHER, _unexpected(_CONSUMER_CAUSE)), None),
+    "the unexpected refusal, under a SnapshotInvalid for another defect": (
+        _after("openxdox.snapshot.SnapshotInvalid: /tmp/x/bad.json: a "
+               "dangling reference",
+               _unexpected(_CONSUMER_CAUSE, raised=False)), None),
 }
 
 
@@ -560,11 +652,12 @@ def _child_pytest(args, *, timeout=ALONE_TIMEOUT_SECONDS):
 
 
 def _junit_evidence(element) -> tuple:
-    """A red result's JUnit `message` and the lines pytest marks `E`, and
-    nothing else, so a quoted source line is never read as evidence."""
+    """A red result's JUnit `message`, the lines pytest marks `E`, and the
+    lines it joins a chain's exceptions with, and nothing else, so a quoted
+    source line is never read as evidence."""
     return (element.get("message") or "",
             [line for line in (element.text or "").splitlines()
-             if line.startswith("E ")])
+             if line.startswith("E ") or line in _JOINS])
 
 
 def _run_alone(path: str, report: Path) -> dict:
@@ -577,12 +670,12 @@ def _run_alone(path: str, report: Path) -> dict:
                 element = case.find(tag)
                 if element is None:
                     continue
-                message, e_lines = _junit_evidence(element)
-                final = _final_exception(message, e_lines) or message
+                message, lines = _junit_evidence(element)
+                final = _final_exception(message, lines) or message
                 red.append({
                     "case": case.get("name"),
                     "tag": tag,
-                    "reasons": _taken(message, e_lines),
+                    "reasons": _taken(message, lines),
                     "message": (final.splitlines() or [""])[0][:300],
                 })
     return {"returncode": done.returncode, "report": report.is_file(),
@@ -616,6 +709,22 @@ def alone_runs(request, tmp_path_factory):
 def collect_only_run():
     """One collect-only run of the whole suite that loads the root conftest."""
     return _child_pytest(["--co", "-q"])
+
+
+#: The listed files one run names on its command line: the first entry and
+#: the last.
+NAMED = sorted({ENTRIES[0]["path"], ENTRIES[-1]["path"]}) if ENTRIES else []
+
+
+def _are(n: int) -> str:
+    return f"{n} is" if n == 1 else f"{n} are"
+
+
+@pytest.fixture(scope="module")
+def named_run():
+    """One collect-only run that names two listed files on its command line,
+    which pytest collects whatever `collect_ignore` says."""
+    return _child_pytest(["--co", "-q", *NAMED])
 
 
 def _root_conftest(config):
@@ -667,8 +776,8 @@ def test_a_run_that_loads_the_root_conftest_prints_the_exclusion(
                      re.MULTILINE), out[-3000:]
     count = DECLARATION["count"]
     assert (f"declared exclusion: {count} file{'' if count == 1 else 's'}, "
-            f"listed in tests/declared_exclusion.yaml") in out, out[-3000:]
-    assert "It is an OPEN extraction" in out
+            f"listed in tests/declared_exclusion.yaml and left out of this "
+            f"run. It is an OPEN extraction") in out, out[-3000:]
     for reason in REASONS.values():
         named = sum(reason["id"] in entry["reasons"] for entry in ENTRIES)
         assert (f"  reason {reason['id']} ({named} "
@@ -678,6 +787,35 @@ def test_a_run_that_loads_the_root_conftest_prints_the_exclusion(
     printed = re.findall(r"^  excluded (\S+): (.+)$", out, re.MULTILINE)
     assert printed == [(entry["path"], ", ".join(entry["reasons"]))
                        for entry in ENTRIES], printed
+    assert not re.search(r"^  collected ", out, re.MULTILINE), out[-3000:]
+
+
+def test_a_run_that_names_a_listed_file_prints_it_as_collected(named_run):
+    """A file named on the command line is collected, listed or not, and the
+    run prints it as collected, not as left out. The count and the rest of
+    the list are printed as in any run, and the rest as left out."""
+    out = named_run.stdout
+    assert NAMED, ("the declaration lists no file, so there is none to name. "
+                   "This check leaves with the last entry.")
+    for path in NAMED:
+        assert (re.search(rf"^{re.escape(path)}::", out, re.MULTILINE)
+                or re.search(rf"^ERROR {re.escape(path)}(?: - .*)?$", out,
+                             re.MULTILINE)), (
+            f"{path}, named on the command line, was not collected",
+            out[-3000:])
+    count = DECLARATION["count"]
+    assert (f"declared exclusion: {count} file{'' if count == 1 else 's'}, "
+            f"listed in tests/declared_exclusion.yaml. "
+            f"{_are(count - len(NAMED))} left out of this run, and "
+            f"{_are(len(NAMED))} collected all the same, since pytest "
+            "collects a file named on the command line whatever "
+            "collect_ignore says. It is an OPEN extraction") in out, (
+        out[-3000:])
+    printed = re.findall(r"^  (excluded|collected) (\S+): (.+)$", out,
+                         re.MULTILINE)
+    assert printed == [
+        ("collected" if entry["path"] in NAMED else "excluded", entry["path"],
+         ", ".join(entry["reasons"])) for entry in ENTRIES], printed
 
 
 # ---------------------------------------------------------------------------
@@ -727,13 +865,13 @@ def test_the_evidence_takes_each_cause_as_raised_and_alone(case):
     """Each reason takes a result only when its final exception is the
     reason's cause and the cause is all the result shows. Otherwise a listed
     file that gained an unrelated failure could have it hidden under a
-    declared reason: a failure raised while handling the cause, a quoted
-    phrase, an unrelated missing file beside a known one, or a look-alike
-    path."""
-    (message, e_lines), expected = EVIDENCE_CASES[case]
-    taken = _taken(message, e_lines)
+    declared reason: a failure raised while handling the cause, the cause
+    raised while handling an unrelated failure, a quoted phrase, an unrelated
+    missing file beside a known one, or a look-alike path."""
+    (message, lines), expected = EVIDENCE_CASES[case]
+    taken = _taken(message, lines)
     assert taken == ([expected] if expected else []), (
-        _final_exception(message, e_lines), taken)
+        _final_exception(message, lines), taken)
 
 
 # ---------------------------------------------------------------------------
