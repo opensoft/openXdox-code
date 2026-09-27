@@ -39,7 +39,9 @@
 #     a ruling first. An id is one lowercase token, and each reason's texts,
 #     like each note, are one line. Every declared reason is named by at least
 #     one entry, and `only` lists exactly the files that name its reason, each
-#     once.
+#     once. A reason its ruling admits for named files alone carries exactly
+#     those in `only`: `consumer-schemas` is `tests/test_snapshot.py`'s alone
+#     (R1Q25 (b)).
 #   * An entry leaves in the pull request that clears its reason, and the count
 #     moves with it. A reason leaves with its last entry.
 #

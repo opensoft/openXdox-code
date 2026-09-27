@@ -350,6 +350,15 @@ def test_the_root_conftest_admits_the_same_four_reasons(request):
     assert dict(root.ADMITTED_REASONS) == RULED_REASONS
 
 
+def test_the_root_conftest_holds_the_consumer_schemas_to_one_file(request):
+    """R1Q25 (b) admits the consumer's schemas for `tests/test_snapshot.py`
+    alone. The conftest refuses a declaration that widens, drops or moves
+    that, so the ruling holds in every run, not only one that runs this
+    module."""
+    root = _root_conftest(request.config)
+    assert root.RULED_FILES == {"consumer-schemas": ("tests/test_snapshot.py",)}
+
+
 def test_the_root_conftest_names_this_module_as_the_check(request):
     """The conftest refuses an entry naming the check, since excluding it
     would drop the check, and its own refusal of that, from every run."""
@@ -368,6 +377,19 @@ def _with_entry(declaration: dict, entry: dict) -> None:
     declaration["entries"].append(entry)
     declaration["entries"].sort(key=lambda listed: listed["path"])
     declaration["count"] = len(declaration["entries"])
+
+
+def _consumer_schemas_on(declaration: dict, only: list, *,
+                         drop_from_snapshot: bool = False) -> None:
+    """Name the consumer's schemas on `tests/test_canvas.py` too, set their
+    `only`, and, if asked, take them off `tests/test_snapshot.py`. `only`
+    stays exact, so only R1Q25 (b)'s one-file rule is broken."""
+    for entry in declaration["entries"]:
+        if entry["path"] == "tests/test_canvas.py":
+            entry["reasons"] = [*entry["reasons"], "consumer-schemas"]
+        if drop_from_snapshot and entry["path"] == "tests/test_snapshot.py":
+            entry["reasons"] = ["doc_health"]
+    declaration["reasons"][-1]["only"] = only
 
 
 #: Each rule the root conftest holds the declaration to, broken once, with the
@@ -414,7 +436,7 @@ BROKEN_DECLARATIONS = {
         lambda d: d["reasons"][0].update(id="doc health"),
         "is not a lowercase token"),
     "an only naming a file that does not name the reason": (
-        lambda d: d["reasons"][-1]["only"].append("tests/test_canvas.py"),
+        lambda d: d["reasons"][1].update(only=["tests/test_canvas.py"]),
         "is not an entry that names it"),
     "a reason no entry names": (
         lambda d: d.update(
@@ -454,7 +476,8 @@ BROKEN_DECLARATIONS = {
             path=d["entries"][0]["path"].replace("tests/", "tests//")),
         "is not written plainly"),
     "an only listing a file twice": (
-        lambda d: d["reasons"][-1]["only"].append("tests/test_snapshot.py"),
+        lambda d: d["reasons"][1].update(
+            only=["tests/test_doxbench_abstract_envelope.py"] * 2),
         "only lists a file twice"),
     "a reason citing another ruling": (
         lambda d: d["reasons"][1].update(
@@ -466,6 +489,17 @@ BROKEN_DECLARATIONS = {
     "unknown keys of two types": (
         lambda d: d.update({1: "one", "counts": d["count"]}),
         "it has an unknown key: 'counts', 1"),
+    "the consumer's schemas widened to a second file": (
+        lambda d: _consumer_schemas_on(
+            d, ["tests/test_canvas.py", "tests/test_snapshot.py"]),
+        "is ruled for ['tests/test_snapshot.py'] alone"),
+    "the consumer's schemas moved to another file": (
+        lambda d: _consumer_schemas_on(d, ["tests/test_canvas.py"],
+                                       drop_from_snapshot=True),
+        "is ruled for ['tests/test_snapshot.py'] alone"),
+    "the consumer's schemas without their only": (
+        lambda d: d["reasons"][-1].pop("only"),
+        "is ruled for ['tests/test_snapshot.py'] alone"),
 }
 
 

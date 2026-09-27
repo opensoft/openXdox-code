@@ -101,6 +101,10 @@ ADMITTED_REASONS = {
     "openxfactory-contracts": "R1Q24 (a)",
     "consumer-schemas": "R1Q25 (b)",
 }
+#: A reason its ruling admits for named files alone, with those files, which
+#: its `only` must list exactly. R1Q25 (b) admits the consumer's schemas for
+#: one schema-reading suite, until 7.3 lands.
+RULED_FILES = {"consumer-schemas": ("tests/test_snapshot.py",)}
 #: The check that holds this declaration to its word. Listed as an entry, it
 #: would drop out of every run that loads this conftest, and so would the
 #: check's own refusal of that.
@@ -266,7 +270,7 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
         if not all(isinstance(name, str) for name in named):
             refuse(f"{entry['path']} names a reason that is not an id: "
                    f"{named!r}")
-        undeclared =[name for name in named if name not in ids]
+        undeclared = [name for name in named if name not in ids]
         if undeclared:
             refuse(f"{entry['path']} names {undeclared}, which is not a "
                    "declared reason")
@@ -289,6 +293,11 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
             refuse(f"the reason {reason['id']} is named by no entry. A "
                    "cleared reason leaves the declaration with its last entry")
         only = reason.get("only")
+        ruled_for = RULED_FILES.get(reason["id"])
+        if ruled_for is not None and only != list(ruled_for):
+            refuse(f"the reason {reason['id']} is ruled for "
+                   f"{list(ruled_for)} alone, so its only must list exactly "
+                   f"that, not {only!r}")
         if only is None:
             continue
         if not (isinstance(only, list) and only
@@ -296,7 +305,7 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
             refuse(f"the reason {reason['id']}'s only is not a list of paths")
         if len(set(only)) != len(only):
             refuse(f"the reason {reason['id']}'s only lists a file twice")
-        absent =[item for item in only if item not in naming]
+        absent = [item for item in only if item not in naming]
         if absent:
             refuse(f"the reason {reason['id']} is for {only} alone, but "
                    f"{absent} is not an entry that names it")
