@@ -122,25 +122,30 @@ def _needs_the_rail(text: str) -> bool:
     return _RAIL in text
 
 
+#: Where the contract family looks for openxFactory's contracts. Its files
+#: take `Path(__file__).parents[2]` for openxFactory's root, which from this
+#: checkout's `tests/` is the directory above the checkout, and they read the
+#: `contracts/` and the validator there. `test_doxbench_blank_reason.py` reads
+#: `contracts/manifest.yaml` at the checkout's own root instead.
+_CONTRACT_TREES = (LEG_ROOT.parent / "contracts", LEG_ROOT / "contracts")
+_CONTRACT_VALIDATOR = (LEG_ROOT.parent / "scripts"
+                       / "validate-ideation-dashboard-contracts.py")
+
+
 def _reads_openxfactory_contracts(text: str) -> bool:
-    """A contract file of openxFactory's is missing where openxFactory's tree
-    keeps it: a path under a `contracts/` directory, or the contract validator
-    `scripts/validate-ideation-dashboard-contracts.py`, that lies OUTSIDE this
-    checkout (the contract-family files read `Path(__file__).parents[2]`, one
-    directory above it) or under the `contracts/` this checkout does not
-    carry. A missing file anywhere else in the checkout is some other defect,
-    and it is not this reason."""
+    """A contract file of openxFactory's is missing where the contract family
+    looks for it: under one of `_CONTRACT_TREES`, or the validator
+    `_CONTRACT_VALIDATOR`. A relative path is the child's, which runs from
+    this checkout's root. A missing file anywhere else, a `contracts/`
+    directory elsewhere included, is some other defect, and it is not this
+    reason."""
     for match in _MISSING.finditer(text):
         path = Path(match.group("path"))
-        shown = path.as_posix()
-        if not ("/contracts/" in shown or shown.endswith(
-                "/scripts/validate-ideation-dashboard-contracts.py")):
-            continue
-        try:
-            inside = path.resolve().relative_to(LEG_ROOT.resolve())
-        except ValueError:
-            return True
-        if inside.parts[:1] == ("contracts",):
+        if not path.is_absolute():
+            path = LEG_ROOT / path
+        path = path.resolve()
+        if path == _CONTRACT_VALIDATOR or any(
+                path.is_relative_to(tree) for tree in _CONTRACT_TREES):
             return True
     return False
 
@@ -155,6 +160,36 @@ EVIDENCE = {
     "status-exemption-rail": _needs_the_rail,
     "openxfactory-contracts": _reads_openxfactory_contracts,
     "consumer-schemas": _needs_the_consumer_schemas,
+}
+
+
+def _missing(path) -> str:
+    return f"FileNotFoundError: [Errno 2] No such file or directory: '{path}'"
+
+
+#: What the contracts evidence must and must not take for its reason: the
+#: three shapes the contract files' runs show, and missing files that only
+#: look like them.
+CONTRACT_EVIDENCE_CASES = {
+    "a schema above the checkout": (
+        _missing(LEG_ROOT.parent / "contracts" / "schemas"
+                 / "gate-intent.schema.yaml"), True),
+    "the validator above the checkout": (
+        f"can't open file '{_CONTRACT_VALIDATOR}': [Errno 2]", True),
+    "the checkout's own contracts/manifest.yaml": (
+        _missing(LEG_ROOT / "contracts" / "manifest.yaml"), True),
+    "the same, as the child's relative path": (
+        _missing("contracts/manifest.yaml"), True),
+    "a contracts/ directory in /tmp": (
+        _missing("/tmp/contracts/manifest.yaml"), False),
+    "a contracts/ directory beside the checkout's tree": (
+        _missing(LEG_ROOT.parent / "elsewhere" / "contracts" / "x.yaml"),
+        False),
+    "a contracts/ directory inside the checkout's src/": (
+        _missing(LEG_ROOT / "src" / "contracts" / "x.yaml"), False),
+    "a validator of the same name elsewhere": (
+        "can't open file '/tmp/scripts/validate-ideation-dashboard-"
+        "contracts.py': [Errno 2]", False),
 }
 
 
@@ -336,6 +371,19 @@ def test_every_entry_names_a_test_file_this_checkout_carries():
         assert (LEG_ROOT / rel).is_file(), f"{path} is not in this checkout"
     assert THIS_FILE not in paths, (
         "this module checks the exclusion, and cannot be excluded by it")
+
+
+@pytest.mark.parametrize("case", sorted(CONTRACT_EVIDENCE_CASES))
+def test_the_contracts_evidence_is_openxfactory_s_trees_alone(case):
+    """A missing file counts as openxFactory's contracts only where the
+    contract family looks for them. Anywhere else, a listed contracts file
+    that gained an unrelated missing file would have that failure hidden
+    under its reason. No other reason's evidence takes these either."""
+    text, expected = CONTRACT_EVIDENCE_CASES[case]
+    assert _reads_openxfactory_contracts(text) is expected, text
+    others = [reason for reason, matches in EVIDENCE.items()
+              if reason != "openxfactory-contracts" and matches(text)]
+    assert others == [], others
 
 
 # ---------------------------------------------------------------------------

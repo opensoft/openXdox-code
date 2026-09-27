@@ -24,8 +24,9 @@ tuple does, and it puts the previous registration back afterwards.
 
 MEASURED BEHIND THE EXCLUSION'S REASON. With openxFactory's `scripts/` on
 `PYTHONPATH`, which supplies `doc_health` (R1Q23 (a)'s composition), both
-cases pass. That needs layer 2 of `tests/hermeticity.py` to be on at this leg,
-which the same pull request does. Without the stand-in host, `gate` is an
+cases pass, with openDox-code `5c137a90` installed and with `71b631bc`. That
+needs layer 2 of `tests/hermeticity.py` to be on at this leg, which the same
+pull request does. Without the stand-in host, `gate` is an
 invalid choice. Without layer 2, the unguarded create reaches the `nlm` shim,
 the notebook adapter swallows the refusal, and nothing is raised.
 """
@@ -52,6 +53,14 @@ class _GateHost:
     ROUTE_EXTENSIONS = ()
 
 
+#: The registry's module state. `_registered` is there at every pin.
+#: `_is_default` and `_built_from_default` come with T016's default
+#: registration (openDox-code `71b631bc`), and they are absent before it
+#: (`5c137a90`). So the fixture records whichever of them the pinned openDox
+#: keeps.
+_REGISTRY_STATE = ("_registered", "_is_default", "_built_from_default")
+
+
 @pytest.fixture(autouse=True)
 def gate_host_profile(monkeypatch):
     """Register the stand-in host for one test, then restore what was there.
@@ -62,10 +71,13 @@ def gate_host_profile(monkeypatch):
     is made on a clean slate. Handing `monkeypatch` each CURRENT value of the
     registry's state records it for teardown, the idiom openDox-code#51 uses
     for the home corpus. So whatever was registered before this test, and
-    whether a parser had been built from it, is put back."""
-    for state in ("_registered", "_is_default", "_built_from_default"):
-        monkeypatch.setattr(opendox_profile, state,
-                            getattr(opendox_profile, state))
+    whether a parser had been built from it, is put back. Only the state the
+    pinned openDox keeps is recorded, so the fixture reaches its test at
+    either pin."""
+    for state in _REGISTRY_STATE:
+        if hasattr(opendox_profile, state):
+            monkeypatch.setattr(opendox_profile, state,
+                                getattr(opendox_profile, state))
     opendox_profile.unregister()
     return opendox_profile.register(_GateHost())
 
