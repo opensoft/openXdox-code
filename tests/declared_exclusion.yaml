@@ -1,0 +1,134 @@
+# THE DECLARED EXCLUSION: the test files this leg's whole suite runs without,
+# each with its reason, and their count (plan 034 task T041, in openxFactory
+# `specs/034-opendox-standalone-operation/`; requirement 9, first scenario).
+#
+# WHAT IT IS. Each file below reaches something that only openxFactory
+# carries, so a lone openXdox-code checkout cannot run it. Requirement 9 asks
+# for the whole suite, green, in the leg's own checkout. A check that runs less
+# than that declares what it leaves out, with the count and the reason, and
+# reports it as an OPEN extraction (FR-006). This file is that declaration.
+# Nothing in it is closed. Each entry stays open until its reason is cleared,
+# and requirement 9 is met for this leg only once the list is empty.
+#
+# WHO READS IT.
+#   * The repository-root `conftest.py`. It derives `collect_ignore` from
+#     `entries`, so a run that loads it collects the whole suite less these
+#     files, with no second list to keep. At the end of that run it prints the
+#     exclusion as an open extraction: the count, each reason, and each file
+#     with its reasons. It refuses to load a declaration that breaks a rule
+#     below, so a malformed one stops the run rather than excluding the wrong
+#     set.
+#   * `tests/test_declared_exclusion.py`. It holds each file to its entry: the
+#     file, run ALONE, must fail, and every red result it shows must be caused
+#     by one of the reasons its entry names, each of them at least once. So the
+#     list cannot hide a failure of any other kind. A file that stops failing
+#     for its reason turns that test red, and it leaves the list in the pull
+#     request that clears the reason.
+#
+# THE RULES.
+#   * `count` equals the number of `entries`.
+#   * Each entry names an existing `tests/test_*.py` file, once, in path order,
+#     and one or more of the declared `reasons` by id. An optional `note` says
+#     why an entry is unusual.
+#   * `reasons` are the four the rulings admit, and no other. A fifth needs a
+#     ruling first. `only` limits a reason to the files it names.
+#   * An entry leaves in the pull request that clears its reason, and the count
+#     moves with it.
+#
+# HOW IT IS WRITTEN. From a run of each file alone at the openDox this leg
+# pins, not from a list. The pull request that changes an entry quotes that
+# run. Where a reason's cause changes shape, for example a new refusal message,
+# `tests/test_declared_exclusion.py`'s evidence for that reason changes with
+# it, in the same pull request.
+
+schema_version: 1
+kind: declared-test-exclusion
+
+count: 66
+
+reasons:
+  - id: doc_health
+    reason: "reaches openxFactory's doc_health, which openxFactory packages nowhere and no lone checkout supplies"
+    ruled: "R1Q6 (d), openxFactory#656 comment 5817152735"
+    open_until: "the doc_health direction arc (plan 034 T008)"
+  - id: status-exemption-rail
+    reason: "needs openxFactory's status-exemption rail, which only openxFactory registers at openDox's status-exemption seam"
+    ruled: "R1Q24 (a), openxFactory#656 comment 5850003126"
+    open_until: "the doc_health direction arc (plan 034 T008)"
+  - id: openxfactory-contracts
+    reason: "reads openxFactory's contracts (the contract family's validator, schemas and examples, or its contracts/manifest.yaml) where openxFactory's tree keeps them, which is outside this checkout"
+    ruled: "R1Q24 (a), openxFactory#656 comment 5850003126"
+    open_until: "the doc_health direction arc (plan 034 T008)"
+  - id: consumer-schemas
+    reason: "needs the consumer validator's schemas, which neither a contracts/ in this tree nor CONTRACTS_DIR supplies until 7.3 finds them through the installed distribution"
+    ruled: "R1Q25 (b), openxFactory#656 comment 5850003126"
+    open_until: "7.3, the consumer's validator lookup (plan 034 T061, in phase 2)"
+    only: [tests/test_snapshot.py]
+
+entries:
+  - {path: tests/test_authoring_agent.py, reasons: [doc_health]}
+  - {path: tests/test_branch_session.py, reasons: [doc_health]}
+  - {path: tests/test_canvas.py, reasons: [doc_health]}
+  - {path: tests/test_completeness.py, reasons: [doc_health]}
+  - {path: tests/test_create_document_cli.py, reasons: [doc_health]}
+  - {path: tests/test_create_project.py, reasons: [doc_health]}
+  - {path: tests/test_doxbench_abstract_envelope.py, reasons: [status-exemption-rail]}
+  - {path: tests/test_doxbench_abstract_route.py, reasons: [doc_health]}
+  - {path: tests/test_doxbench_blank_reason.py, reasons: [doc_health, openxfactory-contracts], note: "two reasons, each checked: a case that reaches doc_health, and one that reads openxFactory's contracts/manifest.yaml"}
+  - {path: tests/test_doxbench_knowledge_service.py, reasons: [doc_health]}
+  - {path: tests/test_doxbench_mutation_boundary.py, reasons: [doc_health]}
+  - {path: tests/test_doxbench_packet.py, reasons: [doc_health, status-exemption-rail], note: "two reasons, each checked: cases that need the rail, and cases that reach doc_health"}
+  - {path: tests/test_doxbench_request_handling.py, reasons: [doc_health]}
+  - {path: tests/test_doxbench_save.py, reasons: [doc_health]}
+  - {path: tests/test_doxbench_scope.py, reasons: [doc_health]}
+  - {path: tests/test_doxbench_share.py, reasons: [doc_health]}
+  - {path: tests/test_doxbench_thread_wiring.py, reasons: [doc_health]}
+  - {path: tests/test_doxbench_threads.py, reasons: [doc_health]}
+  - {path: tests/test_doxbench_transport.py, reasons: [doc_health]}
+  - {path: tests/test_doxbench_turns.py, reasons: [status-exemption-rail]}
+  - {path: tests/test_doxchat_model_intake.py, reasons: [doc_health]}
+  - {path: tests/test_edit_action.py, reasons: [doc_health]}
+  - {path: tests/test_edit_project.py, reasons: [doc_health]}
+  - {path: tests/test_explorer_viewer.py, reasons: [doc_health]}
+  - {path: tests/test_gate_console.py, reasons: [doc_health]}
+  - {path: tests/test_gate_failure_diagnostics.py, reasons: [doc_health]}
+  - {path: tests/test_gateway_provenance.py, reasons: [doc_health]}
+  - {path: tests/test_generated_at_anchor.py, reasons: [doc_health]}
+  - {path: tests/test_generator.py, reasons: [doc_health]}
+  - {path: tests/test_grouping.py, reasons: [doc_health]}
+  - {path: tests/test_header_value_readers.py, reasons: [doc_health]}
+  - {path: tests/test_hermeticity_gate_verbs.py, reasons: [doc_health], note: "two cases openDox-code#51 (plan 034 T035) moved here from its tests/test_hermeticity.py"}
+  - {path: tests/test_hosted_actor.py, reasons: [doc_health]}
+  - {path: tests/test_kickoff.py, reasons: [doc_health]}
+  - {path: tests/test_notebook_action.py, reasons: [doc_health]}
+  - {path: tests/test_project_action_contracts.py, reasons: [openxfactory-contracts]}
+  - {path: tests/test_project_aggregates.py, reasons: [doc_health]}
+  - {path: tests/test_project_schema_election.py, reasons: [openxfactory-contracts]}
+  - {path: tests/test_readiness_gate.py, reasons: [doc_health]}
+  - {path: tests/test_register_edit_lane.py, reasons: [doc_health]}
+  - {path: tests/test_renderer.py, reasons: [doc_health]}
+  - {path: tests/test_repo_root_guard.py, reasons: [doc_health]}
+  - {path: tests/test_repo_selector.py, reasons: [doc_health]}
+  - {path: tests/test_round_trip.py, reasons: [doc_health]}
+  - {path: tests/test_session_commits.py, reasons: [doc_health]}
+  - {path: tests/test_session_confinement.py, reasons: [doc_health]}
+  - {path: tests/test_session_document_ownership.py, reasons: [doc_health]}
+  - {path: tests/test_session_gates.py, reasons: [doc_health]}
+  - {path: tests/test_session_lifecycle.py, reasons: [doc_health]}
+  - {path: tests/test_session_notebook.py, reasons: [doc_health]}
+  - {path: tests/test_session_records.py, reasons: [doc_health]}
+  - {path: tests/test_session_runbook.py, reasons: [doc_health]}
+  - {path: tests/test_session_snapshot.py, reasons: [doc_health]}
+  - {path: tests/test_session_transaction.py, reasons: [doc_health]}
+  - {path: tests/test_session_verbs.py, reasons: [doc_health]}
+  - {path: tests/test_snapshot.py, reasons: [consumer-schemas], note: "a 5.4a protected suite; T061's landing (7.3) clears this entry"}
+  - {path: tests/test_snapshot_determinism.py, reasons: [doc_health]}
+  - {path: tests/test_snapshot_registry.py, reasons: [doc_health]}
+  - {path: tests/test_snapshot_validation_launch.py, reasons: [doc_health], note: "a 5.4a protected suite"}
+  - {path: tests/test_source_dot_directories.py, reasons: [doc_health]}
+  - {path: tests/test_staging_workbench.py, reasons: [doc_health]}
+  - {path: tests/test_trust_gaps.py, reasons: [doc_health]}
+  - {path: tests/test_validate_ideation_dashboard_contracts.py, reasons: [openxfactory-contracts]}
+  - {path: tests/test_wheel_action_contracts.py, reasons: [openxfactory-contracts]}
+  - {path: tests/test_wheel_model.py, reasons: [doc_health]}
+  - {path: tests/test_wheel_verbs_cli.py, reasons: [doc_health]}

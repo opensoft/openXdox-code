@@ -51,3 +51,154 @@ DOMAIN_PROFILE_FIXTURE = (
     / "openxfactory-engineering-profile.yaml")
 
 _domain_profile.register(_domain_profile.load(DOMAIN_PROFILE_FIXTURE))
+
+
+# ---------------------------------------------------------------------------
+# THE DECLARED EXCLUSION, TAKEN INTO EFFECT (plan 034 task T041; requirement
+# 9, first scenario).
+#
+# `tests/declared_exclusion.yaml` lists the test files a lone checkout cannot
+# run, each with its reason, and their count. It acts here, in two ways:
+#   * `collect_ignore` below is derived from its entries. So a run that loads
+#     this conftest collects the whole suite less those files, and there is no
+#     second list to keep. A file named on the command line is still collected,
+#     because pytest collects an initial path whatever `collect_ignore` says.
+#     That is how `tests/test_declared_exclusion.py` runs each one alone.
+#   * `pytest_terminal_summary` below prints the exclusion at the end of the
+#     run as an OPEN extraction: the count, each reason with how many files
+#     name it, and each file with its reasons. It prints under `-q` as well.
+#
+# The declaration is held to its rules when it loads, and a broken rule
+# REFUSES the run, naming the rule. A declaration that loaded anyway would
+# exclude a set nobody declared, and the run would look green for it.
+#
+# `--noconftest` skips all of this. So a run that must report the exclusion,
+# as FR-006 requires, is one that loads this conftest.
+# ---------------------------------------------------------------------------
+from pathlib import PurePosixPath  # noqa: E402
+from typing import NoReturn  # noqa: E402
+
+import yaml as _yaml  # noqa: E402
+
+_LEG_ROOT = Path(__file__).resolve().parent
+DECLARED_EXCLUSION_FILE = _LEG_ROOT / "tests" / "declared_exclusion.yaml"
+DECLARED_EXCLUSION_KIND = "declared-test-exclusion"
+_REASON_FIELDS = ("id", "reason", "ruled", "open_until")
+
+
+class DeclaredExclusionRefused(Exception):
+    """`tests/declared_exclusion.yaml` breaks one of its own rules."""
+
+
+def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
+    """The declaration, held to the rules its own header states.
+
+    Refuses, naming the broken rule, rather than return a set nobody declared.
+    """
+
+    def refuse(rule: str) -> NoReturn:
+        raise DeclaredExclusionRefused(
+            f"{path.name} is refused: {rule}. The run stops here rather than "
+            "exclude a set nobody declared (plan 034 T041).")
+
+    try:
+        data = _yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, _yaml.YAMLError) as exc:
+        refuse(f"it cannot be read ({exc})")
+    if not isinstance(data, dict):
+        refuse("it is not a mapping")
+    if (data.get("kind") != DECLARED_EXCLUSION_KIND
+            or data.get("schema_version") != 1):
+        refuse(f"its kind must be {DECLARED_EXCLUSION_KIND!r}, at "
+               "schema_version 1")
+
+    reasons = data.get("reasons")
+    if not isinstance(reasons, list) or not reasons:
+        refuse("it declares no reasons")
+    ids: list[str] = []
+    for reason in reasons:
+        if not (isinstance(reason, dict) and all(
+                isinstance(reason.get(field), str) and reason[field].strip()
+                for field in _REASON_FIELDS)):
+            refuse(f"the reason {reason!r} lacks one of "
+                   f"{', '.join(_REASON_FIELDS)}")
+        ids.append(reason["id"])
+    if len(set(ids)) != len(ids):
+        refuse("a reason id is declared twice")
+
+    entries = data.get("entries")
+    if not isinstance(entries, list):
+        refuse("its entries are not a list")
+    paths: list[str] = []
+    for entry in entries:
+        if not (isinstance(entry, dict)
+                and isinstance(entry.get("path"), str)):
+            refuse(f"the entry {entry!r} names no path")
+        rel = PurePosixPath(entry["path"])
+        if (rel.is_absolute() or ".." in rel.parts or len(rel.parts) != 2
+                or rel.parts[0] != "tests" or not rel.name.startswith("test_")
+                or rel.suffix != ".py"):
+            refuse(f"{entry['path']} is not a tests/test_*.py path")
+        if not (_LEG_ROOT / rel).is_file():
+            refuse(f"{entry['path']} names no file in this checkout")
+        named = entry.get("reasons")
+        if not isinstance(named, list) or not named:
+            refuse(f"{entry['path']} carries no reason")
+        undeclared = [name for name in named if name not in ids]
+        if undeclared:
+            refuse(f"{entry['path']} names {undeclared}, which is not a "
+                   "declared reason")
+        if len(set(named)) != len(named):
+            refuse(f"{entry['path']} names one reason twice")
+        paths.append(entry["path"])
+    if len(set(paths)) != len(paths):
+        refuse("a file is listed twice")
+    if paths != sorted(paths):
+        refuse("its entries are not in path order")
+
+    for reason in reasons:
+        only = reason.get("only")
+        if only is None:
+            continue
+        if not (isinstance(only, list)
+                and all(isinstance(path, str) for path in only)):
+            refuse(f"the reason {reason['id']}'s only is not a list of paths")
+        outside = [entry["path"] for entry in entries
+                   if reason["id"] in entry["reasons"]
+                   and entry["path"] not in only]
+        if outside:
+            refuse(f"the reason {reason['id']} is for {only} alone, but "
+                   f"{outside} name it")
+
+    if data.get("count") != len(entries):
+        refuse(f"its count is {data.get('count')!r}, but it lists "
+               f"{len(entries)} entries")
+    return data
+
+
+DECLARED_EXCLUSION = load_declared_exclusion()
+
+collect_ignore = [entry["path"] for entry in DECLARED_EXCLUSION["entries"]]
+
+
+def _files(n: int) -> str:
+    return f"{n} file" if n == 1 else f"{n} files"
+
+
+def pytest_terminal_summary(terminalreporter):
+    """Report the declared exclusion as an OPEN extraction (FR-006)."""
+    entries = DECLARED_EXCLUSION["entries"]
+    where = DECLARED_EXCLUSION_FILE.relative_to(_LEG_ROOT).as_posix()
+    write = terminalreporter.write_line
+    terminalreporter.write_sep("=", "open extraction: the declared exclusion")
+    count = DECLARED_EXCLUSION["count"]
+    write(f"declared exclusion: {_files(count)}, listed in {where} and left "
+          "out of this run. It is an OPEN extraction: each file runs again "
+          "once its reason is cleared.")
+    for reason in DECLARED_EXCLUSION["reasons"]:
+        named = sum(reason["id"] in entry["reasons"] for entry in entries)
+        write(f"  reason {reason['id']} ({_files(named)}): "
+              f"{reason['reason']}; open until {reason['open_until']}; "
+              f"ruled {reason['ruled']}")
+    for entry in entries:
+        write(f"  excluded {entry['path']}: {', '.join(entry['reasons'])}")
