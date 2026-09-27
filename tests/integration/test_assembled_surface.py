@@ -49,6 +49,19 @@ WHAT BUILDING IT REACHES. The twenty `gate` entries come from
 importable, and where it is not, this test fails with the child's own
 `ModuleNotFoundError`, naming what the assembly could not reach.
 
+SO THE REQUIRED CHECK LEAVES IT OUT, UNTIL T008, WITH ITS STATED REASON.
+RULED openxFactory#656 comment 5859927858 (Brett Heap, 2026-09-27, "(b)
+Exclude it until T008's arc"): "The test leaves T042's integration step, with
+its stated reason: cli_gate imports openxFactory's doc_health at load time,
+which is R1Q6 (d)'s kind of exclusion. It runs again once the doc_health
+direction arc (T008) lands. F9.2 is unchanged." So `validate.yml`'s
+`integration (9.3)` step deselects the help-tree test and prints why, and
+F9.2, unchanged, still runs it and stays red on it until then. The second test
+below holds that exclusion to its reason: it passes only while the same child
+fails exactly the way the reason says, so once the arc lands it fails, and the
+pull request that clears the reason takes the exclusion out of `validate.yml`
+and that test with it.
+
 A CREATED file: no carve-manifest row (RULED OQ-C). Its admission is a
 `created:` entry in openxFactory's `docs/opendox-carve-admissions.yaml` (T047).
 """
@@ -58,6 +71,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -120,6 +134,22 @@ MANIFEST_RECORDED_GOLDEN_SHA256 = (
 
 #: The variables a lone checkout does not have, dropped from the child.
 SCRUBBED_ENVIRONMENT = ("PYTHONPATH",)
+
+#: Why the required check leaves the help-tree test out, in the ruling's words
+#: (RULED openxFactory#656 comment 5859927858).
+LEFT_OUT_REASON = (
+    "cli_gate imports openxFactory's doc_health at load time, which is "
+    "R1Q6 (d)'s kind of exclusion")
+
+#: What the child ends with while that reason holds: `doc_health`, or a module
+#: in it, not found. It is the evidence `tests/test_declared_exclusion.py`
+#: takes for R1Q6 (d)'s reason.
+_DOC_HEALTH_NOT_FOUND = re.compile(
+    r"ModuleNotFoundError: No module named 'doc_health(?:\.[\w.]+)?'")
+
+#: The frame that says the child reached it through this column's `cli_gate`,
+#: which is the reason's own account of where the import happens.
+_THROUGH_CLI_GATE = re.compile(r'File "[^"]*openxdox[/\\]cli_gate\.py"')
 
 #: The child: the host registers its profile, THEN the parser is built, and the
 #: tree is walked the way openxFactory's golden was taken.
@@ -204,3 +234,32 @@ def test_the_assembled_help_tree_is_the_31_entry_tree_the_manifest_records(
         "`tests/ideation-dashboard/test_extension_point_parity.py::"
         "test_the_help_text_of_every_entry_point_is_unchanged` names the "
         "changed entry points against the golden's text")
+
+
+def test_the_help_tree_is_left_out_only_while_its_stated_reason_holds(
+        composition: Composition, tmp_path: Path) -> None:
+    """The required check leaves the test above out of its integration step,
+    with its stated reason, until the doc_health direction arc (T008) lands
+    (RULED openxFactory#656 comment 5859927858). This test holds that
+    exclusion to the reason. It builds the same assembled command line in the
+    same child, and passes only while the child fails exactly as the reason
+    says: `doc_health` not found, on the way in through `openxdox/cli_gate.py`.
+
+    Once the arc lands and the child builds, this test fails. So the pull
+    request that clears the reason takes the exclusion out of `validate.yml`,
+    and this test with it, and the help-tree test runs again. A child that
+    fails for any other reason fails this test as well, because the exclusion
+    must not hide a failure its reason does not name."""
+    done = _assemble(tmp_path)
+    last = (done.stderr.strip().splitlines() or [""])[-1]
+    assert done.returncode != 0, (
+        f"at {composition}: the assembled command line builds now, so the "
+        f"help-tree test's stated reason for leaving the required check "
+        f"({LEFT_OUT_REASON}) no longer holds. Take its `--deselect` out of "
+        "validate.yml's `integration (9.3)` step, and this test with it, so "
+        "that it runs again (RULED openxFactory#656 comment 5859927858)")
+    assert (_DOC_HEALTH_NOT_FOUND.fullmatch(last)
+            and _THROUGH_CLI_GATE.search(done.stderr)), (
+        f"at {composition}: the assembled command line fails to build for a "
+        f"reason the exclusion does not state. It states: {LEFT_OUT_REASON}. "
+        f"The child ended with: {last}\n{done.stderr[-4000:]}")

@@ -367,12 +367,17 @@ def test_no_sheet_in_the_assembled_bundle_declares_a_design_token(
     # direct-child glob would have let a sheet in a subdirectory declare an
     # `--st-*` token with this guard claiming to cover every contributed sheet.
     sheets = sorted(views.rglob("*.css"))
-    placed = sorted(set(web_assets.VIEW_SHEET_NAMES)
-                    - {sheet.name for sheet in sheets})
-    assert placed == [], (
+    # WHERE THE ASSEMBLY WRITES THEM (Copilot review of `f5efc756`):
+    # `install_view_modules()` writes each sheet to `views/<name>`, so each is
+    # looked for there, and not by name anywhere in the tree. A file of the
+    # same name deeper down is not the sheet this assembly placed, and must not
+    # stand in for it.
+    missing = [name for name in web_assets.VIEW_SHEET_NAMES
+               if not (views / name).is_file()]
+    assert missing == [], (
         f"at {composition}: the assembled bundle lacks this column's sheets "
-        f"{placed}, which `install_view_modules()` places with the modules. A "
-        "scan that found none would prove nothing")
+        f"{missing} at `views/<name>`, where `install_view_modules()` places "
+        "them with the modules. A scan that found none would prove nothing")
     for sheet in sheets:
         css = _blank_css_comments(sheet.read_text(encoding="utf-8"))
         written = _declared_st_tokens(css)
