@@ -1322,8 +1322,12 @@ def test_the_whole_suite_collects_less_the_exclusion(collect_only_run):
                  if line.startswith("tests/") and "::" in line}
     listed = {entry["path"] for entry in ENTRIES}
     assert collected & listed == set(), sorted(collected & listed)
-    present = {f"tests/{path.name}"
-               for path in (LEG_ROOT / "tests").glob("test_*.py")}
+    # RECURSIVE, because the whole suite is: plan 034 T042 adds
+    # `tests/integration/`, whose files sit inside the whole suite that 9.2's
+    # required check runs (box 9.3), and pytest collects them from there. A
+    # flat glob would report each of them as collected but not a test file.
+    present = {path.relative_to(LEG_ROOT).as_posix()
+               for path in (LEG_ROOT / "tests").rglob("test_*.py")}
     assert collected == present - listed, (
         f"not collected: {sorted(present - listed - collected)}; "
         f"collected but not a test file here: {sorted(collected - present)}")
