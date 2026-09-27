@@ -29,25 +29,30 @@ checked (`tests/test_doxbench_packet.py` and
 `tests/test_doxbench_blank_reason.py`).
 
 HOW A RED RESULT IS ATTRIBUTED. Each listed file runs in a child pytest of its
-own, from this checkout's root, with a JUnit report. Every failure and error
-in the report is read through its message, the lines pytest marks `E`, and
-the lines pytest joins one exception of a chain to the next with. So source
-lines a traceback quotes are never read as evidence. Each reason has one
-piece of evidence, `EVIDENCE` below. It takes a result only when the result's
-final exception, the one that ended the test, IS the reason's cause, and the
-cause is all the result shows: any exception before it in the chain is one
-the cause itself comes with. A red result must be taken by exactly one
-reason. None is an unattributed failure, and so is a cause followed, joined
-or preceded by anything else. Two would mean the evidence had stopped telling
-the reasons apart, and that is refused as well, though the evidence as
-written leaves no result that two reasons can take.
+own, from this checkout's root, with a JUnit report. The child shows the
+values an assertion reads whole (`-o verbosity_assertions=2`), so pytest
+elides none of them. Every failure and error in the report is read through
+its message, the lines pytest marks `E`, and the lines pytest joins one
+exception of a chain to the next with. So source lines a traceback quotes
+are never read as evidence. Each reason has one piece of evidence,
+`EVIDENCE` below. It takes a result only when the result's final exception,
+the one that ended the test, IS the reason's cause, and the cause is all the
+result shows: any exception before it in the chain is one the cause itself
+comes with. A red result must be taken by exactly one reason. None is an
+unattributed failure, and so is a cause followed, joined or preceded by
+anything else. Two would mean the evidence had stopped telling the reasons
+apart, and that is refused as well, though the evidence as written leaves no
+result that two reasons can take.
 
 THE LONE CHECKOUT. The child's environment drops `PYTHONPATH`,
 `CONTRACTS_DIR`, `PYTEST_ADDOPTS` and `PYTEST_PLUGINS`, which could otherwise
 supply what the exclusion says is missing, or change what the child collects.
 It also drops this session's hermeticity ledger variable, so the child's guard
-declares its own. So the claim checked is the declaration's own claim: that
-these files fail in a lone checkout.
+declares its own. And it turns off pytest's plugin autoloading
+(`PYTEST_DISABLE_PLUGIN_AUTOLOAD`), so a plugin installed in the environment
+cannot change what the child collects or reports. A lone checkout's
+`pip install -e ".[test]"` installs none. So the claim checked is the
+declaration's own claim: that these files fail in a lone checkout.
 """
 
 from __future__ import annotations
@@ -86,6 +91,13 @@ ALONE_TIMEOUT_SECONDS = 600
 #: The variables a lone checkout does not have, dropped from each child run.
 SCRUBBED_ENVIRONMENT = ("PYTHONPATH", "CONTRACTS_DIR", "PYTEST_ADDOPTS",
                         "PYTEST_PLUGINS", hermeticity.REFUSAL_LOG_ENV)
+#: What each child run is given: plugin autoloading off, so it loads
+#: pytest's own plugins, this checkout's conftests and any plugin its command
+#: line names, and no other.
+CHILD_ENVIRONMENT = {"PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1"}
+#: How each listed file runs alone: quietly, with every value an assertion
+#: reads shown whole, as the evidence matches it.
+ALONE_ARGS = ("-q", "-o", "verbosity_assertions=2")
 
 
 def _load() -> dict:
@@ -145,15 +157,34 @@ def _rail_refusal():
 #: interpreter reports a script it cannot open, in the test's assertion on
 #: the validator's exit status. That one is matched whole: the interpreter's
 #: line, then pytest's account of the assertion, which reads the return code
-#: of the subprocess. A bare assertion that quotes the same words has no such
-#: account.
+#: of the subprocess and shows the subprocess. A bare assertion that quotes
+#: the same words has no such account.
 _CONTRACT_MISSING = re.compile(
     r"FileNotFoundError: \[Errno 2\] No such file or directory: "
     r"'(?P<path>[^']+)'")
 _CONTRACT_UNRUN = re.compile(
-    r"AssertionError: \S+: can't open file '(?P<path>[^']+)': \[Errno 2\] "
-    r"No such file or directory\n *\nassert 2 == 0\n"
-    r" \+  where 2 = CompletedProcess\([^\n]*\)\.returncode")
+    r"AssertionError: (?P<interpreter>\S+): can't open file "
+    r"'(?P<path>[^']+)': \[Errno 2\] No such file or directory\n *\n"
+    r"assert 2 == 0\n \+  where 2 = (?P<process>CompletedProcess\([^\n]*\))"
+    r"\.returncode")
+
+
+def _as_pytest_shows(text: str) -> str:
+    """A repr as pytest shows an assertion's value whole: anything outside
+    ASCII escaped, as `ascii()` escapes it."""
+    return text.encode("ascii", "backslashreplace").decode("ascii")
+
+
+def _unrun_process(interpreter: str, path: str, *, stdout: str = "") -> str:
+    """The process the contract family's test ran, as pytest shows it whole:
+    the interpreter on the validator, exit 2, nothing on stdout by default,
+    and on stderr the interpreter's line that it cannot open the file."""
+    stderr = (f"{interpreter}: can't open file '{path}': [Errno 2] No such "
+              "file or directory\n")
+    return _as_pytest_shows(
+        f"CompletedProcess(args=[{interpreter!r}, {path!r}], returncode=2, "
+        f"stdout={stdout!r}, stderr={stderr!r})")
+
 
 #: The consumer validator's refusal when neither this tree's `contracts/` nor
 #: `CONTRACTS_DIR` supplies its schemas, in the words of this checkout's
@@ -169,20 +200,35 @@ _CONSUMER_REFUSAL = (
                 "directory), so nothing can be validated and no mode may "
                 "report success"))
 #: The assertion on the validator's result: the refusal as the validator
-#: printed it, then pytest's account of the assertion, which reads a harness
-#: failure, exit 2, and shows the result.
+#: printed it, then pytest's account of the assertion, which shows the
+#: result.
 _CONSUMER_ASSERTED = re.compile(
     "AssertionError: (?P<refusal>" + _CONSUMER_REFUSAL + ")(?:\n  "
     + _CONSUMER_REFUSAL + r")*\n *\nassert False\n \+  where False = "
-    r"(?P<result>ValidationResult\(ok=False, returncode=2, [^\n]*\))\.ok")
-#: That result as it starts: nothing on stdout, then stderr.
-_RESULT_START = "ValidationResult(ok=False, returncode=2, stdout='', stderr="
+    r"(?P<result>ValidationResult\([^\n]*\))\.ok")
 #: The reason `validate_snapshot` in this checkout's `src/openxdox/snapshot.py`
 #: gives a validator that exits 2, which its contract calls a harness error.
-#: The result's repr ends with it.
 _HARNESS_ERROR = ("the validator exited 2, which is a HARNESS error in its "
                   "own documented contract (0 ok, 1 findings, 2 harness "
                   "error) \u2014 it never reached a verdict on this snapshot")
+#: The validator the snapshot test finds: this checkout's own.
+_CONSUMER_VALIDATOR = (LEG_ROOT / "scripts"
+                       / "validate-ideation-dashboard-contracts.py")
+
+
+def _validation_result(*, stdout: str = "", stderr: str,
+                       validator: Path = _CONSUMER_VALIDATOR,
+                       outcome: str = "validator-unavailable",
+                       reason: str | None = _HARNESS_ERROR) -> str:
+    """The result `validate_snapshot` returns, as pytest shows it whole. By
+    default it is a harness error's: exit 2, nothing on stdout, and on
+    stderr what the validator printed."""
+    return _as_pytest_shows(
+        f"ValidationResult(ok=False, returncode=2, stdout={stdout!r}, "
+        f"stderr={stderr!r}, validator={validator!r}, "
+        f"outcome={outcome!r}, unavailable_reason={reason!r})")
+
+
 #: pytest's report of a refusal other than the one the test expected: the
 #: refusal, as the input its pattern did not match.
 _CONSUMER_UNEXPECTED = re.compile(
@@ -328,7 +374,9 @@ def _reads_openxfactory_contracts(final: str, before: list,
     if missing:
         named = _resolved(missing.group("path")) in _CONTRACT_FILES
     elif unrun:
-        named = _resolved(unrun.group("path")) == _CONTRACT_VALIDATOR
+        named = (_resolved(unrun.group("path")) == _CONTRACT_VALIDATOR
+                 and unrun.group("process") == _unrun_process(
+                     unrun.group("interpreter"), unrun.group("path")))
     else:
         return False
     shown = _signals(text)
@@ -336,34 +384,19 @@ def _reads_openxfactory_contracts(final: str, before: list,
             and not (shown["modules"] or shown["rail"] or shown["consumer"]))
 
 
-def _shows_the_refusal_alone(result: str, refusal: str) -> bool:
-    """pytest's account of the validator's result shows a validator that
-    printed the refusal and nothing else, under the reason a harness error
-    gets. pytest shows a repr this long as its start and its end around
-    `...`, keeping as many characters of the end as of the start, or one
-    more. So the start must be the result's with stdout empty and stderr the
-    refusal, and the end must be the harness error's reason. Any other
-    outcome, or another diagnostic where those show, is not this cause."""
-    head, elided, tail = result.partition("...")
-    return (elided == "..." and len(head) > len(_RESULT_START)
-            and len(tail) - len(head) in (0, 1)
-            and (_RESULT_START + repr(refusal + "\n")).startswith(head)
-            and (repr(_HARNESS_ERROR) + ")").endswith(tail))
-
-
 def _needs_the_consumer_schemas(final: str, before: list,
                                 text: str) -> bool:
     """The consumer validator refused for want of its schemas, in its own
     words, and nothing else is missing. Its refusal reaches the test inside
     an assertion. So pytest's account of the assertion must show the
-    validator's result, holding the refusal alone, and nothing before it. Or
-    the refusal must come under the `SnapshotInvalid` that carried it, and
-    nothing else."""
+    validator's whole result, which is a harness error's with the refusal
+    alone on stderr, and nothing before it. Or the refusal must come under
+    the `SnapshotInvalid` that carried it, and nothing else."""
     shown = _signals(text)
     asserted_on = _CONSUMER_ASSERTED.fullmatch(final)
     asserted = (asserted_on is not None and not before
-                and _shows_the_refusal_alone(asserted_on.group("result"),
-                                             asserted_on.group("refusal")))
+                and asserted_on.group("result") == _validation_result(
+                    stderr=asserted_on.group("refusal") + "\n"))
     unexpected = (_CONSUMER_UNEXPECTED.fullmatch(final) is not None
                   and len(before) == 1
                   and _CONSUMER_RAISED.fullmatch(before[0]) is not None)
@@ -437,16 +470,19 @@ _OTHER = "KeyError: 'an unrelated key'"
 
 
 def _unrun(path, *, asserted_on_the_process: bool = True,
-           trailing: str = "") -> tuple:
+           process: str | None = None, trailing: str = "") -> tuple:
     """The validator's test asserting on the exit status of a run the
-    interpreter could not start, as pytest reports it. Without pytest's
-    `where` line, it is a bare assertion quoting the same words."""
-    message = (f"AssertionError: /usr/bin/python3: can't open file "
+    interpreter could not start, as pytest reports it: the process's stdout
+    and stderr as the test's message, then the assertion and the process.
+    Without pytest's `where` line, it is a bare assertion quoting the same
+    words."""
+    interpreter = "/usr/bin/python3"
+    message = (f"AssertionError: {interpreter}: can't open file "
                f"'{path}': [Errno 2] No such file or directory\n  \n"
                "assert 2 == 0")
     if asserted_on_the_process:
-        message += (f"\n +  where 2 = CompletedProcess(args=['python3', "
-                    f"'{path}'], returncode=2).returncode")
+        shown = process or _unrun_process(interpreter, str(path))
+        message += f"\n +  where 2 = {shown}.returncode"
     message += trailing
     return message, [f"E   {line}" for line in message.splitlines()]
 
@@ -457,25 +493,6 @@ def _after(exception: str, result: tuple) -> tuple:
     message, lines = result
     return message, [*(f"E   {line}" for line in exception.splitlines()),
                      _DURING_HANDLING, *lines]
-
-
-def _elided(text: str) -> str:
-    """A repr as pytest shows it in an assertion's account at the child's
-    verbosity: over 240 characters, its first 118 and last 119 around
-    `...`."""
-    return text if len(text) <= 240 else text[:118] + "..." + text[-119:]
-
-
-def _validation_result(*, stdout: str = "", stderr: str,
-                       outcome: str = "validator-unavailable",
-                       reason: str | None = _HARNESS_ERROR) -> str:
-    """The repr of the result `validate_snapshot` returns, with this
-    checkout's validator."""
-    validator = (LEG_ROOT / "scripts"
-                 / "validate-ideation-dashboard-contracts.py")
-    return (f"ValidationResult(ok=False, returncode=2, stdout={stdout!r}, "
-            f"stderr={stderr!r}, validator={validator!r}, "
-            f"outcome={outcome!r}, unavailable_reason={reason!r})")
 
 
 def _asserted_on_the_validator(cause: str, *, with_result: bool = True,
@@ -489,7 +506,7 @@ def _asserted_on_the_validator(cause: str, *, with_result: bool = True,
     words."""
     message = f"AssertionError: {cause}\n  {cause}\n  \nassert False"
     if with_result:
-        shown = _elided(result or _validation_result(stderr=cause + "\n"))
+        shown = result or _validation_result(stderr=cause + "\n")
         message += f"\n +  where False = {shown}.ok"
     message += trailing
     return message, [f"E   {line}" for line in message.splitlines()]
@@ -688,6 +705,19 @@ EVIDENCE_CASES = {
         _asserted_on_the_validator(_CONSUMER_CAUSE, result=_validation_result(
             stderr="an unrelated diagnostic\n" + _CONSUMER_CAUSE + "\n")),
         None),
+    "the refusal asserted on, with another diagnostic after it on stderr": (
+        _asserted_on_the_validator(_CONSUMER_CAUSE, result=_validation_result(
+            stderr=_CONSUMER_CAUSE + "\nan unrelated diagnostic\n")), None),
+    "the refusal asserted on, from another tree's validator": (
+        _asserted_on_the_validator(_CONSUMER_CAUSE, result=_validation_result(
+            stderr=_CONSUMER_CAUSE + "\n",
+            validator=Path("/tmp/other/scripts/"
+                           "validate-ideation-dashboard-contracts.py"))),
+        None),
+    "the validator unrun, its process also printing on stdout": (
+        _unrun(_CONTRACT_VALIDATOR, process=_unrun_process(
+            "/usr/bin/python3", str(_CONTRACT_VALIDATOR),
+            stdout="an unrelated diagnostic\n")), None),
     "the unexpected refusal, its SnapshotInvalid raised while handling an "
     "unrelated exception": (
         _after(_OTHER, _unexpected(_CONSUMER_CAUSE)), None),
@@ -703,8 +733,8 @@ EVIDENCE_CASES = {
 # ---------------------------------------------------------------------------
 
 def _child_environment() -> dict[str, str]:
-    return {key: value for key, value in os.environ.items()
-            if key not in SCRUBBED_ENVIRONMENT}
+    return {**{key: value for key, value in os.environ.items()
+               if key not in SCRUBBED_ENVIRONMENT}, **CHILD_ENVIRONMENT}
 
 
 def _child_pytest(args, *, timeout=ALONE_TIMEOUT_SECONDS):
@@ -725,7 +755,7 @@ def _junit_evidence(element) -> tuple:
 
 def _run_alone(path: str, report: Path) -> dict:
     """Run one listed file alone and attribute each red result."""
-    done = _child_pytest(["-q", f"--junitxml={report}", path])
+    done = _child_pytest([*ALONE_ARGS, f"--junitxml={report}", path])
     red = []
     if report.is_file():
         for case in ET.parse(report).getroot().iter("testcase"):
