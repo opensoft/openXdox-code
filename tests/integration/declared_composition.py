@@ -38,7 +38,10 @@ THE RULES OF THIS DIRECTORY, and why each is a rule here:
    declares, and F9.2 runs every file in it. So an unreadable pin, a different
    installed commit, or a bundle that is not there FAILS, naming what it read.
    A skip would let this suite pass while composing nothing, which is the
-   "dropped from both suites" 9.3 exists to end.
+   "dropped from both suites" 9.3 exists to end. Leaving a test out of the
+   required check is not a skip, and it takes a ruling: the one test left
+   out, with its stated reason, until T008, is in
+   `test_assembled_surface.py`, which says why and holds the exclusion to it.
 
 3. THERE IS NO `conftest.py` IN THIS DIRECTORY, on purpose. `conftest` is one
    flat module name in `sys.modules`, and a rootless `conftest.py` added here

@@ -560,11 +560,34 @@ jobs:
       # 2): a test that cannot reach the pinned openDox fails, naming what it
       # read. So this step adds no skip to the triple below, and a skip here
       # moves the exact pin.
+      #
+      # ONE TEST IS LEFT OUT, WITH ITS STATED REASON, UNTIL T008: `LEFT_OUT`
+      # below, the 31-entry assembled `--help` tree. RULED openxFactory#656
+      # comment 5859927858 (Brett Heap, 2026-09-27, "(b) Exclude it until
+      # T008's arc"): "The test leaves T042's integration step, with its
+      # stated reason: cli_gate imports openxFactory's doc_health at load
+      # time, which is R1Q6 (d)'s kind of exclusion. It runs again once the
+      # doc_health direction arc (T008) lands. F9.2 is unchanged."
+      #   * It is LEFT OUT, not skipped: `--deselect` takes it out before it
+      #     runs, so no report counts it, and the triple's exact skip pin is
+      #     untouched.
+      #   * The step prints it as an open extraction, with its reason, on the
+      #     run's own page (the `::notice::` line).
+      #   * F9.2 is unchanged, so F9.2 still runs it, by name, and stays red
+      #     on it until T008.
+      #   * `test_the_help_tree_is_left_out_only_while_its_stated_reason_holds`,
+      #     beside it, runs here and passes only while the reason holds. Once
+      #     the arc lands it fails, so the pull request that clears the reason
+      #     takes `LEFT_OUT` out of this step, and that test with it.
+      #   * T041's declared exclusion lists `tests/test_*.py` files alone, so
+      #     it cannot carry this one test. When T043 folds this step into the
+      #     whole suite, the whole-suite step leaves it out the same way.
       - name: integration (9.3)
-        run: >-
-          python -m pytest -q
-          --junitxml=integration-report.xml
-          tests/integration
+        env:
+          LEFT_OUT: tests/integration/test_assembled_surface.py::test_the_assembled_help_tree_is_the_31_entry_tree_the_manifest_records
+        run: |
+          echo "::notice::open extraction, left out of this step until the doc_health direction arc (plan 034 T008): $LEFT_OUT. Its stated reason: cli_gate imports openxFactory's doc_health at load time, which is R1Q6 (d)'s kind of exclusion (RULED openxFactory#656 comment 5859927858). F9.2 still runs it."
+          python -m pytest -q --junitxml=integration-report.xml tests/integration --deselect "$LEFT_OUT"
 
       # -----------------------------------------------------------------------
       # THE PINNED TRIPLE — `split-opendox-two-layer-product` § 5.4 FLOOR
@@ -605,19 +628,22 @@ jobs:
       # `integration (9.3)` step runs with the chain in play, as F9.2 runs
       # each file in it. Every test there takes the declared composition and
       # none skips, so what it adds to the triple is tests that ran at the
-      # pin. T043 replaces both steps with the whole suite less the declared
-      # exclusion, and this paragraph goes with them.
+      # pin: all of them less the one that step leaves out until T008, with
+      # its stated reason, which `--deselect` takes out before it runs, so no
+      # report counts it. T043 replaces both steps with the whole suite less
+      # the declared exclusion, and this paragraph goes with them.
       #
-      # SO WHAT MOVES THESE NUMBERS IS EDITING THAT LIST OR WHAT
-      # `tests/integration/` HOLDS, and nothing else. The list loads no
-      # conftest, so no collection-ignore mechanism can reach it. The
-      # directory loads the chain, whose one `collect_ignore` (the root
-      # `conftest.py`, T041) is refused any entry that is not a
-      # `tests/test_*.py` file directly in `tests/`, so it cannot reach the
-      # directory either. Adding a file raises SELECTED and PASSED — floors
-      # permit a rise, and the commit that adds it should raise them WITH the
-      # reason so the margin keeps meaning something. Removing one lowers them
-      # and the floor refuses: find the tests, do not lower the floor.
+      # SO WHAT MOVES THESE NUMBERS IS EDITING THAT LIST, WHAT
+      # `tests/integration/` HOLDS, OR WHAT THAT STEP LEAVES OUT, and nothing
+      # else. The list loads no conftest, so no collection-ignore mechanism
+      # can reach it. The directory loads the chain, whose one
+      # `collect_ignore` (the root `conftest.py`, T041) is refused any entry
+      # that is not a `tests/test_*.py` file directly in `tests/`, so it
+      # cannot reach the directory either. Adding a file raises SELECTED and
+      # PASSED — floors permit a rise, and the commit that adds it should
+      # raise them WITH the reason so the margin keeps meaning something.
+      # Removing one lowers them and the floor refuses: find the tests, do
+      # not lower the floor.
       #
       # THE NUMBERS ARE CI'S OWN. Measured on run 35399041710 (PR #25,
       # 2026-09-18), the first commit of that pull request having printed
