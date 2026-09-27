@@ -540,6 +540,55 @@ jobs:
           tests/test_domain_corpus_adapter.py
           --noconftest
 
+      # THE DECLARED INTEGRATION SUITE — plan 034 task T042 (openxFactory
+      # `specs/034-opendox-standalone-operation/`), box 9.3 of the ratified
+      # `add-neutral-product-standalone-operability`: "Behaviours needing both
+      # legs become declared INTEGRATION tests naming the pin they compose at
+      # ... They live in openXdox-code's `tests/integration/` ... They sit
+      # inside the whole suite that 9.2's required check runs, so CI runs them
+      # without a file list."
+      #
+      # UNTIL T043 IT IS A STEP OF ITS OWN, because the step above is not yet
+      # that whole suite: it names sixteen files and switches the conftest chain
+      # off. So this step runs the DIRECTORY, never a list of its files, with
+      # the chain in play, which is how F9.2 runs each of them and how the whole
+      # suite will. T043 replaces the step above with the whole suite less the
+      # declared exclusion, which collects this directory itself, and this step
+      # and its report leave in the same act.
+      #
+      # NOTHING HERE SKIPS (`tests/integration/declared_composition.py`, rule
+      # 2): a test that cannot reach the pinned openDox fails, naming what it
+      # read. So this step adds no skip to the triple below, and a skip here
+      # moves the exact pin.
+      #
+      # ONE TEST IS LEFT OUT, WITH ITS STATED REASON, UNTIL T008: `LEFT_OUT`
+      # below, the 31-entry assembled `--help` tree. RULED openxFactory#656
+      # comment 5859927858 (Brett Heap, 2026-09-27, "(b) Exclude it until
+      # T008's arc"): "The test leaves T042's integration step, with its
+      # stated reason: cli_gate imports openxFactory's doc_health at load
+      # time, which is R1Q6 (d)'s kind of exclusion. It runs again once the
+      # doc_health direction arc (T008) lands. F9.2 is unchanged."
+      #   * It is LEFT OUT, not skipped: `--deselect` takes it out before it
+      #     runs, so no report counts it, and the triple's exact skip pin is
+      #     untouched.
+      #   * The step prints it as an open extraction, with its reason, on the
+      #     run's own page (the `::notice::` line).
+      #   * F9.2 is unchanged, so F9.2 still runs it, by name, and stays red
+      #     on it until T008.
+      #   * `test_the_help_tree_is_left_out_only_while_its_stated_reason_holds`,
+      #     beside it, runs here and passes only while the reason holds. Once
+      #     the arc lands it fails, so the pull request that clears the reason
+      #     takes `LEFT_OUT` out of this step, and that test with it.
+      #   * T041's declared exclusion lists `tests/test_*.py` files alone, so
+      #     it cannot carry this one test. When T043 folds this step into the
+      #     whole suite, the whole-suite step leaves it out the same way.
+      - name: integration (9.3)
+        env:
+          LEFT_OUT: tests/integration/test_assembled_surface.py::test_the_assembled_help_tree_is_the_31_entry_tree_the_manifest_records
+        run: |
+          echo "::notice::open extraction, left out of this step until the doc_health direction arc (plan 034 T008): $LEFT_OUT. Its stated reason: cli_gate imports openxFactory's doc_health at load time, which is R1Q6 (d)'s kind of exclusion (RULED openxFactory#656 comment 5859927858). F9.2 still runs it."
+          python -m pytest -q --junitxml=integration-report.xml tests/integration --deselect "$LEFT_OUT"
+
       # -----------------------------------------------------------------------
       # THE PINNED TRIPLE — `split-opendox-two-layer-product` § 5.4 FLOOR
       # PART 2, clause (d), THIS LEG'S HALF.
@@ -557,21 +606,44 @@ jobs:
       # pin in its own file (openDox-code#29 -> 373b05aa); neither can move
       # the other, and clause (d) says why a sum was rejected.
       #
-      # WHAT IS PINNED IS WHAT THIS JOB COLLECTS, AND THAT IS THE LIST ABOVE
-      # — 16 named files under `--noconftest`, never a directory, while 85
-      # `test_*.py` exist under `tests/`. The step above records the reason
-      # in its own words: "`--noconftest` STAYS, and it is why this list is a
-      # list: `tests/conftest.py` imports the carved session fixtures, which
-      # reach both absent packages." A directory run is therefore not merely
-      # unused here, it is unavailable, and pinning a number this job does
-      # not produce would pin nothing.
+      # TWO REPORTS, SUMMED, since plan 034 T042 (the shape openDox-code's own
+      # required job had until its T036): the named list's `pytest-report.xml`
+      # and the integration directory's `integration-report.xml`. A single
+      # `--junitxml` path would have the second run overwrite the first, so
+      # each step writes its own, and a report that did not appear is a
+      # refusal, not a smaller sum.
       #
-      # SO WHAT MOVES THESE NUMBERS IS EDITING THAT LIST, and nothing else.
-      # No conftest is loaded, so no collection-ignore mechanism can reach
-      # them. Adding a file raises SELECTED and PASSED — floors permit a
-      # rise, and the commit that adds it should raise them WITH the reason
-      # so the margin keeps meaning something. Removing one lowers them and
-      # the floor refuses: find the tests, do not lower the floor.
+      # WHAT IS PINNED IS WHAT THIS JOB COLLECTS, AND THAT IS TWO THINGS.
+      #
+      # THE `pytest` STEP'S LIST — 16 named files under `--noconftest`, never
+      # a directory, while 85 `test_*.py` existed under `tests/` when #25
+      # took this pin. That step records the reason in its own words:
+      # "`--noconftest` STAYS, and it is why this list is a list:
+      # `tests/conftest.py` imports the carved session fixtures, which reach
+      # both absent packages." A directory run of `tests/` was therefore not
+      # merely unused here, it was unavailable, and pinning a number this job
+      # does not produce would pin nothing.
+      #
+      # AND, SINCE T042, ONE DIRECTORY: `tests/integration/`, which the
+      # `integration (9.3)` step runs with the chain in play, as F9.2 runs
+      # each file in it. Every test there takes the declared composition and
+      # none skips, so what it adds to the triple is tests that ran at the
+      # pin: all of them less the one that step leaves out until T008, with
+      # its stated reason, which `--deselect` takes out before it runs, so no
+      # report counts it. T043 replaces both steps with the whole suite less
+      # the declared exclusion, and this paragraph goes with them.
+      #
+      # SO WHAT MOVES THESE NUMBERS IS EDITING THAT LIST, WHAT
+      # `tests/integration/` HOLDS, OR WHAT THAT STEP LEAVES OUT, and nothing
+      # else. The list loads no conftest, so no collection-ignore mechanism
+      # can reach it. The directory loads the chain, whose one
+      # `collect_ignore` (the root `conftest.py`, T041) is refused any entry
+      # that is not a `tests/test_*.py` file directly in `tests/`, so it
+      # cannot reach the directory either. Adding a file raises SELECTED and
+      # PASSED — floors permit a rise, and the commit that adds it should
+      # raise them WITH the reason so the margin keeps meaning something.
+      # Removing one lowers them and the floor refuses: find the tests, do
+      # not lower the floor.
       #
       # THE NUMBERS ARE CI'S OWN. Measured on run 35399041710 (PR #25,
       # 2026-09-18), the first commit of that pull request having printed
@@ -598,6 +670,16 @@ jobs:
       # amends leave that file at 74. Skipped is unchanged, because none of
       # them skips on a runner with node, which this one is.
       #
+      # RAISED BY #31 (plan 034 T042, box 9.3: `tests/integration/`), the same
+      # way: run 36355557215 (2026-09-27) measured `4ae1c5c4`, the head before
+      # this change, at openDox-code `2d116415`: selected 574, passed 568,
+      # skipped 6, failures 0, errors 0. The +10 on both floors is the ten
+      # tests the `integration (9.3)` step runs, which is the second report
+      # this triple now sums. The named list is unchanged at 564/558/6.
+      # Skipped is unchanged, because nothing in `tests/integration/` skips,
+      # and the one test that step leaves out until T008 is deselected, which
+      # no report counts.
+      #
       # AND THE SIX SKIPS ARE THE ONES THIS FILE ALREADY NAMED, which is why
       # the exact pin is safe to take here: "The 6 skips that remain are the
       # three seam suites' `doc_health` pairs, which no pin bump touches."
@@ -614,28 +696,31 @@ jobs:
           # FLOORS - may only RISE, and only with the reason in the commit
           # message. Set to the measured values, which this suite has
           # actually met on CI rather than an aspiration.
-          MIN_SELECTED: "564"
-          MIN_PASSED: "558"
+          MIN_SELECTED: "574"
+          MIN_PASSED: "568"
           # EXACT - the load-bearing number.
           EXPECT_SKIPPED: "6"
         run: |
           python3 - <<'PY' > triple.env
           import xml.etree.ElementTree as ET, pathlib
-          f = pathlib.Path("pytest-report.xml")
-          if not f.exists():
-              # A REPORT THAT DID NOT APPEAR IS A REFUSAL, NOT A ZERO. A
-              # pytest step that died before writing XML would otherwise
-              # present an empty suite to the floors below.
-              print("MISSING=pytest-report.xml")
-              print("SELECTED=0"); print("SKIPPED=0")
-              print("FAILURES=0"); print("ERRORS=0"); print("PASSED=0")
-              raise SystemExit(0)
+          REPORTS = ("pytest-report.xml", "integration-report.xml")
           tot = {"tests": 0, "skipped": 0, "failures": 0, "errors": 0}
-          root = ET.parse(f).getroot()
-          suites = root.iter("testsuite") if root.tag == "testsuites" else [root]
-          for ts in suites:
-              for k in tot:
-                  tot[k] += int(ts.get(k, 0))
+          missing = []
+          for name in REPORTS:
+              f = pathlib.Path(name)
+              if not f.exists():
+                  missing.append(name)
+                  continue
+              root = ET.parse(f).getroot()
+              suites = root.iter("testsuite") if root.tag == "testsuites" else [root]
+              for ts in suites:
+                  for k in tot:
+                      tot[k] += int(ts.get(k, 0))
+          if missing:
+              # A REPORT THAT DID NOT APPEAR IS A REFUSAL, NOT A SMALLER SUM.
+              # A pytest step that died before writing XML would otherwise
+              # take its tests out of every number below in silence.
+              print("MISSING=" + ",".join(missing))
           print(f"SELECTED={tot['tests']}")
           print(f"SKIPPED={tot['skipped']}")
           print(f"FAILURES={tot['failures']}")
@@ -646,7 +731,7 @@ jobs:
           echo "triple: selected=$SELECTED passed=$PASSED skipped=$SKIPPED failures=$FAILURES errors=$ERRORS"
           echo "pins:   selected>=$MIN_SELECTED (margin $((SELECTED - MIN_SELECTED))) passed>=$MIN_PASSED (margin $((PASSED - MIN_PASSED))) skipped==$EXPECT_SKIPPED"
           rc=0
-          [ -z "${MISSING:-}" ] || { echo "::error::JUnit report missing ($MISSING) — a report that did not appear is a refusal, not a zero. The pytest step above did not write one, so every number below is empty rather than small"; rc=1; }
+          [ -z "${MISSING:-}" ] || { echo "::error::JUnit report(s) missing: $MISSING — a report that did not appear is a refusal, not a smaller sum. A step that failed to write one has taken its tests out of every number below"; rc=1; }
           [ "$SELECTED" -ge "$MIN_SELECTED" ] || { echo "::error::selected $SELECTED is BELOW the floor $MIN_SELECTED — tests stopped being collected. Find them; do not lower the floor"; rc=1; }
           [ "$PASSED" -ge "$MIN_PASSED" ] || { echo "::error::passed $PASSED is BELOW the floor $MIN_PASSED — find the tests that stopped passing or stopped being collected; do not lower the floor"; rc=1; }
           [ "$SKIPPED" = "$EXPECT_SKIPPED" ] || { echo "::error::skipped $SKIPPED, pinned exactly $EXPECT_SKIPPED — a named file that silently turned into skips is exactly what this pin exists to catch. The six expected are the three seam suites' doc_health pairs. If the change is intended, move the pin WITH the reason"; rc=1; }
