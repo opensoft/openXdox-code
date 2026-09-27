@@ -9,9 +9,12 @@ fails the run instead of waiting for a reviewer to notice:
   * nothing here skips, marks a skip, or expects a failure;
   * there is no `conftest.py` here.
 
-The checks read pytest's own collection settings (`python_files`,
-`python_classes`, `python_functions`), not a narrower copy of them, so a test
-pytest would collect cannot pass them unexamined.
+Rule 1 is read from pytest's own COLLECTION of this directory, not from a
+reading of its source. A child interpreter collects it with this run's
+`python_files`, `python_classes` and `python_functions`, and reports every item
+it collects. So a test that pytest collects by a route a source reading would
+miss is still examined: a `unittest.TestCase` of any name, a method inherited
+from a base class, or a test bound by assignment.
 
 And the composition itself, in F9.2's own words: the first block of F9.2
 asserts that `pyproject.toml` names ONE full-commit `opendox` pin and that the
@@ -29,7 +32,11 @@ import ast
 import fnmatch
 import importlib.metadata as md
 import json
+import os
 import re
+import subprocess
+import sys
+import tempfile
 import tomllib
 from pathlib import Path
 
@@ -54,44 +61,84 @@ REFUSED_NAMES = ("skip", "skipif", "skipunless", "importorskip", "xfail",
                  "skiptest", "expectedfailure", "skipped", "xfailed")
 
 
-def _matches(name: str, options: list[str]) -> bool:
-    """pytest's own rule for `python_classes` and `python_functions`: a prefix,
-    or a glob where the option carries glob characters."""
-    return any(name.startswith(option)
-               or (any(ch in option for ch in "*?[")
-                   and fnmatch.fnmatch(name, option))
-               for option in options)
+#: The collection settings the child is given, as this run has them.
+COLLECTION_SETTINGS = ("python_files", "python_classes", "python_functions")
+
+#: What the child does not inherit: `PYTHONPATH`, which a lone checkout does not
+#: have, and `PYTEST_ADDOPTS`, which could narrow what it collects.
+SCRUBBED_ENVIRONMENT = ("PYTHONPATH", "PYTEST_ADDOPTS")
+
+#: The child: pytest collects this directory, and each item is reported with
+#: whether pytest hands it `composition` as an argument of its own. That needs
+#: both halves: its function has a parameter of that name with no default
+#: (pytest does not fill a parameter that has one), and pytest resolves the
+#: fixture for it. The conftest chain is off, because what is audited is what
+#: this directory holds.
+_COLLECT = r'''
+import inspect, json, sys
+
+import pytest
 
 
-def _collected_files(config) -> list[Path]:
-    """Every file under this directory, at any depth, that pytest's
-    `python_files` would collect."""
-    globs = config.getini("python_files")
-    return sorted(path for path in HERE.rglob("*.py")
-                  if any(fnmatch.fnmatch(path.name, glob) for glob in globs))
+class Audit:
+    def __init__(self):
+        self.items = []
+
+    def pytest_collection_finish(self, session):
+        for item in session.items:
+            try:
+                parameter = inspect.signature(item.obj).parameters.get(
+                    "composition")
+            except (AttributeError, TypeError, ValueError):
+                parameter = None
+            takes = (parameter is not None
+                     and parameter.default is inspect.Parameter.empty
+                     and parameter.kind not in (parameter.VAR_POSITIONAL,
+                                                parameter.VAR_KEYWORD)
+                     and "composition" in getattr(item, "fixturenames", ()))
+            self.items.append({"nodeid": item.nodeid, "path": str(item.path),
+                               "takes": takes})
 
 
-def _tests(tree: ast.Module, config):
-    """Every test function pytest would collect from a module: module-level
-    functions matching `python_functions`, and methods matching it in classes
-    matching `python_classes`."""
-    functions = config.getini("python_functions")
-    classes = config.getini("python_classes")
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            if _matches(node.name, functions):
-                yield node.name, node
-        elif isinstance(node, ast.ClassDef) and _matches(node.name, classes):
-            for item in node.body:
-                if (isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
-                        and _matches(item.name, functions)):
-                    yield f"{node.name}.{item.name}", item
+audit = Audit()
+code = pytest.main(sys.argv[2:], plugins=[audit])
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    json.dump({"code": int(code), "items": audit.items}, handle)
+'''
+
+#: The child's reading, once per run and per collection settings.
+_COLLECTED: dict = {}
 
 
-def _arguments(node) -> set[str]:
-    args = node.args
-    return {arg.arg for arg in (*args.posonlyargs, *args.args,
-                                *args.kwonlyargs)}
+def _collected(composition: Composition, config) -> list[dict]:
+    """Every item pytest collects from this directory, at any depth, with this
+    run's collection settings. Fails, naming pytest's own words, if the
+    directory does not collect cleanly, since then no rule can be read."""
+    settings = tuple((name, tuple(config.getini(name)))
+                     for name in COLLECTION_SETTINGS)
+    if settings not in _COLLECTED:
+        args = ["--collect-only", "-q", "--noconftest", "-p", "no:cacheprovider"]
+        for name, values in settings:
+            args += ["-o", f"{name}={' '.join(values)}"]
+        env = {key: value for key, value in os.environ.items()
+               if key not in SCRUBBED_ENVIRONMENT}
+        with tempfile.TemporaryDirectory() as scratch:
+            report = Path(scratch) / "collected.json"
+            done = subprocess.run(
+                [sys.executable, "-c", _COLLECT, str(report), *args, str(HERE)],
+                cwd=LEG_ROOT, env=env, capture_output=True, text=True,
+                timeout=300)
+            found = (json.loads(report.read_text(encoding="utf-8"))
+                     if report.exists() else {"code": None, "items": []})
+        found["tail"] = (done.stdout + done.stderr)[-3000:]
+        _COLLECTED[settings] = found
+    found = _COLLECTED[settings]
+    # pytest's own exit codes: 0 collected, 2 a collection error, 5 nothing.
+    assert found["code"] == 0 and found["items"], (
+        f"at {composition}: pytest did not collect this directory cleanly "
+        f"(exit {found['code']}, {len(found['items'])} items), so its rules "
+        f"cannot be read:\n{found['tail']}")
+    return found["items"]
 
 
 def _refused(name: str) -> bool:
@@ -123,9 +170,11 @@ def test_every_file_pytest_collects_here_is_one_f9_2_runs(
     file at a time. pytest also collects `*_test.py` by default, and it
     collects a subdirectory's files. A test file of either kind would run in
     the whole suite and never in F9.2's loop."""
-    missed = [path.relative_to(HERE).as_posix()
-              for path in _collected_files(request.config)
-              if path.parent != HERE or not fnmatch.fnmatch(path.name, F92_GLOB)]
+    missed = sorted({
+        Path(item["path"]).resolve().relative_to(HERE).as_posix()
+        for item in _collected(composition, request.config)
+        if Path(item["path"]).resolve().parent != HERE
+        or not fnmatch.fnmatch(Path(item["path"]).name, F92_GLOB)})
     assert missed == [], (
         f"at {composition}: pytest collects these files here, and F9.2's "
         f"`ls tests/integration/{F92_GLOB}` does not list them: {missed}")
@@ -135,19 +184,16 @@ def test_every_test_here_names_the_pin_it_composes_at(
         composition: Composition, request) -> None:
     """Rule 1: each test takes `composition`, which records the pin on the
     run's report and fails if this checkout is not the declared composition.
-    Every test pytest would collect here is read, by pytest's own settings."""
-    files = _collected_files(request.config)
-    unnamed, seen = [], 0
-    for path in files:
-        tree = ast.parse(path.read_text(encoding="utf-8"), str(path))
-        for name, node in _tests(tree, request.config):
-            seen += 1
-            if "composition" not in _arguments(node):
-                unnamed.append(f"{path.relative_to(HERE).as_posix()}::{name}")
+    Every item pytest collects here is read, however pytest reached it, and
+    each must have the fixture handed to it as an argument of its own: a
+    default value, a `usefixtures` mark or another fixture that uses it does
+    not give the test the pin to name."""
+    unnamed = [item["nodeid"]
+               for item in _collected(composition, request.config)
+               if not item["takes"]]
     assert unnamed == [], (
         f"at {composition}: these tests do not take `composition`, so they do "
         f"not name the pin they compose at (box 9.3): {unnamed}")
-    assert seen, "no test here: the rule checked nothing"
 
 
 def test_nothing_here_skips_or_expects_a_failure(
