@@ -283,9 +283,11 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
                    "declared reason")
         if len(set(named)) != len(named):
             refuse(f"{entry['path']} names one reason twice")
+        # An optional key given is held to its form, null included: a null
+        # note is no note, and is refused rather than read as none.
         note = entry.get("note")
-        if note is not None and not (isinstance(note, str) and note.strip()
-                                     and _is_one_line(note)):
+        if "note" in entry and not (isinstance(note, str) and note.strip()
+                                    and _is_one_line(note)):
             refuse(f"{entry['path']}'s note is not a line of text")
         paths.append(entry["path"])
     if len(set(paths)) != len(paths):
@@ -305,7 +307,7 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
             refuse(f"the reason {reason['id']} is ruled for "
                    f"{list(ruled_for)} alone, so its only must list exactly "
                    f"that, not {only!r}")
-        if only is None:
+        if "only" not in reason:
             continue
         if not (isinstance(only, list) and only
                 and all(isinstance(item, str) for item in only)):
