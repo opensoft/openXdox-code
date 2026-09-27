@@ -111,51 +111,66 @@ REASONS = {reason["id"]: reason for reason in DECLARATION.get("reasons") or []}
 _DOC_HEALTH = re.compile(
     r"ModuleNotFoundError: No module named 'doc_health(?:\.[\w.]+)?'")
 
-#: What openDox's status-exemption seam says when nothing is registered (plan
-#: 034 T027, openDox-code#41). It is raised as `StatusExemptionNotRegistered`,
-#: or, for a rail name read from the module, as the `AttributeError` that
-#: carries it.
-_RAIL_WORDS = (r"no status-exemption rail is registered at openDox's "
-               r"status-exemption seam \(opendox\.doxbench_packet\)")
-_RAIL = re.compile(r"(?:[a-z_]\w*\.)+StatusExemptionNotRegistered: "
-                   + _RAIL_WORDS)
-_RAIL_THROUGH_ATTRIBUTE = re.compile(
+#: The `AttributeError` openDox raises for a rail name read from
+#: `opendox.doxbench_packet` while no rail is registered, up to the refusal
+#: it carries.
+_RAIL_THROUGH_ATTRIBUTE = (
     r"AttributeError: module 'opendox\.doxbench_packet' has no attribute "
-    r"'\w+': the status-exemption rail cannot answer it \(" + _RAIL_WORDS)
+    r"'\w+': the status-exemption rail cannot answer it \(")
 
-#: A contract file raised missing, and the family's validator as the
-#: interpreter reports a script it cannot open, in the assertion on the
-#: validator's exit status.
+
+def _rail_refusal():
+    """What the pinned openDox's status-exemption seam says when nothing is
+    registered (plan 034 T027, openDox-code#41): openDox's own constant, so
+    a host's tests hold the refusal to the one it gives. A pin before the
+    seam has none, and there nothing is this reason."""
+    try:
+        from opendox.doxbench_packet import STATUS_EXEMPTION_NOT_REGISTERED
+    except ImportError:
+        return None
+    return STATUS_EXEMPTION_NOT_REGISTERED
+
+
+#: A contract file raised missing. And the family's validator as the
+#: interpreter reports a script it cannot open, in the test's assertion on
+#: the validator's exit status. That one is matched whole: the interpreter's
+#: line, then pytest's account of the assertion, which reads the return code
+#: of the subprocess. A bare assertion that quotes the same words has no such
+#: account.
 _CONTRACT_MISSING = re.compile(
     r"FileNotFoundError: \[Errno 2\] No such file or directory: "
     r"'(?P<path>[^']+)'")
 _CONTRACT_UNRUN = re.compile(
     r"AssertionError: \S+: can't open file '(?P<path>[^']+)': \[Errno 2\] "
-    r"No such file or directory\n")
-#: pytest's account of that assertion: the subprocess whose exit status it
-#: read. A bare assertion that quotes the same words has none.
-_ASSERTED_ON_A_PROCESS = re.compile(
-    r"^E\s+\+\s+where \d+ = CompletedProcess\(", re.MULTILINE)
+    r"No such file or directory\n *\nassert 2 == 0\n"
+    r" \+  where 2 = CompletedProcess\([^\n]*\)\.returncode")
 
 #: The consumer validator's refusal when neither this tree's `contracts/` nor
 #: `CONTRACTS_DIR` supplies its schemas, in the words of this checkout's
 #: `scripts/validate-ideation-dashboard-contracts.py` (C3's openXdox-code#28),
 #: naming this checkout's own `contracts/schemas`. The tests assert on it, or
-#: meet it where they expected another refusal.
+#: meet it where they expected another refusal, and each form is matched
+#: whole.
 _CONSUMER_REFUSAL = (
     re.escape(f"ERROR harness failure: {LEG_ROOT / 'contracts' / 'schemas'}"
               " carries none of the family's ") + r"\d+"
     + re.escape(" schemas (this tree carries no contracts/ and CONTRACTS_DIR "
-                "is not set;"))
-_CONSUMER_ASSERTED = re.compile("AssertionError: " + _CONSUMER_REFUSAL)
-#: pytest's account of the assertion on the validator's result: a harness
+                "is not set; export it as the spec leg's contracts "
+                "directory), so nothing can be validated and no mode may "
+                "report success"))
+#: The assertion on the validator's result: the refusal as the validator
+#: printed it, then pytest's account of the assertion, which reads a harness
 #: failure, exit 2.
-_ASSERTED_ON_A_HARNESS_FAILURE = re.compile(
-    r"^E\s+\+\s+where False = ValidationResult\(ok=False, returncode=2, ",
-    re.MULTILINE)
+_CONSUMER_ASSERTED = re.compile(
+    "AssertionError: " + _CONSUMER_REFUSAL + "(?:\n  " + _CONSUMER_REFUSAL
+    + r")*\n *\nassert False\n \+  where False = "
+    r"ValidationResult\(ok=False, returncode=2, [^\n]*\)\.ok")
+#: pytest's report of a refusal other than the one the test expected: the
+#: refusal, as the input its pattern did not match.
 _CONSUMER_UNEXPECTED = re.compile(
     r"AssertionError: Regex pattern did not match\.\n Regex: [^\n]*\n "
-    r"Input: [\"'][^\n]*?" + _CONSUMER_REFUSAL)
+    r"Input: \"[^\n\"]*: " + _CONSUMER_REFUSAL
+    + r"(?:\\n" + _CONSUMER_REFUSAL + r")*\"")
 #: The refusal as `openxdox.snapshot` raises it, which pytest then matched
 #: against the refusal the test expected.
 _CONSUMER_RAISED = re.compile(
@@ -241,12 +256,18 @@ def _reaches_doc_health(final: str, text: str) -> bool:
 
 
 def _needs_the_rail(final: str, text: str) -> bool:
-    """openDox's status-exemption seam refused, with no rail registered, and
-    nothing else is missing."""
+    """openDox's status-exemption seam refused, with no rail registered, in
+    its own words and nothing after them, and nothing else is missing."""
+    refusal = _rail_refusal()
+    if refusal is None:
+        return False
+    whole = (final == ("opendox.doxbench_packet.StatusExemptionNotRegistered: "
+                       + refusal)
+             or re.fullmatch(_RAIL_THROUGH_ATTRIBUTE + re.escape(refusal)
+                             + r"\)", final) is not None)
     shown = _signals(text)
-    return ((_RAIL.match(final) or _RAIL_THROUGH_ATTRIBUTE.match(final))
-            is not None
-            and not (shown["modules"] or shown["files"] or shown["consumer"]))
+    return whole and not (shown["modules"] or shown["files"]
+                          or shown["consumer"])
 
 
 def _reads_openxfactory_contracts(final: str, text: str) -> bool:
@@ -255,12 +276,11 @@ def _reads_openxfactory_contracts(final: str, text: str) -> bool:
     missing file, even one beside those in the same `contracts/`, is some
     other defect."""
     missing = _CONTRACT_MISSING.fullmatch(final)
-    unrun = _CONTRACT_UNRUN.match(final)
+    unrun = _CONTRACT_UNRUN.fullmatch(final)
     if missing:
         named = _resolved(missing.group("path")) in _CONTRACT_FILES
     elif unrun:
-        named = (_resolved(unrun.group("path")) == _CONTRACT_VALIDATOR
-                 and _ASSERTED_ON_A_PROCESS.search(text) is not None)
+        named = _resolved(unrun.group("path")) == _CONTRACT_VALIDATOR
     else:
         return False
     shown = _signals(text)
@@ -274,9 +294,8 @@ def _needs_the_consumer_schemas(final: str, text: str) -> bool:
     an assertion, so pytest's account of the assertion must show the
     validator's result, or the `SnapshotInvalid` that carried it."""
     shown = _signals(text)
-    asserted = (_CONSUMER_ASSERTED.match(final) is not None
-                and _ASSERTED_ON_A_HARNESS_FAILURE.search(text) is not None)
-    unexpected = (_CONSUMER_UNEXPECTED.match(final) is not None
+    asserted = _CONSUMER_ASSERTED.fullmatch(final) is not None
+    unexpected = (_CONSUMER_UNEXPECTED.fullmatch(final) is not None
                   and _CONSUMER_RAISED.search(text) is not None)
     return ((asserted or unexpected)
             and not (shown["modules"] or shown["files"] or shown["rail"]))
@@ -321,37 +340,36 @@ def _at_collection(*exceptions: str) -> tuple:
 
 
 _DOC_HEALTH_CAUSE = "ModuleNotFoundError: No module named 'doc_health'"
-_RAIL_CAUSE = ("opendox.doxbench_packet.StatusExemptionNotRegistered: no "
-               "status-exemption rail is registered at openDox's "
-               "status-exemption seam (opendox.doxbench_packet), so no source "
-               "can be marked")
+_RAIL_REFUSAL = _rail_refusal() or "<no status-exemption seam at this pin>"
+_RAIL_CAUSE = ("opendox.doxbench_packet.StatusExemptionNotRegistered: "
+               + _RAIL_REFUSAL)
 _RAIL_ATTRIBUTE = (
     "AttributeError: module 'opendox.doxbench_packet' has no attribute "
     "'is_compression_exempt': the status-exemption rail cannot answer it "
-    "(no status-exemption rail is registered at openDox's status-exemption "
-    "seam (opendox.doxbench_packet), so no source can be marked)")
+    f"({_RAIL_REFUSAL})")
 _CONSUMER_CAUSE = (
     f"ERROR harness failure: {LEG_ROOT / 'contracts' / 'schemas'} carries "
     "none of the family's 10 schemas (this tree carries no contracts/ and "
     "CONTRACTS_DIR is not set; export it as the spec leg's contracts "
-    "directory), so nothing can be validated")
+    "directory), so nothing can be validated and no mode may report success")
 _GATE_INTENT = (LEG_ROOT.parent / "contracts" / "schemas"
                 / "gate-intent.schema.yaml")
 _UNRELATED = "AssertionError: an unrelated failure"
 
 
-def _unrun(path, *, asserted_on_the_process: bool = True) -> tuple:
+def _unrun(path, *, asserted_on_the_process: bool = True,
+           trailing: str = "") -> tuple:
     """The validator's test asserting on the exit status of a run the
-    interpreter could not start. Without pytest's `where` line, it is a bare
-    assertion quoting the same words."""
+    interpreter could not start, as pytest reports it. Without pytest's
+    `where` line, it is a bare assertion quoting the same words."""
     message = (f"AssertionError: /usr/bin/python3: can't open file "
                f"'{path}': [Errno 2] No such file or directory\n  \n"
                "assert 2 == 0")
-    e_lines = [f"E   {line}" for line in message.splitlines()]
     if asserted_on_the_process:
-        e_lines.append(f"E    +  where 2 = CompletedProcess(args=['python3', "
-                       f"'{path}'], returncode=2).returncode")
-    return message, e_lines
+        message += (f"\n +  where 2 = CompletedProcess(args=['python3', "
+                    f"'{path}'], returncode=2).returncode")
+    message += trailing
+    return message, [f"E   {line}" for line in message.splitlines()]
 
 
 def _after(exception: str, result: tuple) -> tuple:
@@ -360,15 +378,33 @@ def _after(exception: str, result: tuple) -> tuple:
     return message, [f"E   {exception}", *e_lines]
 
 
-def _asserted_on_the_validator(cause: str, *, with_result: bool = True):
-    """The snapshot test asserting on the consumer validator's result.
-    Without pytest's `where` line, it is a bare assertion quoting the same
-    words."""
-    message = f"AssertionError: {cause}\n\nassert False"
-    e_lines = [f"E   {line}" for line in message.splitlines()]
+def _asserted_on_the_validator(cause: str, *, with_result: bool = True,
+                               trailing: str = "") -> tuple:
+    """The snapshot test asserting on the consumer validator's result, as
+    pytest reports it: the refusal the validator printed twice, then the
+    assertion. Without pytest's `where` line, it is a bare assertion quoting
+    the same words."""
+    message = f"AssertionError: {cause}\n  {cause}\n  \nassert False"
     if with_result:
-        e_lines.append("E    +  where False = ValidationResult(ok=False, "
-                       f"returncode=2, stdout='', stderr='{cause}').ok")
+        message += ("\n +  where False = ValidationResult(ok=False, "
+                    "returncode=2, stdout='', stderr='...').ok")
+    message += trailing
+    return message, [f"E   {line}" for line in message.splitlines()]
+
+
+def _unexpected(cause: str, *, raised: bool = True,
+                trailing: str = "") -> tuple:
+    """The snapshot test meeting the refusal where it expected another, as
+    pytest reports it: the `SnapshotInvalid` raised, and the pattern that
+    did not match it. Without the raise, it is a bare assertion quoting the
+    same words."""
+    carried = f"/tmp/x/bad.json: {cause}"
+    message = ("AssertionError: Regex pattern did not match.\n Regex: "
+               "'dangling|unknown document'\n Input: "
+               f"\"{carried}\\n{cause}{trailing}\"")
+    e_lines = [f"E   {line}" for line in message.splitlines()]
+    if raised:
+        e_lines.insert(0, f"E   openxdox.snapshot.SnapshotInvalid: {carried}")
     return message, e_lines
 
 
@@ -383,6 +419,8 @@ EVIDENCE_CASES = {
     "a doc_health module": (
         _raised("ModuleNotFoundError: No module named 'doc_health.corpus'"),
         "doc_health"),
+    "doc_health, with text after it": (
+        _raised(_DOC_HEALTH_CAUSE + " (and an unrelated failure)"), None),
     "doc_health's words in an assertion": (
         _raised("AssertionError: No module named 'doc_health'"), None),
     "doc_health's whole exception quoted in an assertion": (
@@ -401,6 +439,11 @@ EVIDENCE_CASES = {
         _raised(_RAIL_CAUSE, _RAIL_ATTRIBUTE), "status-exemption-rail"),
     "the rail's whole refusal quoted in an assertion": (
         _raised("AssertionError: " + _RAIL_CAUSE), None),
+    "the rail's refusal, with text after it": (
+        _raised(_RAIL_CAUSE + " And an unrelated diagnostic."), None),
+    "the rail's AttributeError, with text after it": (
+        _raised(_RAIL_CAUSE, _RAIL_ATTRIBUTE + " And an unrelated diagnostic."),
+        None),
     "the rail's words in another error": (
         _raised("RuntimeError: no status-exemption rail is registered at "
                 "openDox's status-exemption seam (opendox.doxbench_packet)"),
@@ -427,6 +470,11 @@ EVIDENCE_CASES = {
         _unrun(_CONTRACT_VALIDATOR), "openxfactory-contracts"),
     "the validator's words in a bare assertion": (
         _unrun(_CONTRACT_VALIDATOR, asserted_on_the_process=False), None),
+    "the validator unrun, with a line after pytest's account": (
+        _unrun(_CONTRACT_VALIDATOR, trailing="\nand an unrelated failure"),
+        None),
+    "a known schema missing, with text after it": (
+        _raised(_missing(_GATE_INTENT) + " and an unrelated failure"), None),
     "a known schema's whole exception quoted in an assertion": (
         _raised("AssertionError: " + _missing(_GATE_INTENT)), None),
     "a known schema, then an unrelated missing file while handling it": (
@@ -464,15 +512,16 @@ EVIDENCE_CASES = {
         _asserted_on_the_validator(_CONSUMER_CAUSE, with_result=False),
         None),
     "the refusal where another refusal was expected": (
-        _raised("openxdox.snapshot.SnapshotInvalid: /tmp/x/bad.json: "
-                + _CONSUMER_CAUSE,
-                "AssertionError: Regex pattern did not match.\n Regex: "
-                "'dangling|unknown document'\n Input: \"/tmp/x/bad.json: "
-                + _CONSUMER_CAUSE + "\""), "consumer-schemas"),
+        _unexpected(_CONSUMER_CAUSE), "consumer-schemas"),
     "a regex mismatch quoting the refusal, with nothing raising it": (
-        _raised("AssertionError: Regex pattern did not match.\n Regex: "
-                "'dangling|unknown document'\n Input: \"/tmp/x/bad.json: "
-                + _CONSUMER_CAUSE + "\""), None),
+        _unexpected(_CONSUMER_CAUSE, raised=False), None),
+    "the unexpected refusal, with unrelated text in its input": (
+        _unexpected(_CONSUMER_CAUSE, trailing=" and an unrelated failure"),
+        None),
+    "the refusal asserted on, with a line after pytest's account": (
+        _asserted_on_the_validator(_CONSUMER_CAUSE,
+                                   trailing="\nand an unrelated failure"),
+        None),
     "CONTRACTS_DIR's words in an unrelated assertion": (
         _raised("AssertionError: CONTRACTS_DIR is not set"), None),
     "the refusal for another tree's schemas": (
