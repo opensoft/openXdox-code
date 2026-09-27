@@ -170,11 +170,19 @@ _CONSUMER_REFUSAL = (
                 "report success"))
 #: The assertion on the validator's result: the refusal as the validator
 #: printed it, then pytest's account of the assertion, which reads a harness
-#: failure, exit 2.
+#: failure, exit 2, and shows the result.
 _CONSUMER_ASSERTED = re.compile(
-    "AssertionError: " + _CONSUMER_REFUSAL + "(?:\n  " + _CONSUMER_REFUSAL
-    + r")*\n *\nassert False\n \+  where False = "
-    r"ValidationResult\(ok=False, returncode=2, [^\n]*\)\.ok")
+    "AssertionError: (?P<refusal>" + _CONSUMER_REFUSAL + ")(?:\n  "
+    + _CONSUMER_REFUSAL + r")*\n *\nassert False\n \+  where False = "
+    r"(?P<result>ValidationResult\(ok=False, returncode=2, [^\n]*\))\.ok")
+#: That result as it starts: nothing on stdout, then stderr.
+_RESULT_START = "ValidationResult(ok=False, returncode=2, stdout='', stderr="
+#: The reason `validate_snapshot` in this checkout's `src/openxdox/snapshot.py`
+#: gives a validator that exits 2, which its contract calls a harness error.
+#: The result's repr ends with it.
+_HARNESS_ERROR = ("the validator exited 2, which is a HARNESS error in its "
+                  "own documented contract (0 ok, 1 findings, 2 harness "
+                  "error) \u2014 it never reached a verdict on this snapshot")
 #: pytest's report of a refusal other than the one the test expected: the
 #: refusal, as the input its pattern did not match.
 _CONSUMER_UNEXPECTED = re.compile(
@@ -328,15 +336,34 @@ def _reads_openxfactory_contracts(final: str, before: list,
             and not (shown["modules"] or shown["rail"] or shown["consumer"]))
 
 
+def _shows_the_refusal_alone(result: str, refusal: str) -> bool:
+    """pytest's account of the validator's result shows a validator that
+    printed the refusal and nothing else, under the reason a harness error
+    gets. pytest shows a repr this long as its start and its end around
+    `...`, keeping as many characters of the end as of the start, or one
+    more. So the start must be the result's with stdout empty and stderr the
+    refusal, and the end must be the harness error's reason. Any other
+    outcome, or another diagnostic where those show, is not this cause."""
+    head, elided, tail = result.partition("...")
+    return (elided == "..." and len(head) > len(_RESULT_START)
+            and len(tail) - len(head) in (0, 1)
+            and (_RESULT_START + repr(refusal + "\n")).startswith(head)
+            and (repr(_HARNESS_ERROR) + ")").endswith(tail))
+
+
 def _needs_the_consumer_schemas(final: str, before: list,
                                 text: str) -> bool:
     """The consumer validator refused for want of its schemas, in its own
     words, and nothing else is missing. Its refusal reaches the test inside
-    an assertion, so pytest's account of the assertion must show the
-    validator's result, on its own, or come under the `SnapshotInvalid` that
-    carried the refusal and nothing else."""
+    an assertion. So pytest's account of the assertion must show the
+    validator's result, holding the refusal alone, and nothing before it. Or
+    the refusal must come under the `SnapshotInvalid` that carried it, and
+    nothing else."""
     shown = _signals(text)
-    asserted = _CONSUMER_ASSERTED.fullmatch(final) is not None and not before
+    asserted_on = _CONSUMER_ASSERTED.fullmatch(final)
+    asserted = (asserted_on is not None and not before
+                and _shows_the_refusal_alone(asserted_on.group("result"),
+                                             asserted_on.group("refusal")))
     unexpected = (_CONSUMER_UNEXPECTED.fullmatch(final) is not None
                   and len(before) == 1
                   and _CONSUMER_RAISED.fullmatch(before[0]) is not None)
@@ -432,16 +459,38 @@ def _after(exception: str, result: tuple) -> tuple:
                      _DURING_HANDLING, *lines]
 
 
+def _elided(text: str) -> str:
+    """A repr as pytest shows it in an assertion's account at the child's
+    verbosity: over 240 characters, its first 118 and last 119 around
+    `...`."""
+    return text if len(text) <= 240 else text[:118] + "..." + text[-119:]
+
+
+def _validation_result(*, stdout: str = "", stderr: str,
+                       outcome: str = "validator-unavailable",
+                       reason: str | None = _HARNESS_ERROR) -> str:
+    """The repr of the result `validate_snapshot` returns, with this
+    checkout's validator."""
+    validator = (LEG_ROOT / "scripts"
+                 / "validate-ideation-dashboard-contracts.py")
+    return (f"ValidationResult(ok=False, returncode=2, stdout={stdout!r}, "
+            f"stderr={stderr!r}, validator={validator!r}, "
+            f"outcome={outcome!r}, unavailable_reason={reason!r})")
+
+
 def _asserted_on_the_validator(cause: str, *, with_result: bool = True,
+                               result: str | None = None,
                                trailing: str = "") -> tuple:
     """The snapshot test asserting on the consumer validator's result, as
-    pytest reports it: the refusal the validator printed twice, then the
-    assertion. Without pytest's `where` line, it is a bare assertion quoting
-    the same words."""
+    pytest reports it: the test's message, which is the last line the
+    validator printed and then all it printed, then the assertion and the
+    result. By default the validator printed the refusal alone, on stderr.
+    Without pytest's `where` line, it is a bare assertion quoting the same
+    words."""
     message = f"AssertionError: {cause}\n  {cause}\n  \nassert False"
     if with_result:
-        message += ("\n +  where False = ValidationResult(ok=False, "
-                    "returncode=2, stdout='', stderr='...').ok")
+        shown = _elided(result or _validation_result(stderr=cause + "\n"))
+        message += f"\n +  where False = {shown}.ok"
     message += trailing
     return message, [f"E   {line}" for line in message.splitlines()]
 
@@ -625,6 +674,20 @@ EVIDENCE_CASES = {
         _after(_OTHER, _unrun(_CONTRACT_VALIDATOR)), None),
     "the refusal asserted on, while handling an unrelated exception": (
         _after(_OTHER, _asserted_on_the_validator(_CONSUMER_CAUSE)), None),
+    "the refusal asserted on, from a snapshot the validator found "
+    "unreadable": (
+        _asserted_on_the_validator(_CONSUMER_CAUSE, result=_validation_result(
+            stderr=_CONSUMER_CAUSE + "\n", outcome="not-conformant",
+            reason=None)), None),
+    "the refusal asserted on, from a validator that also printed to "
+    "stdout": (
+        _asserted_on_the_validator(_CONSUMER_CAUSE, result=_validation_result(
+            stdout="an unrelated diagnostic\n",
+            stderr=_CONSUMER_CAUSE + "\n")), None),
+    "the refusal asserted on, after another diagnostic on stderr": (
+        _asserted_on_the_validator(_CONSUMER_CAUSE, result=_validation_result(
+            stderr="an unrelated diagnostic\n" + _CONSUMER_CAUSE + "\n")),
+        None),
     "the unexpected refusal, its SnapshotInvalid raised while handling an "
     "unrelated exception": (
         _after(_OTHER, _unexpected(_CONSUMER_CAUSE)), None),
@@ -867,7 +930,8 @@ def test_the_evidence_takes_each_cause_as_raised_and_alone(case):
     file that gained an unrelated failure could have it hidden under a
     declared reason: a failure raised while handling the cause, the cause
     raised while handling an unrelated failure, a quoted phrase, an unrelated
-    missing file beside a known one, or a look-alike path."""
+    missing file beside a known one, a result that shows another outcome, or
+    a look-alike path."""
     (message, lines), expected = EVIDENCE_CASES[case]
     taken = _taken(message, lines)
     assert taken == ([expected] if expected else []), (
