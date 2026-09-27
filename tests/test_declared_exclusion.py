@@ -127,9 +127,13 @@ REASONS = {reason["id"]: reason for reason in DECLARATION.get("reasons") or []}
 # files' 233 red results take when each file runs alone.
 # ---------------------------------------------------------------------------
 
-#: `doc_health`, or one of its modules, raised missing.
-_DOC_HEALTH = re.compile(
-    r"ModuleNotFoundError: No module named 'doc_health(?:\.[\w.]+)?'")
+#: `doc_health` raised missing. Where it is absent, the interpreter names
+#: `doc_health` itself whichever of its modules was imported (`import
+#: doc_health.corpus` raises `No module named 'doc_health'`), so every
+#: `doc_health` result the listed files give alone shows exactly this. A
+#: result that names a module inside it, well formed or not, did not come
+#: from importing it where it is absent.
+_DOC_HEALTH = "ModuleNotFoundError: No module named 'doc_health'"
 
 #: The refusal as openDox raises it, up to its words.
 _RAIL_RAISED = "opendox.doxbench_packet.StatusExemptionNotRegistered: "
@@ -332,17 +336,13 @@ def _signals(text: str) -> dict:
             "consumer": _ANY_CONSUMER in text}
 
 
-def _is_doc_health(module: str) -> bool:
-    return module == "doc_health" or module.startswith("doc_health.")
-
-
 def _reaches_doc_health(final: str, before: list, text: str) -> bool:
     """openxFactory's corpus machinery, which `src/openxdox/generator.py`,
     `gate_console.py` and the rest import at module level, raised missing,
     on its own, and no other module, file or refusal."""
     shown = _signals(text)
-    return (_DOC_HEALTH.fullmatch(final) is not None and not before
-            and all(_is_doc_health(module) for module in shown["modules"])
+    return (final == _DOC_HEALTH and not before
+            and shown["modules"] == {"doc_health"}
             and not (shown["files"] or shown["rail"] or shown["consumer"]))
 
 
@@ -537,9 +537,23 @@ EVIDENCE_CASES = {
     "doc_health, at collection": (
         _at_collection(_DOC_HEALTH_CAUSE), "doc_health"),
     "doc_health, in a test": (_raised(_DOC_HEALTH_CAUSE), "doc_health"),
-    "a doc_health module": (
+    "a module inside doc_health, which its absence never names": (
         _raised("ModuleNotFoundError: No module named 'doc_health.corpus'"),
-        "doc_health"),
+        None),
+    "a module inside doc_health, at collection": (
+        _at_collection(
+            "ModuleNotFoundError: No module named 'doc_health.corpus'"),
+        None),
+    "a malformed module inside doc_health, with a doubled dot": (
+        _raised("ModuleNotFoundError: No module named 'doc_health..x'"),
+        None),
+    "a malformed module inside doc_health, with a trailing dot": (
+        _raised("ModuleNotFoundError: No module named 'doc_health.x.'"),
+        None),
+    "doc_health, with a module inside it shown too": (
+        (_DOC_HEALTH_CAUSE, [f"E   {_DOC_HEALTH_CAUSE}",
+                             "E   No module named 'doc_health.corpus'"]),
+        None),
     "doc_health, with text after it": (
         _raised(_DOC_HEALTH_CAUSE + " (and an unrelated failure)"), None),
     "doc_health's words in an assertion": (

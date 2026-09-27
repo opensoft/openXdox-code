@@ -227,6 +227,16 @@ jobs:
       # amends leave that file at 74. Skipped is unchanged, because none of
       # them skips on a runner with node, which this one is.
       #
+      # RAISED BY #31 (plan 034 T042, box 9.3: `tests/integration/`), the same
+      # way: run 36355557215 (2026-09-27) measured `4ae1c5c4`, the head before
+      # this change, at openDox-code `2d116415`: selected 574, passed 568,
+      # skipped 6, failures 0, errors 0. The +10 on both floors is the ten
+      # tests the `integration (9.3)` step runs, which is the second report
+      # this triple now sums. The named list is unchanged at 564/558/6.
+      # Skipped is unchanged, because nothing in `tests/integration/` skips,
+      # and the one test that step leaves out until T008 is deselected, which
+      # no report counts.
+      #
       # THE SKIPS ARE NAMED, which is why the exact pin is safe to take. SIX
       # are the three seam suites' `doc_health` pairs, the six this file has
       # always named and 9.4 asks about: two each in
@@ -251,8 +261,8 @@ jobs:
           # FLOORS - may only RISE, and only with the reason in the commit
           # message. Set to the measured values, which this suite has
           # actually met on CI rather than an aspiration.
-          MIN_SELECTED: "564"
-          MIN_PASSED: "558"
+          MIN_SELECTED: "574"
+          MIN_PASSED: "568"
           # EXACT - the load-bearing number.
           EXPECT_SKIPPED: "6"
         run: |
