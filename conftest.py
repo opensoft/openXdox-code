@@ -90,6 +90,12 @@ _REASON_KEYS = {*_REASON_FIELDS, "only"}
 _ENTRY_KEYS = {"path", "reasons", "note"}
 #: A reason id is printed in a comma-separated list, so it is one plain token.
 _REASON_ID = re.compile(r"[a-z][a-z0-9_-]*")
+#: The reasons the rulings admit, and no other: R1Q6 (d) (`doc_health`,
+#: openxFactory#656 comment 5817152735); R1Q24 (a) (the rail and the
+#: contracts) and R1Q25 (b) (the consumer's schemas), comment 5850003126. A
+#: fifth needs a ruling before it needs a line here.
+ADMITTED_REASONS = ("doc_health", "status-exemption-rail",
+                    "openxfactory-contracts", "consumer-schemas")
 
 
 class DeclaredExclusionRefused(Exception):
@@ -100,6 +106,50 @@ def _is_integer(value) -> bool:
     """An integer as YAML writes one. Not a `bool`, which Python counts as an
     `int`, and not a float, which compares equal to one."""
     return type(value) is int
+
+
+def _is_one_line(text: str) -> bool:
+    """Text the run can print as one line: no line break of any kind, a
+    trailing one included."""
+    return text.splitlines() == [text]
+
+
+class _KeyGivenTwice(Exception):
+    """One mapping in the declaration gives the same key twice."""
+
+    def __init__(self, key, line: int):
+        super().__init__(key, line)
+        self.key, self.line = key, line
+
+
+class _DeclarationLoader(_yaml.SafeLoader):
+    """PyYAML's safe loader, except that a mapping giving one key twice is
+    refused. PyYAML keeps the last and drops the first without a word. So a
+    second `entries:` would un-declare every file the first one listed, and a
+    `reasons:` given twice in one entry would swap that entry's reasons."""
+
+    def construct_mapping(self, node, deep=False):
+        self.flatten_mapping(node)
+        seen = set()
+        for key_node, _ in node.value:
+            key = self.construct_object(key_node, deep=deep)
+            try:
+                given_twice = key in seen
+            except TypeError:  # unhashable: PyYAML refuses that key itself
+                continue
+            if given_twice:
+                raise _KeyGivenTwice(key, key_node.start_mark.line + 1)
+            seen.add(key)
+        return super().construct_mapping(node, deep=deep)
+
+
+def _read_declaration(text: str):
+    """`yaml.safe_load`, through the loader that refuses a key given twice."""
+    loader = _DeclarationLoader(text)
+    try:
+        return loader.get_single_data()
+    finally:
+        loader.dispose()
 
 
 def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
@@ -114,7 +164,10 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
             "exclude a set nobody declared (plan 034 T041).")
 
     try:
-        data = _yaml.safe_load(path.read_text(encoding="utf-8"))
+        data = _read_declaration(path.read_text(encoding="utf-8"))
+    except _KeyGivenTwice as exc:
+        refuse(f"it gives the key {exc.key!r} twice in one mapping (line "
+               f"{exc.line}), and YAML would keep only the last")
     except (OSError, _yaml.YAMLError) as exc:
         refuse(f"it cannot be read ({exc})")
     if not isinstance(data, dict):
@@ -144,6 +197,15 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
         if not _REASON_ID.fullmatch(reason["id"]):
             refuse(f"the reason id {reason['id']!r} is not a lowercase token "
                    "(a letter, then letters, digits, - and _)")
+        if reason["id"] not in ADMITTED_REASONS:
+            refuse(f"the reason {reason['id']} is not one the rulings admit "
+                   f"({', '.join(ADMITTED_REASONS)}); a fifth needs a ruling "
+                   "first")
+        multiline = [field for field in _REASON_FIELDS
+                     if not _is_one_line(reason[field])]
+        if multiline:
+            refuse(f"the reason {reason['id']}'s {', '.join(multiline)} is "
+                   "not one line, and the run prints each reason on one line")
         ids.append(reason["id"])
     if len(set(ids)) != len(ids):
         refuse("a reason id is declared twice")
@@ -176,7 +238,8 @@ def load_declared_exclusion(path: Path = DECLARED_EXCLUSION_FILE) -> dict:
         if len(set(named)) != len(named):
             refuse(f"{entry['path']} names one reason twice")
         note = entry.get("note")
-        if note is not None and not (isinstance(note, str) and note.strip()):
+        if note is not None and not (isinstance(note, str) and note.strip()
+                                     and _is_one_line(note)):
             refuse(f"{entry['path']}'s note is not a line of text")
         paths.append(entry["path"])
     if len(set(paths)) != len(paths):

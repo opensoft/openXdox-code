@@ -340,6 +340,13 @@ def test_every_entry_names_a_test_file_this_checkout_carries():
 # The root conftest takes the declaration into effect, and refuses a broken one.
 # ---------------------------------------------------------------------------
 
+def test_the_root_conftest_admits_the_same_four_reasons(request):
+    """The conftest refuses any other reason at load. This holds its list and
+    this module's to one set, so neither can admit a fifth alone."""
+    root = _root_conftest(request.config)
+    assert set(root.ADMITTED_REASONS) == set(RULED_REASONS)
+
+
 def test_the_root_conftest_derives_collect_ignore_from_the_file(request):
     root = _root_conftest(request.config)
     assert root.collect_ignore == [entry["path"] for entry in ENTRIES]
@@ -404,6 +411,18 @@ BROKEN_DECLARATIONS = {
         lambda d: d.update(counts=d["count"]), "has an unknown key"),
     "a note that is not text": (
         lambda d: d["entries"][0].update(note=5), "is not a line of text"),
+    "a note over two lines": (
+        lambda d: d["entries"][0].update(note="one\ntwo"),
+        "is not a line of text"),
+    "a reason the rulings do not admit": (
+        lambda d: d["reasons"][0].update(id="some-other-reason"),
+        "is not one the rulings admit"),
+    "a reason text over two lines": (
+        lambda d: d["reasons"][0].update(reason="one\ntwo"),
+        "is not one line"),
+    "a reason text broken by a carriage return": (
+        lambda d: d["reasons"][0].update(reason="one\rtwo"),
+        "is not one line"),
 }
 
 
@@ -417,6 +436,42 @@ def test_the_root_conftest_refuses_a_declaration_that_breaks_a_rule(
     broken = tmp_path / "declared_exclusion.yaml"
     broken.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
     with pytest.raises(root.DeclaredExclusionRefused, match=re.escape(rule)):
+        root.load_declared_exclusion(broken)
+
+
+#: A key given twice in one mapping, which plain YAML settles by keeping the
+#: last: an edit of the committed text, and the key its refusal must name.
+KEYS_GIVEN_TWICE = {
+    "a second entries list": (
+        lambda text: text + ("entries:\n"
+                             "  - {path: tests/test_canvas.py, "
+                             "reasons: [doc_health]}\n"),
+        "entries"),
+    "reasons given twice in one entry": (
+        lambda text: text.replace(
+            "{path: tests/test_canvas.py, reasons: [doc_health]}",
+            "{path: tests/test_canvas.py, reasons: [doc_health], "
+            "reasons: [status-exemption-rail]}", 1),
+        "reasons"),
+}
+
+
+@pytest.mark.parametrize("breakage", sorted(KEYS_GIVEN_TWICE))
+def test_the_root_conftest_refuses_a_key_given_twice(breakage, request,
+                                                     tmp_path):
+    """Plain YAML loads both edits. It keeps the last key and drops the first
+    without a word, so the first list, or the first reasons, would go
+    undeclared. The root conftest refuses them instead."""
+    root = _root_conftest(request.config)
+    edit, key = KEYS_GIVEN_TWICE[breakage]
+    text = DECLARATION_FILE.read_text(encoding="utf-8")
+    edited = edit(text)
+    assert edited != text, "the edit no longer applies to the committed text"
+    assert isinstance(yaml.safe_load(edited), dict)
+    broken = tmp_path / "declared_exclusion.yaml"
+    broken.write_text(edited, encoding="utf-8")
+    with pytest.raises(root.DeclaredExclusionRefused,
+                       match=re.escape(f"gives the key {key!r} twice")):
         root.load_declared_exclusion(broken)
 
 
