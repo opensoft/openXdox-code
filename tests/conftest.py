@@ -235,21 +235,30 @@ SERVE_SURFACE_MODULES: tuple[str, ...] = (
 #     openxFactory (`not_moved`, `stays_openxfactory_adapter`).
 # So the lane column is the one file of the tuple this leg cannot read. It is
 # NAMED here rather than dropped from the tuple: the tuple stays the whole
-# surface, and a file missing for any other reason still refuses the read.
+# surface, and a file missing for any other reason still refuses the read. The
+# declaration is held to its word as well (`assert_not_at_this_leg`): once the
+# file is here, the readers refuse until the name leaves this tuple.
 SERVE_SURFACE_NOT_AT_THIS_LEG: tuple[str, ...] = ("serve_openxfactory_lanes.py",)
+
+
+def carved_module_homes(name: str) -> tuple[Path, Path]:
+    """The two places the pre-carve module `scripts/ideation_dashboard/<name>`
+    can live at this leg: this leg's own `src/openxdox/`, and the openDox it
+    pins."""
+    import opendox  # the PINNED openDox, resolved as `opendox_bundle.find()` does
+
+    return (REPO_ROOT / "src" / "openxdox" / name,
+            Path(opendox.__file__).resolve().parent / name)
 
 
 def carved_module_path(name: str) -> Path:
     """Where the pre-carve module `scripts/ideation_dashboard/<name>` lives at
-    this leg: in this leg's own `src/openxdox/`, or in the openDox it pins.
+    this leg: in one of its two `carved_module_homes`.
 
     Refuses a name found in both homes or in neither, so a resolution can never
     quietly pick one, and a module that moved again reads as a failure rather
     than as a scan that got smaller."""
-    import opendox  # the PINNED openDox, resolved as `opendox_bundle.find()` does
-
-    homes = (REPO_ROOT / "src" / "openxdox" / name,
-             Path(opendox.__file__).resolve().parent / name)
+    homes = carved_module_homes(name)
     found = [path for path in homes if path.is_file()]
     if len(found) != 1:
         raise FileNotFoundError(
@@ -259,10 +268,29 @@ def carved_module_path(name: str) -> Path:
     return found[0]
 
 
+def assert_not_at_this_leg(names: tuple[str, ...]) -> None:
+    """Hold a "not at this leg" declaration to its word: each name must be in
+    NEITHER of its `carved_module_homes`.
+
+    A scan skips a declared name. If the module then arrives here, the scan
+    would skip code this leg carries and stay green, so this refuses instead.
+    The repair is to drop the name from the declaration, so the scan reads it.
+    """
+    for name in names:
+        present = [path for path in carved_module_homes(name)
+                   if path.is_file()]
+        if present:
+            raise AssertionError(
+                f"{name} is declared not at this leg, but it is here: "
+                f"{[str(path) for path in present]}. Drop it from the "
+                f"declaration, so the scan reads it.")
+
+
 def serve_surface_paths() -> tuple[Path, ...]:
     """Every file the dashboard serve is made of that this leg can read, in
-    import-graph order: the tuple above less `SERVE_SURFACE_NOT_AT_THIS_LEG`,
-    each at its carved home (`carved_module_path`).
+    import-graph order: the tuple above less `SERVE_SURFACE_NOT_AT_THIS_LEG`
+    (held to its word by `assert_not_at_this_leg`), each at its carved home
+    (`carved_module_path`).
 
     Dependency-first: `serve_wire.py` imports no sibling; `serve_workbench.py`,
     `serve_project.py`, `serve_gate.py` and `serve_projection.py` each import
@@ -280,6 +308,7 @@ def serve_surface_paths() -> tuple[Path, ...]:
     substring/absence, or a `.index()` search that resolves within a single
     file's own content) — only the docstring claim above does.
     """
+    assert_not_at_this_leg(SERVE_SURFACE_NOT_AT_THIS_LEG)
     return tuple(carved_module_path(name) for name in SERVE_SURFACE_MODULES
                  if name not in SERVE_SURFACE_NOT_AT_THIS_LEG)
 
