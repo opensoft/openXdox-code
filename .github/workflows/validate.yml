@@ -590,21 +590,34 @@ jobs:
       # each step writes its own, and a report that did not appear is a
       # refusal, not a smaller sum.
       #
-      # WHAT IS PINNED IS WHAT THIS JOB COLLECTS, AND THAT IS THE LIST ABOVE
-      # — 16 named files under `--noconftest`, never a directory, while 85
-      # `test_*.py` exist under `tests/`. The step above records the reason
-      # in its own words: "`--noconftest` STAYS, and it is why this list is a
-      # list: `tests/conftest.py` imports the carved session fixtures, which
-      # reach both absent packages." A directory run is therefore not merely
-      # unused here, it is unavailable, and pinning a number this job does
-      # not produce would pin nothing.
+      # WHAT IS PINNED IS WHAT THIS JOB COLLECTS, AND THAT IS TWO THINGS.
       #
-      # SO WHAT MOVES THESE NUMBERS IS EDITING THAT LIST, and nothing else.
-      # No conftest is loaded, so no collection-ignore mechanism can reach
-      # them. Adding a file raises SELECTED and PASSED — floors permit a
-      # rise, and the commit that adds it should raise them WITH the reason
-      # so the margin keeps meaning something. Removing one lowers them and
-      # the floor refuses: find the tests, do not lower the floor.
+      # THE `pytest` STEP'S LIST — 16 named files under `--noconftest`, never
+      # a directory, while 85 `test_*.py` existed under `tests/` when #25
+      # took this pin. That step records the reason in its own words:
+      # "`--noconftest` STAYS, and it is why this list is a list:
+      # `tests/conftest.py` imports the carved session fixtures, which reach
+      # both absent packages." A directory run of `tests/` was therefore not
+      # merely unused here, it was unavailable, and pinning a number this job
+      # does not produce would pin nothing.
+      #
+      # AND, SINCE T042, ONE DIRECTORY: `tests/integration/`, which the
+      # `integration (9.3)` step runs with the chain in play, as F9.2 runs
+      # each file in it. Every test there takes the declared composition and
+      # none skips, so what it adds to the triple is tests that ran at the
+      # pin. T043 replaces both steps with the whole suite less the declared
+      # exclusion, and this paragraph goes with them.
+      #
+      # SO WHAT MOVES THESE NUMBERS IS EDITING THAT LIST OR WHAT
+      # `tests/integration/` HOLDS, and nothing else. The list loads no
+      # conftest, so no collection-ignore mechanism can reach it. The
+      # directory loads the chain, whose one `collect_ignore` (the root
+      # `conftest.py`, T041) is refused any entry that is not a
+      # `tests/test_*.py` file directly in `tests/`, so it cannot reach the
+      # directory either. Adding a file raises SELECTED and PASSED — floors
+      # permit a rise, and the commit that adds it should raise them WITH the
+      # reason so the margin keeps meaning something. Removing one lowers them
+      # and the floor refuses: find the tests, do not lower the floor.
       #
       # THE NUMBERS ARE CI'S OWN. Measured on run 35399041710 (PR #25,
       # 2026-09-18), the first commit of that pull request having printed
