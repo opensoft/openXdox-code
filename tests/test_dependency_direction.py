@@ -22,8 +22,9 @@ manifest declares what LEAVES openxFactory). Run by `.github/workflows/
 validate.yml`, at first beside `test_leg_shape.py` on its named list; it is a
 SHAPE assertion authored at this leg, and adding it did not un-narrow RULED
 Q-L8 (b′). Since plan 034 T043 that check runs the whole suite less its
-declared exclusion, so the carved suites run there too, all but the files the
-declaration lists.
+declared exclusion and the one test it deselects until T008 (the assembled
+`--help` tree, RULED openxFactory#656 comment 5859927858). So the carved suites
+run there too, all but the files the declaration lists.
 """
 
 from __future__ import annotations

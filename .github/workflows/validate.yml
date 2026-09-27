@@ -2,7 +2,8 @@ name: validate
 
 # The required check for this leg: parity with the assembly root's own
 # `validate` gate (same name, same triggers). Since plan 034 task T043 it runs
-# the leg's whole pytest suite, less its declared exclusion.
+# the leg's whole pytest suite, less its declared exclusion and the one test
+# the `pytest` step deselects until T008, both named at that step.
 #
 # Levelled against openDox-code by the OQ-O scaffold-levelling pass
 # (openxFactory#656): same pinned pytest major, same least-privilege
