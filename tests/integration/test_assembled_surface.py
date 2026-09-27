@@ -22,12 +22,12 @@ builds to that golden twice:
     checked at the declared composition.
 Both were read at openxFactory `d90df42d`.
 
-WHY IT IS 31 AND NOT MORE. The default profile openDox registers where no host
-has contributes the runtime verbs (`RuntimeSubcommand`, R1Q5 (a)). A host that
-registers its own profile does not get them, so the assembled tree stays at 31
-entries: the root, six top-level subcommands, `gate`'s nineteen verbs and
-`model-binding`'s five. Eleven are openDox's own (research R8), and the other
-twenty are this column's `gate` tree.
+WHY IT IS 31 AND NOT MORE. The default profile, which openDox registers when no
+host has registered one, contributes the runtime verbs (`RuntimeSubcommand`,
+R1Q5 (a)). A host that registers its own profile does not get them, so the
+assembled tree stays at 31 entries: the root, six top-level subcommands,
+`gate`'s nineteen verbs and `model-binding`'s five. Eleven are openDox's own
+(research R8), and the other twenty are this column's `gate` tree.
 
 THE HOST, STOOD IN, IN A FRESH INTERPRETER. No module in this leg registers an
 openDox profile. openxFactory's `profile_openxfactory.SUBCOMMAND_EXTENSIONS` is
