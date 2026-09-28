@@ -198,10 +198,11 @@ jobs:
       #   * A test removed, or a file that JOINS the declaration, LOWERS them,
       #     and the floor refuses. A file joins only on a ruling that admits
       #     its reason, and the act that adds it re-pins these floors in the
-      #     same commit, with the reason. Plan 034 T044 is such an act: a
-      #     file whose skip joins the declaration lowers the counts. Anything
-      #     else that lowers them is tests that stopped being collected: find
-      #     them, do not lower the floor.
+      #     same commit, with the reason. Plan 034 T044 was such an act: the
+      #     file its six skips moved into joined the declaration and lowered
+      #     SELECTED, as its paragraph below records. Anything else that
+      #     lowers them is tests that stopped being collected: find them, do
+      #     not lower the floor.
       #
       # THE NUMBERS ARE CI'S OWN. Measured on run 35399041710 (PR #25,
       # 2026-09-18), the first commit of that pull request having printed
@@ -252,34 +253,58 @@ jobs:
       # and the six are unchanged. The margin is zero, as #25 set it, and
       # restoring it is plan 034 T044's (9.4, this leg's half).
       #
-      # THE SKIPS ARE NAMED, which is why the exact pin is safe to take. SIX
-      # are the three seam suites' `doc_health` pairs, the six this file has
-      # always named and 9.4 asks about: two each in
-      # `tests/test_evidence_provenance_surface_seam.py`,
+      # RE-PINNED BY plan 034 T044 (box 9.4, this leg's half: "Restore the
+      # margin, and stop the skips carrying the gap"), the same way: run
+      # 36445143486 (2026-09-28) measured `64bca95d`, the commit that set
+      # these pins, at openDox-code `2d116415`: selected 885, passed 881,
+      # skipped 4, failures 0, errors 0. The six skips that carried the
+      # gap were the three seam suites' `doc_health` pairs. T044 made each of
+      # them assert for real and moved the six into
+      # `tests/test_seam_assembly_beside_gate_and_projection.py`, which the
+      # declaration lists under `doc_health` (R1Q6 (d)), so SELECTED and
+      # SKIPPED each lose those six. The declaration's own check gains one
+      # case, that file run alone, which passes, so SELECTED and PASSED each
+      # gain one. SELECTED goes 890 -> 885, PASSED 880 -> 881 and SKIPPED
+      # 10 -> 4. The 24 seam cases that need neither column stay where they
+      # were, and pass. The floors sit ON the reading, as #25 set them and as
+      # 9.4 and T044's text read (the holder's decision for this leg, where
+      # openDox-code's T037 set its own floors three below). So the margin
+      # this step prints stays zero. What 9.4 asks to restore is that no skip
+      # in this pin carries the gap, and none now does: the four skips left
+      # are named below, and none of them waits for `doc_health`.
+      #
+      # THE SKIPS ARE NAMED, which is why the exact pin is safe to take. All
+      # FOUR are `tests/test_aggregation_register_instance.py`'s, which the
+      # sixteen-file list never ran: each skips because the "aggregation
+      # checkout (seed register + pinned validator) [is] not reachable", which
+      # is every lone checkout's state. Until plan 034 T044 there were SIX
+      # more, the three seam suites' `doc_health` pairs, which this file had
+      # always named and 9.4 asks about. Each said that "doc_health
+      # reachability is BUILD-arc work (§ 3.5/3.6) ... this test will assert
+      # for real once that lands". T044 made each assert for real, and moved
+      # them from `tests/test_evidence_provenance_surface_seam.py`,
       # `tests/test_model_scenario_workbench_seam.py` and
-      # `tests/test_role_authority_projection_seam.py`, each one saying that
-      # "doc_health reachability is BUILD-arc work (§ 3.5/3.6) ... this test
-      # will assert for real once that lands". Plan 034 T044 makes each of
-      # them assert for real, or declares its file with that reason. FOUR are
-      # `tests/test_aggregation_register_instance.py`'s, which the list never
-      # ran: each skips because the "aggregation checkout (seed register +
-      # pinned validator) [is] not reachable", which is every lone checkout's
-      # state. None comes from `tests/integration/`, where nothing skips (its
-      # rule 2). If the count moves, move the pin WITH the reason — never
-      # relax the comparison. SKIPPED is `==` where the other two are `>=`
-      # because a file that quietly turns into skips is exactly what an exact
-      # pin catches and a floor structurally cannot: the floor only looks
-      # down.
+      # `tests/test_role_authority_projection_seam.py` into
+      # `tests/test_seam_assembly_beside_gate_and_projection.py`, which the
+      # declaration lists under `doc_health`. So none of them is a skip any
+      # more, and none is in these numbers. None comes from
+      # `tests/integration/`, where nothing skips (its rule 2). If the count
+      # moves, move the pin WITH the reason — never relax the comparison.
+      # SKIPPED is `==` where the other two are `>=` because a file that
+      # quietly turns into skips is exactly what an exact pin catches and a
+      # floor structurally cannot: the floor only looks down.
       - name: Pin the triple
         shell: bash
         env:
           # FLOORS - may only RISE, and only with the reason in the commit
-          # message. Set to the measured values, which this suite has
-          # actually met on CI rather than an aspiration.
-          MIN_SELECTED: "890"
-          MIN_PASSED: "880"
+          # message, except in the act that joins a file to the declaration
+          # on a ruling, which lowers them with its reason (above). Set to
+          # the measured values, which this suite has actually met on CI
+          # rather than an aspiration.
+          MIN_SELECTED: "885"
+          MIN_PASSED: "881"
           # EXACT - the load-bearing number.
-          EXPECT_SKIPPED: "10"
+          EXPECT_SKIPPED: "4"
         run: |
           python3 - <<'PY' > triple.env
           import xml.etree.ElementTree as ET, pathlib
@@ -314,7 +339,7 @@ jobs:
           [ -z "${MISSING:-}" ] || { echo "::error::JUnit report(s) missing: $MISSING — a report that did not appear is a refusal, not a smaller sum. A step that failed to write one has taken its tests out of every number below"; rc=1; }
           [ "$SELECTED" -ge "$MIN_SELECTED" ] || { echo "::error::selected $SELECTED is BELOW the floor $MIN_SELECTED — tests stopped being collected. Find them; do not lower the floor"; rc=1; }
           [ "$PASSED" -ge "$MIN_PASSED" ] || { echo "::error::passed $PASSED is BELOW the floor $MIN_PASSED — find the tests that stopped passing or stopped being collected; do not lower the floor"; rc=1; }
-          [ "$SKIPPED" = "$EXPECT_SKIPPED" ] || { echo "::error::skipped $SKIPPED, pinned exactly $EXPECT_SKIPPED — a file that silently turned into skips is exactly what this pin exists to catch. The expected skips are the three seam suites' doc_health pairs and the aggregation-register suite's four, named above this step. If the change is intended, move the pin WITH the reason"; rc=1; }
+          [ "$SKIPPED" = "$EXPECT_SKIPPED" ] || { echo "::error::skipped $SKIPPED, pinned exactly $EXPECT_SKIPPED — a file that silently turned into skips is exactly what this pin exists to catch. The expected skips are the aggregation-register suite's four, named above this step. If the change is intended, move the pin WITH the reason"; rc=1; }
           [ "$FAILURES" = "0" ] || { echo "::error::failures $FAILURES, clause (d) requires zero"; rc=1; }
           [ "$ERRORS" = "0" ] || { echo "::error::errors $ERRORS, clause (d) requires zero"; rc=1; }
           exit $rc

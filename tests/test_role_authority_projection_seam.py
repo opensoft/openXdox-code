@@ -11,11 +11,21 @@ extension that (a) structurally conforms to `route_extension.RouteExtension`,
 class it will be mixed into (`resolve_handlers` — the "a route that cannot be
 served must not start" refusal), and (d) that assembles cleanly beside the
 OTHER two existing contribution columns, in either declaration order.
+
+(d) IS ASSERTED ELSEWHERE, since plan 034 task T044. The two columns are
+`serve_gate.GateRoutesExtension` and `serve_projection.ProjectionRoutesExtension`,
+and `serve_projection` reaches openxFactory's `doc_health` when it is imported
+(through `snapshot_registry`), which no lone checkout supplies. So this
+suite's two cases for (d) sat behind a guard that skipped on every lone run,
+until T044 made them assert for real and moved them to
+`tests/test_seam_assembly_beside_gate_and_projection.py`. That file is in the
+declared exclusion (`tests/declared_exclusion.yaml`) under `doc_health`. It
+runs wherever `doc_health` is present, and everywhere else it is reported as
+an open extraction.
 """
 
 from __future__ import annotations
 
-import pytest
 import route_extension
 
 from openxdox.role_authority_projection import (
@@ -23,32 +33,6 @@ from openxdox.role_authority_projection import (
     RoleAuthorityProjectionExtension,
     RoleAuthorityRoutes,
 )
-
-
-def _existing_contribution_extensions():
-    """Import the two ALREADY-LANDED contribution columns, or skip.
-
-    `openxdox.serve_projection` reaches `doc_health` at import time (via
-    `snapshot_registry`), which § 4.1's own second clause already names as
-    lawful-but-not-yet-reachable here: `doc_health` is openxFactory's own
-    corpus machinery, not vendored, not on PyPI, and making it reachable is
-    BUILD-arc work (§ 3.5/3.6) this slice does not touch. Where that gap is
-    unresolved in the running environment, the two tests that need these
-    extensions skip with the reason on the record rather than failing on a
-    module this slice has no ruling to fix — and start asserting for real
-    the day the BUILD arc closes it."""
-    try:
-        from openxdox.serve_gate import GateRoutesExtension
-        from openxdox.serve_projection import ProjectionRoutesExtension
-    except ModuleNotFoundError as exc:
-        if exc.name != "doc_health" and not (exc.name or "").startswith("doc_health"):
-            raise
-        pytest.skip(
-            f"existing § 2.4 contribution column not importable in this "
-            f"environment ({exc!r}) — doc_health reachability is BUILD-arc "
-            "work (§ 3.5/3.6), not this slice's to fix; this test will "
-            "assert for real once that lands")
-    return GateRoutesExtension, ProjectionRoutesExtension
 
 
 def test_extension_conforms_structurally_to_route_extension() -> None:
@@ -71,43 +55,6 @@ def test_handler_name_resolves_on_the_mixin_class() -> None:
     # will be mixed into, without needing the full DashboardHandler.
     bindings = route_extension.collect_bindings([RoleAuthorityProjectionExtension()])
     route_extension.resolve_handlers(bindings, RoleAuthorityRoutes)  # must not raise
-
-
-def test_assembles_beside_the_two_existing_contribution_columns() -> None:
-    # The real assembly, once task 4.3's composition point exists, combines
-    # every § 2.4 contribution in one tuple. Proving that combination here —
-    # ahead of that wiring — is what makes this a seam-conformance test and
-    # not just a unit test of one class.
-    GateRoutesExtension, ProjectionRoutesExtension = _existing_contribution_extensions()
-    extensions = [
-        GateRoutesExtension(),
-        ProjectionRoutesExtension(),
-        RoleAuthorityProjectionExtension(),
-    ]
-    bindings = route_extension.collect_bindings(extensions)
-    # 1 (gate prefix) + 1 (snapshot-index exact) + 1 (this projection's
-    # exact GET) = 3, and no RouteBindingError means none of the three
-    # collide or nest.
-    # WAS 5 UNTIL § 3.4 SLICE S6 (RULED Q4, `#656` comment `5642758731`):
-    # `/source` (exact) and `/source/` (prefix) left this column with the
-    # route, and are fixed core arms of `opendox/serve.py` now. The count is
-    # the seam's own arithmetic, so it moves with the contribution.
-    assert len(bindings) == 3
-    assert ROLE_AUTHORITY_ROUTE in {b.pattern for b in bindings}
-
-
-def test_assembly_is_order_insensitive() -> None:
-    # collect_bindings groups every exact binding ahead of every prefix one
-    # regardless of declaration order (route_extension.py's own docstring) —
-    # declaring this extension FIRST must assemble identically.
-    GateRoutesExtension, ProjectionRoutesExtension = _existing_contribution_extensions()
-    extensions = [
-        RoleAuthorityProjectionExtension(),
-        GateRoutesExtension(),
-        ProjectionRoutesExtension(),
-    ]
-    bindings = route_extension.collect_bindings(extensions)
-    assert len(bindings) == 3
 
 
 def test_role_authority_route_does_not_sit_under_either_declared_prefix() -> None:

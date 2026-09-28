@@ -123,8 +123,8 @@ REASONS = {reason["id"]: reason for reason in DECLARATION.get("reasons") or []}
 # its own. So a cause followed by an unrelated failure, a cause raised while
 # an unrelated exception was being handled, a cause beside an unrelated one,
 # and a cause's words quoted in some other failure are each unattributed, and
-# no two reasons can take one result. The shapes are the ones the 66 listed
-# files' 233 red results take when each file runs alone.
+# no two reasons can take one result. The shapes are the ones the 67 listed
+# files' 234 red results take when each file runs alone.
 # ---------------------------------------------------------------------------
 
 #: `doc_health` raised missing. Where it is absent, the interpreter names

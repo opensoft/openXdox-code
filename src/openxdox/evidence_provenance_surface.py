@@ -98,6 +98,8 @@ ASSUMPTIONS_FORBIDDEN_FORM = "assumptions_forbidden"
 #: "/actions/gate/"`, `SOURCE_PREFIX = "/source/"`) and is distinct from
 #: `ROLE_AUTHORITY_ROUTE`, so `route_extension.collect_bindings` accepts it
 #: beside all three (proved by
+#: `tests/test_seam_assembly_beside_gate_and_projection.py` since plan 034
+#: T044, and beside role authority alone by
 #: `tests/test_evidence_provenance_surface_seam.py`).
 EVIDENCE_ROUTE = "/projections/evidence"
 
