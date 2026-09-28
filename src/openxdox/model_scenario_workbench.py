@@ -152,6 +152,8 @@ SCENARIO_ROLE = "scenario"
 #: "/actions/gate/"`, `SOURCE_PREFIX = "/source/"`) and is distinct from both
 #: sibling projection routes, so `route_extension.collect_bindings` accepts
 #: it beside all four existing columns (proved by
+#: `tests/test_seam_assembly_beside_gate_and_projection.py` since plan 034
+#: T044, and beside its two § 4.5 siblings by
 #: `tests/test_model_scenario_workbench_seam.py`).
 WORKBENCH_ROUTE = "/projections/workbench"
 

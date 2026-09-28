@@ -57,7 +57,7 @@
 schema_version: 1
 kind: declared-test-exclusion
 
-count: 66
+count: 67
 
 reasons:
   - id: doc_health
@@ -123,6 +123,7 @@ entries:
   - {path: tests/test_repo_root_guard.py, reasons: [doc_health]}
   - {path: tests/test_repo_selector.py, reasons: [doc_health]}
   - {path: tests/test_round_trip.py, reasons: [doc_health]}
+  - {path: tests/test_seam_assembly_beside_gate_and_projection.py, reasons: [doc_health], note: "six cases plan 034 T044 moved here from the three route seam suites, where each skipped on doc_health"}
   - {path: tests/test_session_commits.py, reasons: [doc_health]}
   - {path: tests/test_session_confinement.py, reasons: [doc_health]}
   - {path: tests/test_session_document_ownership.py, reasons: [doc_health]}

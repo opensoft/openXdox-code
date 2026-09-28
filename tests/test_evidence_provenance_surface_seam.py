@@ -15,11 +15,22 @@ refusal), and (d) that assembles cleanly beside the OTHER existing
 contribution columns, in either declaration order — see
 `tests/test_role_authority_projection_seam.py`'s own docstring, which states
 this reasoning first.
+
+(d) IS ASSERTED IN TWO PLACES, since plan 034 task T044. Beside role
+authority alone, which needs nothing a lone checkout lacks, it is asserted
+below. Beside the gate and projection columns it is asserted in
+`tests/test_seam_assembly_beside_gate_and_projection.py`, because
+`serve_projection` reaches openxFactory's `doc_health` when it is imported
+(through `snapshot_registry`), which no lone checkout supplies. Those two
+cases sat here behind a guard that skipped on every lone run, until T044 made
+them assert for real and moved them. That file is in the declared exclusion
+(`tests/declared_exclusion.yaml`) under `doc_health`. It runs wherever
+`doc_health` is present, and everywhere else it is reported as an open
+extraction.
 """
 
 from __future__ import annotations
 
-import pytest
 import route_extension
 
 from openxdox.evidence_provenance_surface import (
@@ -31,29 +42,6 @@ from openxdox.role_authority_projection import (
     ROLE_AUTHORITY_ROUTE,
     RoleAuthorityProjectionExtension,
 )
-
-
-def _existing_gate_and_projection_extensions():
-    """Import the two ALREADY-LANDED columns that reach `doc_health`
-    transitively (via `snapshot_registry`), or skip — the identical guard
-    `test_role_authority_projection_seam.py` uses, for the identical reason:
-    `doc_health` reachability is BUILD-arc work (§ 3.5/3.6), not this
-    slice's to fix. `role_authority_projection` (§ 4.5 slice 1) imports
-    nothing but `route_extension` and `opendox.serve_wire`, exactly as this
-    module does, so it is ALWAYS importable and is asserted unconditionally
-    below instead of behind this guard."""
-    try:
-        from openxdox.serve_gate import GateRoutesExtension
-        from openxdox.serve_projection import ProjectionRoutesExtension
-    except ModuleNotFoundError as exc:
-        if exc.name != "doc_health" and not (exc.name or "").startswith("doc_health"):
-            raise
-        pytest.skip(
-            f"existing § 2.4 contribution column not importable in this "
-            f"environment ({exc!r}) — doc_health reachability is BUILD-arc "
-            "work (§ 3.5/3.6), not this slice's to fix; this test will "
-            "assert for real once that lands")
-    return GateRoutesExtension, ProjectionRoutesExtension
 
 
 def test_extension_conforms_structurally_to_route_extension() -> None:
@@ -76,50 +64,13 @@ def test_handler_name_resolves_on_the_mixin_class() -> None:
 
 def test_assembles_beside_role_authority_alone() -> None:
     # Neither § 4.5 feature reaches doc_health, so this pair is asserted
-    # unconditionally, ahead of the fuller (and possibly-skipped) assembly
-    # below that also brings in the gate/projection columns.
+    # unconditionally, here. The fuller assembly that also brings in the
+    # gate/projection columns is in
+    # `tests/test_seam_assembly_beside_gate_and_projection.py` (plan 034 T044).
     extensions = [RoleAuthorityProjectionExtension(), EvidenceProvenanceSurfaceExtension()]
     bindings = route_extension.collect_bindings(extensions)
     assert len(bindings) == 2
     assert {b.pattern for b in bindings} == {ROLE_AUTHORITY_ROUTE, EVIDENCE_ROUTE}
-
-
-def test_assembles_beside_all_three_existing_contribution_columns() -> None:
-    # The real assembly, once task 4.3's composition point exists, combines
-    # every § 2.4 contribution in one tuple. Proving that combination here —
-    # ahead of that wiring — is what makes this a seam-conformance test and
-    # not just a unit test of one class.
-    GateRoutesExtension, ProjectionRoutesExtension = _existing_gate_and_projection_extensions()
-    extensions = [
-        GateRoutesExtension(),
-        ProjectionRoutesExtension(),
-        RoleAuthorityProjectionExtension(),
-        EvidenceProvenanceSurfaceExtension(),
-    ]
-    bindings = route_extension.collect_bindings(extensions)
-    # 1 (gate prefix) + 1 (projection: snapshot-index exact) + 1
-    # (role-authority exact) + 1 (this surface's exact GET) = 4, and no
-    # RouteBindingError means none of the four collide or nest.
-    # WAS 6 UNTIL § 3.4 SLICE S6 (RULED Q4, `#656` comment `5642758731`):
-    # the projection's `/source` exact and `/source/` prefix bindings left
-    # this column and are fixed core arms of `opendox/serve.py` now.
-    assert len(bindings) == 4
-    assert EVIDENCE_ROUTE in {b.pattern for b in bindings}
-
-
-def test_assembly_is_order_insensitive() -> None:
-    # collect_bindings groups every exact binding ahead of every prefix one
-    # regardless of declaration order (route_extension.py's own docstring) —
-    # declaring this extension FIRST must assemble identically.
-    GateRoutesExtension, ProjectionRoutesExtension = _existing_gate_and_projection_extensions()
-    extensions = [
-        EvidenceProvenanceSurfaceExtension(),
-        RoleAuthorityProjectionExtension(),
-        GateRoutesExtension(),
-        ProjectionRoutesExtension(),
-    ]
-    bindings = route_extension.collect_bindings(extensions)
-    assert len(bindings) == 4
 
 
 def test_evidence_route_does_not_sit_under_either_declared_prefix() -> None:

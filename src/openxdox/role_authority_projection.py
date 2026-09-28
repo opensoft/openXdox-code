@@ -226,7 +226,9 @@ def project(*, actor: Optional[str], capabilities,
 #: sub-paths. Does not sit under either declared prefix
 #: (`ACTIONS_GATE_PREFIX = "/actions/gate/"`, `SOURCE_PREFIX = "/source/"`),
 #: so `route_extension.collect_bindings` accepts it beside both (proved by
-#: `tests/test_role_authority_projection_seam.py`).
+#: `tests/test_seam_assembly_beside_gate_and_projection.py` since plan 034
+#: T044; `tests/test_role_authority_projection_seam.py` proves the prefix
+#: checks).
 ROLE_AUTHORITY_ROUTE = "/projections/role-authority"
 
 

@@ -20,13 +20,24 @@ second slice.
 
 WITH THIS SLICE THE ASSEMBLY IS COMPLETE for § 4.5: all three features D4
 names as openXdox's unbuilt centre of gravity now contribute a route
-through the one seam, and the full five-column assembly below is the first
-test anywhere that proves all of them fit together.
+through the one seam, and the full five-column assembly is the first test
+anywhere that proves all of them fit together. Since plan 034 task T044 that
+assembly is in `tests/test_seam_assembly_beside_gate_and_projection.py`.
+
+(d) IS ASSERTED IN TWO PLACES, since T044. Beside the other two § 4.5
+features, which need nothing a lone checkout lacks, it is asserted below.
+Beside the gate and projection columns it is asserted in that file, because
+`serve_projection` reaches openxFactory's `doc_health` when it is imported
+(through `snapshot_registry`), which no lone checkout supplies. Those two
+cases sat here behind a guard that skipped on every lone run, until T044 made
+them assert for real and moved them. That file is in the declared exclusion
+(`tests/declared_exclusion.yaml`) under `doc_health`. It runs wherever
+`doc_health` is present, and everywhere else it is reported as an open
+extraction.
 """
 
 from __future__ import annotations
 
-import pytest
 import route_extension
 
 from openxdox.evidence_provenance_surface import (
@@ -42,31 +53,6 @@ from openxdox.role_authority_projection import (
     ROLE_AUTHORITY_ROUTE,
     RoleAuthorityProjectionExtension,
 )
-
-
-def _existing_gate_and_projection_extensions():
-    """Import the two ALREADY-LANDED columns that reach `doc_health`
-    transitively (via `snapshot_registry`), or skip — the identical guard
-    `test_role_authority_projection_seam.py` and
-    `test_evidence_provenance_surface_seam.py` use, for the identical
-    reason: `doc_health` reachability is BUILD-arc work (§ 3.5/3.6), not
-    this slice's to fix. The skip is NARROW — any `ModuleNotFoundError` that
-    is not `doc_health` re-raises, so a genuine breakage in this slice can
-    never hide behind it. All three § 4.5 features import nothing but
-    `route_extension` and `opendox.serve_wire`, so their mutual assembly is
-    asserted unconditionally below instead of behind this guard."""
-    try:
-        from openxdox.serve_gate import GateRoutesExtension
-        from openxdox.serve_projection import ProjectionRoutesExtension
-    except ModuleNotFoundError as exc:
-        if exc.name != "doc_health" and not (exc.name or "").startswith("doc_health"):
-            raise
-        pytest.skip(
-            f"existing § 2.4 contribution column not importable in this "
-            f"environment ({exc!r}) — doc_health reachability is BUILD-arc "
-            "work (§ 3.5/3.6), not this slice's to fix; this test will "
-            "assert for real once that lands")
-    return GateRoutesExtension, ProjectionRoutesExtension
 
 
 def test_extension_conforms_structurally_to_route_extension() -> None:
@@ -89,10 +75,11 @@ def test_handler_name_resolves_on_the_mixin_class() -> None:
 
 def test_assembles_beside_both_section_4_5_siblings() -> None:
     # None of the three § 4.5 features reaches doc_health, so this trio is
-    # asserted unconditionally, ahead of the fuller (and possibly-skipped)
-    # assembly below that also brings in the gate/projection columns. Three
-    # bindings, three distinct exact routes: § 4.5's whole build content,
-    # assembled.
+    # asserted unconditionally, here. The fuller assembly that also brings in
+    # the gate/projection columns is in
+    # `tests/test_seam_assembly_beside_gate_and_projection.py` (plan 034
+    # T044). Three bindings, three distinct exact routes: § 4.5's whole build
+    # content, assembled.
     extensions = [
         RoleAuthorityProjectionExtension(),
         EvidenceProvenanceSurfaceExtension(),
@@ -102,57 +89,6 @@ def test_assembles_beside_both_section_4_5_siblings() -> None:
     assert len(bindings) == 3
     assert {b.pattern for b in bindings} == {
         ROLE_AUTHORITY_ROUTE, EVIDENCE_ROUTE, WORKBENCH_ROUTE}
-
-
-def test_assembles_beside_all_four_existing_contribution_columns() -> None:
-    # The real assembly, once task 4.3's composition point exists, combines
-    # every § 2.4 contribution in one tuple. Proving that combination here —
-    # ahead of that wiring — is what makes this a seam-conformance test and
-    # not just a unit test of one class.
-    GateRoutesExtension, ProjectionRoutesExtension = _existing_gate_and_projection_extensions()
-    extensions = [
-        GateRoutesExtension(),
-        ProjectionRoutesExtension(),
-        RoleAuthorityProjectionExtension(),
-        EvidenceProvenanceSurfaceExtension(),
-        ModelScenarioWorkbenchExtension(),
-    ]
-    bindings = route_extension.collect_bindings(extensions)
-    # 1 (gate prefix) + 1 (projection: snapshot-index exact) + 1
-    # (role-authority exact) + 1 (evidence exact) + 1 (this bench's exact
-    # GET) = 5, and no RouteBindingError means none of the five collide or
-    # nest.
-    # WAS 7 UNTIL § 3.4 SLICE S6 (RULED Q4, `#656` comment `5642758731`):
-    # the projection's `/source` exact and `/source/` prefix bindings left
-    # this column and are fixed core arms of `opendox/serve.py` now.
-    assert len(bindings) == 5
-    assert WORKBENCH_ROUTE in {b.pattern for b in bindings}
-
-
-def test_assembly_is_order_insensitive() -> None:
-    # collect_bindings groups every exact binding ahead of every prefix one
-    # regardless of declaration order (route_extension.py's own docstring) —
-    # declaring this extension FIRST must assemble identically, and the
-    # RESULTING SET must be identical too, not merely the same size.
-    GateRoutesExtension, ProjectionRoutesExtension = _existing_gate_and_projection_extensions()
-    declared_last = [
-        GateRoutesExtension(),
-        ProjectionRoutesExtension(),
-        RoleAuthorityProjectionExtension(),
-        EvidenceProvenanceSurfaceExtension(),
-        ModelScenarioWorkbenchExtension(),
-    ]
-    declared_first = [
-        ModelScenarioWorkbenchExtension(),
-        EvidenceProvenanceSurfaceExtension(),
-        RoleAuthorityProjectionExtension(),
-        GateRoutesExtension(),
-        ProjectionRoutesExtension(),
-    ]
-    last = route_extension.collect_bindings(declared_last)
-    first = route_extension.collect_bindings(declared_first)
-    assert len(first) == len(last) == 5
-    assert {b.key for b in first} == {b.key for b in last}
 
 
 def test_workbench_route_does_not_sit_under_either_declared_prefix() -> None:
