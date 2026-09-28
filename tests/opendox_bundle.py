@@ -18,8 +18,10 @@ is a line spelling `REPO_ROOT / "src" / "openxdox" / "web"` in any Path or slash
 form, counted over the REVISIONS with `git grep` and never a worktree — **46 root
 spellings over 31 files**, as 22 resolving a concrete `views/<name>.js` module plus
 9 using the root as a serve root (the ninth being the tool at
-`tests/tools/playwright-smoke.py`, outside `validate`'s list). `validate.yml`'s S8
-block carries that same 46. The review rounds on #19 said "31 files, 47 sites";
+`tests/tools/playwright-smoke.py`, outside `validate`'s list, and outside the
+whole suite that check runs since plan 034 T043, since it is no test module).
+`validate.yml`'s S8 block carried that same 46 until T043 replaced it
+(`git show d84b5048:.github/workflows/validate.yml`). The review rounds on #19 said "31 files, 47 sites";
 that figure is left ATTRIBUTED and not restated, for #19's own reason — a root
 spelled once carries several derived sites, so neither total corrects the other —
 and this line asserted it as "the real count" until the review of `de7d966` on #21

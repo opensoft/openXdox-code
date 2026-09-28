@@ -194,7 +194,7 @@ def bundle(tmp_path) -> Path:
         # Its four-row table is there, not restated here. Round 1 of the review on
         # #21 found this file claiming the install "came from somewhere older than
         # the declared pin" on a check that only tested for a marker. UNDER THAT
-        # CHECK, had the DECLARED leg (`0b4e8bbf` then, `5c137a90` now) itself ever
+        # CHECK, had the DECLARED leg (`0b4e8bbf` then, `2d116415` now) itself ever
         # stopped shipping `web/**`, all thirteen
         # probes below would have skipped and this required check would have stayed
         # green over the regression. UNDER THE TABLE THEY OBEY NOW THEY FAIL: the
@@ -974,8 +974,9 @@ def test_the_replayed_shell_statements_are_the_pinned_bundles(bundle) -> None:
 # These live HERE rather than in a new file on purpose: a created file at this leg
 # needs an admission row in openxFactory's `docs/opendox-carve-admissions.yaml`
 # (RULED OQ-C), and adding one is not a pin bump's act. This module is already
-# admitted, already on `validate.yml`'s list, and already owns the fixture whose
-# probes the decision gates.
+# admitted, was already on `validate.yml`'s list (the list plan 034 T043
+# replaced with the whole suite), and already owns the fixture whose probes the
+# decision gates.
 # ---------------------------------------------------------------------------
 
 import opendox_bundle as _ob  # noqa: E402  (a helper import, never OPENDOX_WEB)
@@ -1631,12 +1632,15 @@ def test_installed_commit_is_none_when_reading_the_record_raises(monkeypatch) ->
 # number is not carried here. What is true at any head is the command:
 #   git diff main -- tests/test_gate_loop_probes.py | grep -c '^+def test_'
 #   git diff main -- tests/test_gate_loop_views.py  | grep -c '^+def test_'
-# (37 in this file and 6 in the views file at THIS head — 19 decision/read cases,
-# 13 `installed_commit` parser tests and 5 call-site tests here; `validate.yml`'s
-# record block carries the total, 43. The review of `fd3af6a` caught this pair
-# reading 25 and 6, and the review of `de7d966` moved it again by asking for the
-# two undeclared-pin tests: a count written in prose is stale one round later,
-# which is why the commands are printed above it every time.)
+# (37 in this file and 6 in the views file at the head that added them, #21's,
+# squashed as `2529c10` — 19 decision/read cases, 13 `installed_commit` parser
+# tests and 5 call-site tests here; `validate.yml`'s record block carried the
+# total, 43, until plan 034 T043 replaced that block, and
+# `git show d84b5048:.github/workflows/validate.yml` still shows it. The review
+# of `fd3af6a` caught this pair reading 25 and 6, and the review of `de7d966`
+# moved it again by asking for the two undeclared-pin tests: a count written in
+# prose is stale one round later, which is why the commands are printed above it
+# every time.)
 # It is exactly the silent green this whole guard exists to break, reached one
 # level further out each round — and the review of `b22a6fd` caught the quoted
 # count going stale three rounds after the quotation.

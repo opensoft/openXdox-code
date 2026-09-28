@@ -19,9 +19,12 @@ tree rather than one re-derived from a thread each time.
 
 A CREATED FILE: no row in `docs/opendox-carve-manifest.yaml` (RULED OQ-C, the
 manifest declares what LEAVES openxFactory). Run by `.github/workflows/
-validate.yml` beside `test_leg_shape.py`; it is a SHAPE assertion authored at
-this leg, and adding it does not un-narrow RULED Q-L8 (b′) — the carved suites
-stay out of `validate` until the BUILD arc makes them runnable.
+validate.yml`, at first beside `test_leg_shape.py` on its named list; it is a
+SHAPE assertion authored at this leg, and adding it did not un-narrow RULED
+Q-L8 (b′). Since plan 034 T043 that check runs the whole suite less its
+declared exclusion and the one test it deselects until T008 (the assembled
+`--help` tree, RULED openxFactory#656 comment 5859927858). So the carved suites
+run there too, all but the files the declaration lists.
 """
 
 from __future__ import annotations
@@ -326,26 +329,38 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 #: head of that slice and from the 13 / 19 over six modules that the census
 #: RULED 5626260214 called "the 13-line openDox->openXdox inversion" stood at.
 #:
-#: THE PIN HAS MOVED THREE TIMES SINCE — three bumps of THIS file's own
+#: THE PIN HAS MOVED FOUR TIMES SINCE — four bumps of THIS file's own
 #: declaration, `0f1f2e59` -> `a99eba03` (openXdox-code#15), `a99eba03` ->
-#: `0b4e8bbf` (openXdox-code#21) and `0b4e8bbf` -> `5c137a90` (this act) — AND
-#: THE TABLE HAS NOT. Measured, not assumed. (Three pin bumps, five upstream
-#: landings: they are different counts of different things, and both are stated
-#: here so neither can be read as the other.)
+#: `0b4e8bbf` (openXdox-code#21), `0b4e8bbf` -> `5c137a90` (openXdox-code#24)
+#: and `5c137a90` -> `2d116415` (openXdox-code#29, plan 034 T040) — AND THE
+#: TABLE HAS NOT. Measured, not assumed. (Four pin bumps, and forty-one
+#: upstream landings from `a99eba03` to `2d116415`: they are different counts
+#: of different things, and both are stated here so neither can be read as the
+#: other.)
 #: This note used to say slice 2b's merge was the commit "this file's pin now
 #: names"; that stopped being true at openXdox-code#15 (`0f1f2e59` ->
 #: `a99eba03`) and the sentence was not followed, which is the stale-claim class
-#: this repository has since had to sweep for. The pin names `5c137a90`
-#: (openDox-code#27, § 3.4 RULED Q7) as of 2026-09-17, and
-#: `_back_import_census()` recomputed against THAT tree returns exactly the five
-#: rows below. THE RANGE THAT COVERS IS FIVE openDox-code LANDINGS, and naming
-#: them is the correction Copilot's round-1 review of openXdox-code#21 asked
-#: for: from `a99eba03` (#11, § 4.3) this pin crosses `8efb3cf5` (#20, § 3.4
-#: slice S5 leg B), `1e469713` (#21, § 3.4 slice S7), `0b4e8bbf` (#23, § 3.4
-#: slice S8 leg B), `0e65b5f8` (#24, the two intent-feed DOM suites retired at
-#: that leg) and `5c137a90` (#27, RULED Q7's contributed stylesheets). The
-#: ratchet neither fell nor rose across any of them, and the numbers here are
-#: that measurement, not a carried-forward memory.
+#: this repository has since had to sweep for. It happened once more: the pin
+#: named `5c137a90` (openDox-code#27, § 3.4 RULED Q7) from 2026-09-17, and
+#: this note went on saying so after #29 moved it, until plan 034 T043 swept
+#: it. The pin names `2d116415` (openDox-code#55, plan 034 T037) since
+#: 2026-09-27, and `_back_import_census()` recomputed against THAT tree returns
+#: exactly the five rows below. FROM `a99eba03` (#11, § 4.3) TO `5c137a90` THE
+#: PIN CROSSED THIRTEEN openDox-code LANDINGS, from #13 (`e86deb2`) to #27
+#: (`git rev-list --count --first-parent a99eba03..5c137a90` in openDox-code).
+#: This note named five of them, the correction Copilot's round-1 review of
+#: openXdox-code#21 asked for, and called the range five until plan 034 T043
+#: counted it: `8efb3cf5` (#20, § 3.4 slice S5 leg B), `1e469713` (#21, § 3.4
+#: slice S7), `0b4e8bbf` (#23, § 3.4 slice S8 leg B), `0e65b5f8` (#24, the two
+#: intent-feed DOM suites retired at that leg) and `5c137a90` (#27, RULED Q7's
+#: contributed stylesheets). FROM `5c137a90` TO `2d116415` IT CROSSED
+#: TWENTY-EIGHT MORE, from #28 (`52b237e`) to #55, plan 034's phase-1 slices
+#: among them. The ratchet neither fell nor rose across any of them: plan 034
+#: T043 ran `_census` over openDox-code's `src/opendox` at each of the
+#: fourteen commits from `a99eba03` to `5c137a90`, and at each of the
+#: twenty-nine from `5c137a90` to `2d116415`, and every one returns exactly
+#: the five rows below. The numbers here are that measurement, not a
+#: carried-forward memory.
 #:
 #: THE WHOLE OF THE INVERSION IS GONE, which is worth stating plainly because
 #: this table has never been able to say it before: no module of the pinned
@@ -382,17 +397,22 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 #: imports each converted module in a subprocess with `openxdox` blocked — and
 #: that is the right home for it: this leg measures a repository it does not
 #: write, and cannot import openDox's modules to find out. That file's
-#: `NEUTRAL_MODULES` is the asserted half and now holds `branch_session`,
-#: `workbench`, `serve_workbench` and `consumer_reach`.
+#: `NEUTRAL_MODULES` is the asserted half, and at `2d116415` it holds nine:
+#: `workbench`, `serve_workbench`, `consumer_reach`, `branch_session`,
+#: `domain_profile`, `profile_proxy`, `view_extension`, `cli` and `serve`. Its
+#: `STILL_REACHING` is empty there.
 #:
-#: TWO MODULES STILL DO NOT IMPORT WITHOUT A CONSUMER, and NEITHER is blocked by
-#: `openxdox` any more. `opendox.serve` and `opendox.cli` are blocked by
-#: `ideation_dashboard` — openxFactory's PRE-CARVE package name, a
-#: `stays_openxfactory_adapter` row (RULING DQ-1) present at neither carve
-#: destination, so the carve's `import rewrites` class had nothing lawful to
-#: rewrite it to. It is the same defect class § 4.1 fixed on this side, it is
-#: censused at openDox-code, and it is owed a later act. It is invisible to THIS
-#: table by construction: the table counts `openxdox` and nothing else.
+#: THE TWO MODULES THAT DID NOT IMPORT WITHOUT A CONSUMER NOW DO. This note
+#: said `opendox.serve` and `opendox.cli` were blocked by `ideation_dashboard`
+#: — openxFactory's PRE-CARVE package name, a `stays_openxfactory_adapter` row
+#: (RULING DQ-1) present at neither carve destination, so the carve's
+#: `import rewrites` class had nothing lawful to rewrite it to — and that the
+#: reach was owed a later act. Plan 034 T011 (openDox-code#46) was that act.
+#: At `2d116415` both import in a venv holding that commit alone, with none of
+#: `openxdox`, `ideation_dashboard`, `doc_health` and
+#: `corpus_adapter_openxfactory` findable (measured for plan 034 T043). It was
+#: invisible to THIS table by construction, and still is: the table counts
+#: `openxdox` and nothing else.
 #:
 #: A RATCHET, not a target: the numbers may only FALL. When a BUILD-arc slice
 #: lands, lower them here in the same act — the suite refuses a silent
