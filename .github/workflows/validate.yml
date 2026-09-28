@@ -254,9 +254,10 @@ jobs:
       # restoring it is plan 034 T044's (9.4, this leg's half).
       #
       # RE-PINNED BY plan 034 T044 (box 9.4, this leg's half: "Restore the
-      # margin, and stop the skips carrying the gap"): selected 885, passed
-      # 881, skipped 4, failures 0, errors 0, the reading of this change's
-      # whole suite at openDox-code `2d116415`. The six skips that carried the
+      # margin, and stop the skips carrying the gap"), the same way: run
+      # 36445143486 (2026-09-28) measured `64bca95d`, the commit that set
+      # these pins, at openDox-code `2d116415`: selected 885, passed 881,
+      # skipped 4, failures 0, errors 0. The six skips that carried the
       # gap were the three seam suites' `doc_health` pairs. T044 made each of
       # them assert for real and moved the six into
       # `tests/test_seam_assembly_beside_gate_and_projection.py`, which the
