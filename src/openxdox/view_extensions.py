@@ -126,8 +126,11 @@ AND ONE FACET THAT IS NOT A BINDING. `DISPLAY`, declared below
 `VIEW_EXTENSIONS`, is the other thing this module contributes to openDox's
 shell: not a panel but WORDS, the xFactory host's names for openDox's sixth
 stage and for its items, RULED at `opensoft/openxFactory#656` comments
-`5784683830` and `5801057769`. Its own block says what it declares, why it is
-partial, and how a served page comes to show it.
+`5784683830` and `5801057769`. Beside them it carries the governed snapshot's
+VALUES, which the shell matches rather than renders (plan 034 T060, on R1Q11
+(a), comment `5850003126`, and R1Q26 (a), comment `5851950767`). Its own block
+says what it declares, why it is partial, and how a served page comes to show
+it.
 
 A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
 (RULED OQ-C).
@@ -667,10 +670,45 @@ VIEW_EXTENSIONS: tuple[GateLoopViews, ...] = (GateLoopViews(),)
 #: pin on the openXdox assembly root, and moving that pin onto a root that
 #: carries this commit is openxFactory's act, not this leg's. That facet names
 #: no stage word of its own.
+#:
+#: AND THE GOVERNED SNAPSHOT'S VALUES, on the `values` block beside the stage.
+#: openDox's views resolve two snapshot enums to a ROLE before they do anything
+#: with them: which column a document sits in (`documents[].stage`) and which
+#: state a candidate is in (`possibles[].state`), matched against
+#: `display_profile.SNAPSHOT_VALUES`. R1Q11 (a) gives openDox a neutral
+#: snapshot of its own (`opensoft/openxFactory#656` comment `5850003126`), so
+#: plan 034 T054 makes those defaults the neutral snapshot's values, while this
+#: leg's governed generator goes on writing `ideation-dashboard-snapshot`,
+#: whose values are the governed domain's words. The governed values therefore
+#: move HERE, onto the block `display_profile` already lets a host override,
+#: and T007's batch I amends 5.3a to admit it beside the one stage (R1Q26 (a),
+#: comment `5851950767`, kept at `5852513402`). Every role openDox matches on
+#: carries the word the governed profile gives it, and the two kinds are named
+#: the way the engine names them, by an act: `document_stage` takes the words
+#: of the kind `kind_declaring("demote")` names, the document spine
+#: (`generator._document_status_vocabulary`), and `register_state` the words of
+#: the kind `kind_declaring("promote-to-staging")` names, the register
+#: (`gate_console._promotable_register_state`).
+#:
+#: INERT UNTIL THE DEFAULTS MOVE. In every openDox that serves `values` before
+#: T054, the defaults ARE these words, so the block changes nothing the host
+#: serves. That is why it lands before this leg moves its openDox pin past
+#: T054: after the move, this leg's own views go on placing every governed card
+#: where they place it now. `tests/test_gate_loop_probes.py` holds the block to
+#: the vendored engineering profile, and runs the pinned bundle's placement
+#: under node at both defaults. The block renders no word and names no stage,
+#: so the facet is still PARTIAL in its stages, which is all 5.3a's falsifier
+#: reads. It reaches openxFactory's served views only once openxFactory's own
+#: facet composes it beside the `stages` it copies today (plan 034 T066).
 DISPLAY: dict[str, Any] = {
     "stages": {
         "completion": {"one": "implemented item", "many": "implemented items",
                        "short": "implemented", "label": "implemented"},
+    },
+    "values": {
+        "document_stage": {"captured": "brainstorm", "organized": "staged"},
+        "register_state": {"captured": "latent", "proposed": "picked",
+                           "retired": "rejected", "superseded": "superseded"},
     },
 }
 

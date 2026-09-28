@@ -1648,11 +1648,21 @@ def test_the_display_facet_declares_one_stage_entry_and_nothing_else() -> None:
     openDox spells both `completed` (the first ruling); `one` and `many` because
     they are its two item nouns (the second). `gate` is left to openDox. The
     block above `DISPLAY` in `view_extensions.py` gives the render sites.
+
+    AND THE `values` BLOCK BESIDE IT, which is not a stage: the governed
+    snapshot's values, which openDox's views match by role (plan 034 T060,
+    RULED R1Q26 (a), `opensoft/openxFactory#656` comment `5851950767`, on R1Q11
+    (a), comment `5850003126`). The edit that admitted it is entered, with its
+    reason, in `tests/protected_suite_respellings.yaml`.
     """
     assert "DISPLAY" in view_extensions.__all__
     assert view_extensions.DISPLAY == {
         "stages": {"completion": {"one": IMPLEMENTED_ITEM, "many": IMPLEMENTED_ITEMS,
                                   "short": IMPLEMENTED, "label": IMPLEMENTED}},
+        "values": {"document_stage": {"captured": "brainstorm", "organized": "staged"},
+                   "register_state": {"captured": "latent", "proposed": "picked",
+                                      "retired": "rejected",
+                                      "superseded": "superseded"}},
     }
 
 
