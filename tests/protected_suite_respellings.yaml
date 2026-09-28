@@ -1,0 +1,135 @@
+# THE REVIEWED ALLOW-LIST: every edit an arc landing makes to a protected
+# suite, each entered with its reason (plan 034, in openxFactory
+# `specs/034-opendox-standalone-operation/`).
+#
+# WHAT IT IS. #1144 (openxFactory `openspec/changes/
+# add-neutral-product-standalone-operability/`) protects two sets of this
+# leg's suites from the arc that realizes it:
+#   * 5.4a's falsifier (F5.2) protects the governed projection's own proofs,
+#     taken by glob: `tests/test_generator.py`, `tests/test_snapshot*.py` and
+#     `tests/test_session_snapshot.py`;
+#   * 12.5's falsifier protects the governed flow's proofs, computed: every
+#     `tests/test_*.py` that names `open-pr`, `open_pr` or `FakePullRequests`.
+# Each falsifier finds the arc's landings by their `Arc:` trailer, and it
+# refuses any landing that touches one of those paths. T007's batch C amends
+# both (RULED R1Q7 (a), openxFactory#656 comment `5817152735`). The check
+# subtracts the edits entered here, and only those, so an edit to a protected
+# suite is lawful only as an entry in this file, and only where a ruling
+# admits it. The name is the one batch C gives the file.
+#
+# WHAT A RULING ADMITS. Nothing else is entered.
+#   * A RESPELLING of a reference to a seam the arc moved, with no assertion
+#     weakened (R1Q7 (a), batch C).
+#   * The two edits F7.1 requires (R1Q14 (a), `5850003126`, batch F), in
+#     `tests/test_snapshot.py` and `tests/test_snapshot_validator_home.py`.
+#   * The two edits 5.3a's `values` block requires (R1Q26 (a), `5851950767`,
+#     batch I), in `tests/test_gate_loop_views.py`.
+# The last two kinds are each entered with a reason, and neither is entered as
+# a respelling.
+#
+# WHO WRITES IT. The task that makes the first admitted edit creates it, in its
+# own pull request (plan 034 T019's rule). T067 amended that rule: T060
+# creates it if T043 has not, and T043 did not. So the file begins with T060's
+# entry. Each later admitted edit appends its own entry in the pull request
+# that makes the edit.
+#
+# WHO READS IT. F5.2 and 12.5's falsifier, once plan 034 T059 and T086 wire the
+# subtraction into both checks (batch C). Until then nothing reads this file,
+# and both falsifiers still refuse every protected path an arc landing touches,
+# as written.
+#
+# THE RULES.
+#   * `schema_version` is the integer 1, and `kind` is
+#     `protected-suite-respellings`. No mapping gives a key twice.
+#   * `entries` are in landing order, one per edit. Each entry names:
+#     - `suite`, the protected file, written plainly (`tests/<name>`);
+#     - `test`, the one test the edit changes;
+#     - `landing`, the pull request that lands the edit,
+#       `opensoft/openXdox-code#<n>`, because the landing's commit is not
+#       known inside it (T019's rule);
+#     - `edit`, which is `respelling` or `admitted`. A respelling also names
+#       `respelled`, the reference it respells, from what to what. An admitted
+#       edit also names `reason`;
+#     - `ruled`, the ruling that admits the edit and the #1144 amendment that
+#       records it;
+#     - `review`, the basis the landing pull request is reviewed on;
+#     - `before_blob` and `after_blob`, the git blob ids of `suite` just
+#       before and just after the edit;
+#     - `old` and `new`, the exact text the edit replaces and the text it
+#       leaves, whole lines, each ending in a newline.
+#   * AN ENTRY HOLDS when its landing L satisfies three conditions:
+#     `git rev-parse L^1:<suite>` is `before_blob`; `git rev-parse L:<suite>`
+#     is `after_blob`; and replacing `old`, which occurs exactly once in the
+#     `before_blob` text, with `new` gives the `after_blob` text byte for byte.
+#     A landing whose diff for a protected path matches no entry is refused,
+#     exactly as an unentered edit is (batch C).
+#   * Entries for one suite CHAIN: each one's `before_blob` is the previous
+#     one's `after_blob`, because each edit is made to the suite the last one
+#     left.
+#   * No entry weakens an assertion. The pull request that adds an entry is
+#     reviewed on exactly that basis (batch C).
+
+schema_version: 1
+kind: protected-suite-respellings
+
+entries:
+  - suite: tests/test_gate_loop_views.py
+    test: test_the_display_facet_declares_one_stage_entry_and_nothing_else
+    landing: opensoft/openXdox-code#34
+    edit: admitted
+    reason: >-
+      5.3a's `values` block (plan 034 T060). openXdox's DISPLAY facet now
+      carries the governed snapshot's values beside its one stage, so the test
+      that pins the facet as one whole value admits the block beside the stage.
+      No other assertion of the suite changes. This is the first of the two
+      edits batch I admits. T059 makes the second, to the overlay test, when
+      it moves this leg's openDox pin past plan 034 T054.
+    ruled: >-
+      R1Q26 (a), opensoft/openxFactory#656 comment 5851950767 (kept at
+      5852513402), on R1Q11 (a), comment 5850003126. It is recorded in #1144's
+      12.5 falsifier by T007's batch I (openxFactory#1180, landed as 8421603a).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. Its diff for
+      this suite is exactly `old` to `new`, inside the one test named. The
+      facet is still pinned as one whole value, the block added beside the
+      stage, so no assertion is weakened.
+    before_blob: 7321b04d2d436fdd319f630e0b425ab3dc7ab22a
+    after_blob: a56906c6c56b1c2db5e45aee5e93e6f07740484a
+    old: |
+      def test_the_display_facet_declares_one_stage_entry_and_nothing_else() -> None:
+          """The rulings' partial facet, pinned as a value: `stages.completion`, four fields.
+
+          `short` and `label` because they are the stage's two rendered names and
+          openDox spells both `completed` (the first ruling); `one` and `many` because
+          they are its two item nouns (the second). `gate` is left to openDox. The
+          block above `DISPLAY` in `view_extensions.py` gives the render sites.
+          """
+          assert "DISPLAY" in view_extensions.__all__
+          assert view_extensions.DISPLAY == {
+              "stages": {"completion": {"one": IMPLEMENTED_ITEM, "many": IMPLEMENTED_ITEMS,
+                                        "short": IMPLEMENTED, "label": IMPLEMENTED}},
+          }
+    new: |
+      def test_the_display_facet_declares_one_stage_entry_and_nothing_else() -> None:
+          """The rulings' partial facet, pinned as a value: `stages.completion`, four fields.
+
+          `short` and `label` because they are the stage's two rendered names and
+          openDox spells both `completed` (the first ruling); `one` and `many` because
+          they are its two item nouns (the second). `gate` is left to openDox. The
+          block above `DISPLAY` in `view_extensions.py` gives the render sites.
+
+          AND THE `values` BLOCK BESIDE IT, which is not a stage: the governed
+          snapshot's values, which openDox's views match by role (plan 034 T060,
+          RULED R1Q26 (a), `opensoft/openxFactory#656` comment `5851950767`, on R1Q11
+          (a), comment `5850003126`). The edit that admitted it is entered, with its
+          reason, in `tests/protected_suite_respellings.yaml`.
+          """
+          assert "DISPLAY" in view_extensions.__all__
+          assert view_extensions.DISPLAY == {
+              "stages": {"completion": {"one": IMPLEMENTED_ITEM, "many": IMPLEMENTED_ITEMS,
+                                        "short": IMPLEMENTED, "label": IMPLEMENTED}},
+              "values": {"document_stage": {"captured": "brainstorm", "organized": "staged"},
+                         "register_state": {"captured": "latent", "proposed": "picked",
+                                            "retired": "rejected",
+                                            "superseded": "superseded"}},
+          }
