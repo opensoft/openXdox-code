@@ -13,8 +13,8 @@ write is atomic, and a value JSON cannot carry is refused rather than written
 (plan 034 T059: this module is openXdox's writer at openDox's writer seam).
 
 Validation is DELEGATED to this product's own validator, in this repository
-(`scripts/validate-ideation-dashboard-contracts.py`) — the schema is never
-restated here. `validate_or_raise` fails loudly on a non-conforming snapshot.
+(`scripts/validate-ideation-dashboard-contracts.py`) and, in an install, in the
+package (`openxdox/contracts/`) — the schema is never restated here. `validate_or_raise` fails loudly on a non-conforming snapshot.
 It reports THREE outcomes: validated, not conformant, and validator
 unavailable — see the commentary above `VALIDATED` for why the third one exists.
 """
@@ -147,8 +147,9 @@ PRODUCT_DISTRIBUTION = "openxdox"
 
 def product_root() -> Path | None:
     """This product's own source tree, or None when the module is not running
-    from one (an installed wheel ships no `scripts/`, so it has no validator of
-    its own to offer, and it must not go looking for somebody else's).
+    from one (an installed wheel ships no `scripts/`: its validator is the
+    packaged one, `openxdox/contracts/`, and it never goes looking for somebody
+    else's).
 
     NO WALK. The root is fixed arithmetic on this module's own resolved path —
     `parents[2]` of `src/openxdox/snapshot.py` — confirmed by the explicit
@@ -171,25 +172,50 @@ def _inside(path: Path, root: Path) -> bool:
     return Path(path).resolve().is_relative_to(root.resolve())
 
 
-def find_validator(start: Path | None = None) -> Path | None:
-    """THIS PRODUCT'S OWN validator, `product_root() / VALIDATOR_RELPATH`, or
-    None. It is looked for in exactly one place, and never above the product's
-    root: the parent walk this replaces ADOPTED whatever enclosing checkout
-    still carried a pre-shed copy (split-opendox-two-layer-product § 8.9
-    residue (iii) — a reader adopting its enclosing tree).
+def _packaged_candidate() -> tuple[Path, Path]:
+    """This installed package's directory, and where its packaged validator
+    sits in it: `openxdox/contracts/`, beside this module."""
+    package = Path(__file__).resolve().parent
+    return package, package / "contracts" / VALIDATOR_RELPATH.name
 
-    `start` keeps its declared signature (openDox's `consumer_reach` binds this
-    function by name) and now CONFINES instead of widening: a `start` outside
-    this product's own tree answers None, because nothing outside that tree is
-    ever consulted, and `start=None` asks from the module itself. A caller that
-    means a validator from anywhere else passes it explicitly —
-    `validate_snapshot(..., validator=...)`; none is ever inferred from where a
-    snapshot, a corpus or the cwd happens to sit."""
+
+def _packaged_validator() -> Path | None:
+    """The installed distribution's packaged validator, or None where this
+    install carries none. `is_file()` follows a symlink, so containment is
+    checked on the RESOLVED path too, as the source-tree branch of
+    `find_validator` checks it: a `contracts/` or a validator that links out of
+    the installed package is somebody else's script, and is never run
+    (Copilot on openXdox-code#36)."""
+    package, candidate = _packaged_candidate()
+    if candidate.is_file() and _inside(candidate, package):
+        return candidate
+    return None
+
+
+def find_validator(start: Path | None = None) -> Path | None:
+    """THE INSTALLED DISTRIBUTION'S OWN validator, or None (plan 034 T061;
+    #1144 7.3, RULED R1Q14 (a)). There is no parent walk, and no search at all:
+
+    * where this module runs from this product's source tree (`product_root()`),
+      it is that tree's `VALIDATOR_RELPATH`, the file openxFactory's lanes read
+      at that path;
+    * where it runs from an install, it is the packaged validator,
+      `openxdox/contracts/validate-ideation-dashboard-contracts.py`, which finds
+      this validator's own three schemas beside it.
+
+    `start` KEEPS ITS DECLARED SIGNATURE, and is IGNORED. openDox's
+    `consumer_reach` binds this function by name, and callers pass the
+    directories they validate from. Under split-opendox § 8.9 residue (iii)
+    (openXdox-code#28, `e28930bf`) a `start` outside the product's tree
+    CONFINED the answer to None, so a launch from a corpus or a run directory
+    went unvalidated. The answer now never depends on it, nor on the cwd, a
+    snapshot's directory or a corpus, so an enclosing tree's validator is never
+    adopted, whatever it carries. A caller that means another validator passes
+    it explicitly: `validate_snapshot(..., validator=...)`."""
+    del start  # the declared signature is kept, and the start is ignored (7.3)
     root = product_root()
     if root is None:
-        return None
-    if start is not None and not _inside(Path(start), root):
-        return None
+        return _packaged_validator()
     candidate = root / VALIDATOR_RELPATH
     # `is_file()` follows a symlink, so containment is checked on the RESOLVED
     # path as well: a `scripts/` link pointing out of the tree is refused.
@@ -199,16 +225,23 @@ def find_validator(start: Path | None = None) -> Path | None:
 
 
 def _validator_not_found_reason(search_from: Path | None) -> str:
-    """Why `find_validator` answered None, in the three ways it can."""
+    """Why `find_validator` answered None, in the two ways it can. The start is
+    not one of them: it is ignored (plan 034 T061)."""
     root = product_root()
     if root is None:
-        where = ("this openxdox is not running from a source checkout, so it "
-                 f"carries no {VALIDATOR_RELPATH} of its own")
-    elif search_from is not None and not _inside(Path(search_from), root):
-        where = (f"the search was confined to {search_from}, which lies outside "
-                 f"this product's own tree ({root})")
+        package, candidate = _packaged_candidate()
+        if candidate.is_file() and not _inside(candidate, package):
+            where = (f"this openxdox's packaged validator ({candidate}) resolves "
+                     "outside the installed package, so it is not run")
+        else:
+            where = ("this openxdox is installed without its packaged validator "
+                     f"(openxdox/contracts/{VALIDATOR_RELPATH.name})")
     else:
-        where = f"{root / VALIDATOR_RELPATH} does not exist"
+        candidate = root / VALIDATOR_RELPATH
+        if candidate.is_file() and not _inside(candidate, root):
+            where = f"{candidate} resolves outside this product's tree, so it is not run"
+        else:
+            where = f"{candidate} does not exist"
     return (f"{where}; a validator in an enclosing checkout is never adopted — "
             "pass validator= to use one explicitly")
 
@@ -303,9 +336,11 @@ def validate_snapshot(
     `result.outcome` is one of `VALIDATED`, `NOT_CONFORMANT`, or
     `VALIDATOR_UNAVAILABLE`; `result.ok` stays True only for `VALIDATED`."""
     path = Path(path).resolve()
-    # The snapshot's own directory is NOT a search root any more: a snapshot
-    # written inside some other checkout must not choose that checkout's
-    # validator (§ 8.9 residue (iii)). `search_from`, when given, only confines.
+    # The snapshot's own directory is NOT a search root: a snapshot written
+    # inside some other checkout must not choose that checkout's validator
+    # (§ 8.9 residue (iii)). `search_from` keeps its place in the signature
+    # (openDox's validator seam passes the roots it validates from), and is
+    # ignored with `find_validator`'s start (plan 034 T061).
     validator = validator or find_validator(search_from)
     if validator is None:
         return ValidationResult(

@@ -229,22 +229,20 @@ class GovernedValidator:
     openXdox-spec's three kinds.
 
     openDox hands it the roots a search may start from, the written snapshot's
-    directory first and the served checkout second. `locate()` asks
-    `snapshot.find_validator` from each in turn, as openDox's
-    `cli._locate_validator` did before T055, and the first validator found
-    runs. `snapshot.validate_snapshot` reaches the verdict, with its three
-    outcomes, and its result carries every attribute openDox reads."""
+    directory first and the served checkout second. Since plan 034 T061 there
+    is no search: `snapshot.find_validator` answers the installed
+    distribution's own validator whatever the start (#1144 7.3, RULED R1Q14
+    (a)), so `locate()` asks it once and the roots are not read.
+    `snapshot.validate_snapshot` reaches the verdict, with its three outcomes,
+    and its result carries every attribute openDox reads."""
 
     #: The remedy openDox prints when the validator is found but cannot run.
     dependency_remedy = snapshot_mod.DEPENDENCY_REMEDY
 
     def locate(self, search_from: tuple = ()) -> Path | None:
-        """The validator from the first root that reaches one, or None."""
-        for start in tuple(search_from) or (None,):
-            found = snapshot_mod.find_validator(None if start is None else Path(start))
-            if found is not None:
-                return found
-        return None
+        """The installed distribution's own validator, or None. `search_from`
+        keeps the seam's signature and is not read."""
+        return snapshot_mod.find_validator()
 
     def validate(self, path: Path | str, *, strict: bool = False,
                  search_from: tuple = ()) -> snapshot_mod.ValidationResult:
@@ -252,18 +250,11 @@ class GovernedValidator:
         if validator is not None:
             return snapshot_mod.validate_snapshot(path, validator=validator,
                                                   strict=strict)
-        starts = tuple(search_from) or (None,)
-        reasons = []
-        for start in starts:
-            reason = snapshot_mod._validator_not_found_reason(
-                None if start is None else Path(start))
-            if reason not in reasons:
-                reasons.append(reason)
         return snapshot_mod.ValidationResult(
             False, -1, "", "validator not found", None,
             snapshot_mod.VALIDATOR_UNAVAILABLE,
-            f"no {snapshot_mod.VALIDATOR_RELPATH} of this product's own was "
-            f"found from any root offered: " + "; ".join(reasons))
+            f"this product's own validator ({snapshot_mod.VALIDATOR_RELPATH.name}) "
+            f"was not found: {snapshot_mod._validator_not_found_reason(None)}")
 
 
 VALIDATOR = GovernedValidator()

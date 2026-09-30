@@ -10,9 +10,10 @@ than convenient:
   * T007 batch B's three assertions on the file: its count equals its
     entries, every entry carries its reason, and a run that loads the root
     conftest prints it;
-  * the reasons are the four the rulings admit (R1Q6 (d); R1Q24 (a) twice;
-    R1Q25 (b)), and the consumer's schemas are `tests/test_snapshot.py`'s
-    alone;
+  * the reasons are drawn from the four the rulings admit (R1Q6 (d); R1Q24
+    (a) twice; R1Q25 (b)), and the consumer's schemas were
+    `tests/test_snapshot.py`'s alone, until T061 (7.3) cleared that entry and
+    the reason left with it;
   * the root conftest derives `collect_ignore` from the file, refuses a file
     that breaks a rule, and the whole suite collects less exactly these files,
     while a listed file named on the command line is collected and printed as
@@ -23,7 +24,7 @@ than convenient:
 The last is the one that stops the exclusion from hiding anything. A listed
 file that also failed for some other cause would turn its case red, and so
 would a file that stopped failing for its reason. That file then leaves the
-list, in the pull request that clears the reason (T061's, for
+list, in the pull request that clears the reason (as T061's did for
 `tests/test_snapshot.py`). An entry may name two reasons, and each is then
 checked (`tests/test_doxbench_packet.py` and
 `tests/test_doxbench_blank_reason.py`).

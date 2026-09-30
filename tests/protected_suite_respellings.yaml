@@ -24,7 +24,11 @@
 #     `tests/test_snapshot.py` and `tests/test_snapshot_validator_home.py`.
 #   * The two edits 5.3a's `values` block requires (R1Q26 (a), `5851950767`,
 #     batch I), in `tests/test_gate_loop_views.py`.
-# The last two kinds are each entered with a reason, and neither is entered as
+#   * The ten cases 7.3's lookup rewords (Brett's ruling at `5916000030`, batch
+#     K), nine in `tests/test_snapshot_validation_launch.py` and one in
+#     `tests/test_snapshot.py`: each one's walk premise becomes 7.3's answer,
+#     and its assertions stay.
+# The last three kinds are each entered with a reason, and none is entered as
 # a respelling.
 #
 # WHO WRITES IT. The task that makes the first admitted edit creates it, in its
@@ -68,9 +72,23 @@
 #     fourth, from `test`: `old` lies inside the named test in the
 #     `before_blob` text, and `new` inside it in the `after_blob` text, so an
 #     entry cannot admit an edit to another test of the suite.
+#   * AN ADDED TEST (plan 034 T061; batch F admits one). Where `test` does not
+#     exist in the `before_blob` text, the fourth condition reads instead: `new`
+#     is `old` followed by that test's whole definition and blank lines, and
+#     nothing else. `old` is then the text the test is added after.
 #   * Entries for one suite CHAIN: each one's `before_blob` is the previous
 #     one's `after_blob`, because each edit is made to the suite the last one
 #     left.
+#   * SEVERAL EDITS IN ONE LANDING (plan 034 T061; batch K), in F5.2's call
+#     alone (`--chains`; 12.5's keeps one entry per suite per landing). A
+#     landing that edits one suite in several tests enters each edit as its
+#     own entry, in the order they apply, all naming that landing. The first
+#     one's `before_blob` is the suite before the landing and the last one's
+#     `after_blob` the suite at it. Each one between records, as its
+#     `after_blob`, the blob id of the text its edit leaves (`git
+#     hash-object`; no commit need hold it). Each holds on its own texts by the
+#     conditions above, so the landing's diff for the suite is exactly their
+#     texts, each inside its own test.
 #   * No entry weakens an assertion. The pull request that adds an entry is
 #     reviewed on exactly that basis (batch C).
 
@@ -279,3 +297,598 @@ entries:
 
           source = inspect.getsource(serve_mod.DashboardHandler._serve_source)
           assert "resolve_source_path(Path(root), rest)" in source
+  - suite: tests/test_snapshot.py
+    test: test_the_validator_is_the_installed_consumers_own
+    landing: opensoft/openXdox-code#36
+    edit: admitted
+    reason: >-
+      F7.1's first named test, ADDED after
+      test_referentially_broken_snapshot_is_rejected (plan 034 T061, #1144
+      7.3). It plants the pre-shed tree above the start and asserts that
+      find_validator answers the consumer's own validator for every start,
+      never one under the planted tree, and that it runs: a good snapshot
+      validates, a dangling edge is not conformant. The first of the two edits
+      batch F admits.
+    ruled: >-
+      R1Q14 (a), opensoft/openxFactory#656 comment 5850003126, recorded in
+      #1144's F5.2 by T007's batch F.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order, under
+      F5.2's `--chains`: the landing's diff for this suite is exactly the
+      chain's recorded texts, each inside its own named test, and this step's
+      is `old` to `new`, which adds the named test and nothing beside it. No
+      assertion is weakened: the edit adds a test and changes no line of any
+      other.
+    before_blob: 312224fb34e148606be1e09e5674680ca050703a
+    after_blob: ff7d5b1f756eb15419536afc6c204e507d7efd6c
+    old: |2
+              snapshot.validate_or_raise(p, validator=validator)
+    new: |2
+              snapshot.validate_or_raise(p, validator=validator)
+
+
+      def test_the_validator_is_the_installed_consumers_own(tmp_path, monkeypatch):
+          """#1144 7.3 (plan 034 T061, RULED R1Q14 (a)): the lookup answers the INSTALLED
+          distribution's own validator, whatever it is asked from, and never an
+          enclosing tree's. The planted tree is F7.1's: a pre-shed
+          `openxFactory/scripts/validate-ideation-dashboard-contracts.py` above the
+          working directory, which exits 0 whatever it is given. And the validator
+          found checks a snapshot against the consumer's own schema, which it reads
+          from the distribution (R1Q27 (a)), with no `contracts/` of its own and no
+          `CONTRACTS_DIR`: a dangling edge is a verdict, and a conforming snapshot
+          validates. This test is added by T007's batch F, entered in
+          `tests/protected_suite_respellings.yaml`."""
+          import pathlib
+
+          planted = tmp_path / "preshed"
+          decoy = planted / "openxFactory" / "scripts" / "validate-ideation-dashboard-contracts.py"
+          decoy.parent.mkdir(parents=True)
+          decoy.write_text("raise SystemExit(0)\n", encoding="utf-8")
+          (planted / "work").mkdir()
+          monkeypatch.chdir(planted / "work")
+          monkeypatch.delenv("CONTRACTS_DIR", raising=False)
+
+          own = snapshot.find_validator()
+          assert own is not None, "the consumer found no validator of its own"
+          for start in (planted / "work", planted, planted / "openxFactory", tmp_path):
+              assert snapshot.find_validator(start) == own, start
+          assert planted.resolve() not in own.resolve().parents
+          root = snapshot.product_root()
+          home = root if root is not None else pathlib.Path(snapshot.__file__).resolve().parent
+          assert own.resolve().is_relative_to(home.resolve())
+
+          b = OutputBoundary(tmp_path, ["out/"])
+          good = snapshot.write_snapshot(_minimal_snapshot(), tmp_path / "out" / "s.json", b)
+          result = snapshot.validate_snapshot(good, search_from=planted / "work")
+          assert result.outcome == snapshot.VALIDATED, result.summary() + result.stdout + result.stderr
+          assert result.validator == own
+          bad = snapshot.write_snapshot(_minimal_snapshot(clusters=[{
+              "id": "cl-x", "name": "X", "topics": ["x"],
+              "document_edges": [{"document": "doc-missing", "matched_topics": ["x"]}]}]),
+              tmp_path / "out" / "bad.json", b)
+          refused = snapshot.validate_snapshot(bad, search_from=planted)
+          assert refused.outcome == snapshot.NOT_CONFORMANT, refused.stdout + refused.stderr
+          assert "dangling" in refused.stdout
+  - suite: tests/test_snapshot.py
+    test: test_a_missing_validator_is_unavailable_not_a_verdict
+    landing: opensoft/openXdox-code#36
+    edit: admitted
+    reason: >-
+      Case 10 of batch K's ten (plan 034 T061, #1144 7.3). A start outside the
+      product no longer confines the lookup, so "missing" is made where the
+      arc moved it: the distribution carries no validator of its own
+      (`product_root` and `_packaged_validator` both None), the one way under
+      7.3 to have none. The call and its search_from are unchanged.
+    ruled: >-
+      Brett's ruling at opensoft/openxFactory#656 comment 5916000030 ("Reword
+      as reviewed entries"), on R1Q7 (a), comment 5817152735. It is recorded
+      in #1144's F5.2 by T007's batch K, and T061 lands only after batch K
+      does.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order, under
+      F5.2's `--chains`: the landing's diff for this suite is exactly the
+      chain's recorded texts, each inside its own named test, and this step's
+      is `old` to `new`, inside the test named. No assertion is weakened:
+      UNAVAILABLE and `validator is None` stay.
+    before_blob: ff7d5b1f756eb15419536afc6c204e507d7efd6c
+    after_blob: bcd2c0b6308cd9f8ea170567f52505ded9468d39
+    old: |2
+      def test_a_missing_validator_is_unavailable_not_a_verdict(tmp_path):
+    new: |2
+      def test_a_missing_validator_is_unavailable_not_a_verdict(tmp_path, monkeypatch):
+          # Since plan 034 T061 (#1144 7.3; T007's batch K, on Brett's ruling at
+          # openxFactory#656 comment 5916000030) the start never confines the lookup,
+          # so "missing" is made where the arc moved it: a distribution that carries no
+          # validator of its own, from no source tree and with no packaged copy.
+          monkeypatch.setattr(snapshot, "product_root", lambda: None)
+          monkeypatch.setattr(snapshot, "_packaged_validator", lambda: None)
+  - suite: tests/test_snapshot_validator_home.py
+    test: test_a_start_outside_the_product_is_refused_not_walked
+    landing: opensoft/openXdox-code#36
+    edit: admitted
+    reason: >-
+      The second of the two edits batch F admits (plan 034 T061, #1144 7.3):
+      the expected answer is now 7.3's. A start outside the product no longer
+      confines the answer to None; every start answers the product's own
+      validator, and the planted tree above it is still never walked.
+    ruled: >-
+      R1Q14 (a), opensoft/openxFactory#656 comment 5850003126, recorded in
+      #1144's F5.2 by T007's batch F.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. Its diff for
+      this suite is exactly `old` to `new`, inside the one test named, and
+      nothing else. No assertion is weakened: the planted tree is still
+      asserted never to be adopted.
+    before_blob: 789a87b26313d630f0cce249e9350a4d1b60e2c5
+    after_blob: 70a687a78311d2f1a6ed307f8102c8ccf90b953b
+    old: |2
+          """(iii) `start` CONFINES. Every directory above or beside the product —
+          the enclosing checkout's root, its `openxFactory/`, a run directory — answers
+          None; none of them is walked to the enclosing validator sitting right there."""
+          agg, enclosing, product, module = _enclosed_product(tmp_path, load_copy)
+          assert enclosing.is_file()
+          for start in (agg, agg / "openxFactory", agg / "work", agg / "work" / "out"):
+              assert module.find_validator(start) is None, start
+          assert module.find_validator(product / "src") == \
+              product / "scripts" / "validate-ideation-dashboard-contracts.py"
+    new: |2
+          """(iii) `start` IS IGNORED (#1144 7.3, plan 034 T061, RULED R1Q14 (a); this
+          case's expected answer revised under T007's batch F, entered in
+          `tests/protected_suite_respellings.yaml`). The lookup answers the installed
+          distribution's own validator whatever it is asked from. Every directory
+          above or beside the product — the enclosing checkout's root, its
+          `openxFactory/`, a run directory — answers the product's own; none of them
+          is walked to the enclosing validator sitting right there. Until 7.3 a start
+          outside the product CONFINED the answer to None."""
+          agg, enclosing, product, module = _enclosed_product(tmp_path, load_copy)
+          own = product / "scripts" / "validate-ideation-dashboard-contracts.py"
+          assert enclosing.is_file()
+          for start in (agg, agg / "openxFactory", agg / "work", agg / "work" / "out"):
+              assert module.find_validator(start) == own, start
+          assert module.find_validator(product / "src") == own
+  - suite: tests/test_snapshot_validation_launch.py
+    test: test_the_default_shaped_launch_validates_from_the_repo_root
+    landing: opensoft/openXdox-code#36
+    edit: admitted
+    reason: >-
+      One of batch K's ten (plan 034 T061, #1144 7.3). Under 7.3 no walk finds
+      a validator, so the stub is planted as the installed distribution's own
+      validator (`product_root` None, `_packaged_validator` the stub), which
+      the real `find_validator` answers whatever the start; the run dir's
+      start answers it rather than None.
+    ruled: >-
+      Brett's ruling at opensoft/openxFactory#656 comment 5916000030 ("Reword
+      as reviewed entries"), on R1Q7 (a), comment 5817152735. It is recorded
+      in #1144's F5.2 by T007's batch K, and T061 lands only after batch K
+      does.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order, under
+      F5.2's `--chains`: the landing's diff for this suite is exactly the
+      chain's recorded texts, each inside its own named test, and this step's
+      is `old` to `new`, inside the test named. No assertion is weakened: rc
+      0, not SKIPPED on either stream, the stub's verdict line, and the
+      snapshot written all stay.
+    before_blob: 1fb53b56ac219b4c7d8020c3263b300a141e6e27
+    after_blob: 3057f6c3a5853f5111d4f4ccf3bd6c942482b87a
+    old: |2
+      def test_the_default_shaped_launch_validates_from_the_repo_root(tmp_path, capsys):
+          """THE DEFECT: the run dir is OUTSIDE any aggregation checkout — the shape
+          `tempfile.mkdtemp()` always produces — and the snapshot is validated anyway,
+          because `--repo-root` is a checkout and the validator lives in it.
+
+          A real temp dir is not used, because a test that wrote to /tmp/<random> would
+          be asserting the same thing with less control; what matters is that the run
+          dir has NO aggregation ancestor, which `tmp_path/run` also has not."""
+          repo_root = _corpus_with_a_reachable_validator(tmp_path)
+          run_dir = tmp_path / "outside" / "run"          # no validator above it
+          assert snapshot_mod.find_validator(run_dir.parent) is None
+    new: |2
+      def test_the_default_shaped_launch_validates_from_the_repo_root(tmp_path, capsys,
+                                                                     monkeypatch):
+          """THE DEFECT: the run dir is OUTSIDE any aggregation checkout — the shape
+          `tempfile.mkdtemp()` always produces — and the snapshot is validated anyway.
+
+          A real temp dir is not used, because a test that wrote to /tmp/<random> would
+          be asserting the same thing with less control; what matters is that the run
+          dir has NO aggregation ancestor, which `tmp_path/run` also has not.
+
+          WHY IT VALIDATES. It once did because `--repo-root` was a checkout and the
+          walk found the validator in it. Since plan 034 T061 (#1144 7.3; admitted by
+          T007's batch K, on Brett's ruling at openxFactory#656 comment 5916000030)
+          neither root is searched: the validator is the installed distribution's own,
+          whatever the start. So the stub is planted as the distribution's own
+          validator, and the run dir's start answers it."""
+          repo_root = _corpus_with_a_reachable_validator(tmp_path)
+          stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
+          monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+          monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: stub)
+          run_dir = tmp_path / "outside" / "run"          # no validator above it
+          assert snapshot_mod.find_validator(run_dir.parent) == stub   # the start is ignored
+  - suite: tests/test_snapshot_validation_launch.py
+    test: test_a_run_dir_beside_a_checkout_still_uses_that_one_first
+    landing: opensoft/openXdox-code#36
+    edit: admitted
+    reason: >-
+      One of batch K's ten (plan 034 T061, #1144 7.3). 7.3 ends output-path
+      priority: an enclosing tree's validator is never adopted, so the one
+      beside the run dir is not run, and the stub is planted as the installed
+      distribution's own validator (`product_root` None, `_packaged_validator`
+      the stub), which the real `find_validator` answers whatever the start.
+      The one case whose expected answer inverts, as C3's did under batch F;
+      its name is kept because an entry admits an edit inside one named test.
+    ruled: >-
+      Brett's ruling at opensoft/openxFactory#656 comment 5916000030 ("Reword
+      as reviewed entries"), on R1Q7 (a), comment 5817152735. It is recorded
+      in #1144's F5.2 by T007's batch K, and T061 lands only after batch K
+      does.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order, under
+      F5.2's `--chains`: the landing's diff for this suite is exactly the
+      chain's recorded texts, each inside its own named test, and this step's
+      is `old` to `new`, inside the test named. No assertion is weakened: rc 0
+      stays, and the case now asserts both that the beside validator did not
+      run and that the distribution's own did.
+    before_blob: 3057f6c3a5853f5111d4f4ccf3bd6c942482b87a
+    after_blob: 554d6536c2e9d7fcff55c5428b33df50e241862c
+    old: |2
+      def test_a_run_dir_beside_a_checkout_still_uses_that_one_first(tmp_path, capsys):
+          """The output path keeps PRIORITY: a run dir deliberately placed inside an
+          aggregation checkout is validated by THAT checkout's validator, as before.
+          `--repo-root` is the fallback that makes the ordinary launch validate, not a
+          replacement for the search that already worked."""
+          repo_root = _corpus_with_a_reachable_validator(tmp_path)
+          beside = tmp_path / "other-aggregation"
+          marker = beside / snapshot_mod.VALIDATOR_RELPATH
+          marker.parent.mkdir(parents=True, exist_ok=True)
+          marker.write_text('print("beside-validator: 0 error(s), 0 warning(s)")\n',
+                            encoding="utf-8")
+          run_dir = beside / "run"
+
+          rc = _launch(repo_root, run_dir)
+          out = capsys.readouterr().out
+
+          assert rc == 0
+          assert "beside-validator" in out, out
+    new: |2
+      def test_a_run_dir_beside_a_checkout_still_uses_that_one_first(tmp_path, capsys,
+                                                                     monkeypatch):
+          """Before plan 034 T061 the output path kept PRIORITY: a run dir placed
+          inside another aggregation checkout was validated by THAT checkout's
+          validator, found by walking up from it.
+
+          7.3 ENDS THAT (#1144 7.3, "no parent walk remains"; admitted by T007's
+          batch K, on Brett's ruling at openxFactory#656 comment 5916000030). An
+          enclosing tree's validator is never adopted, so the one planted beside the
+          run dir is not run, and the distribution's own validator (the stub) is. The
+          name is kept, since an entry admits an edit inside one named test; this is
+          the one case whose expected answer inverts, as C3's did under batch F."""
+          repo_root = _corpus_with_a_reachable_validator(tmp_path)
+          stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
+          monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+          monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: stub)
+          beside = tmp_path / "other-aggregation"
+          marker = beside / snapshot_mod.VALIDATOR_RELPATH
+          marker.parent.mkdir(parents=True, exist_ok=True)
+          marker.write_text('print("beside-validator: 0 error(s), 0 warning(s)")\n',
+                            encoding="utf-8")
+          run_dir = beside / "run"
+
+          rc = _launch(repo_root, run_dir)
+          out = capsys.readouterr().out
+
+          assert rc == 0
+          assert "beside-validator" not in out, out
+          assert "validation: stub-validator: 0 error(s), 0 warning(s)" in out, out
+  - suite: tests/test_snapshot_validation_launch.py
+    test: test_when_neither_root_reaches_a_validator_the_message_names_both
+    landing: opensoft/openXdox-code#36
+    edit: admitted
+    reason: >-
+      One of batch K's ten (plan 034 T061, #1144 7.3). Under 7.3 a skip has
+      one cause left, so the distribution carries no validator of its own
+      (`product_root` and `_packaged_validator` both None), the one way under
+      7.3 to have none.
+    ruled: >-
+      Brett's ruling at opensoft/openxFactory#656 comment 5916000030 ("Reword
+      as reviewed entries"), on R1Q7 (a), comment 5817152735. It is recorded
+      in #1144's F5.2 by T007's batch K, and T061 lands only after batch K
+      does.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order, under
+      F5.2's `--chains`: the landing's diff for this suite is exactly the
+      chain's recorded texts, each inside its own named test, and this step's
+      is `old` to `new`, inside the test named. No assertion is weakened: rc
+      0, SKIPPED on stderr only, both offered roots named, and "NOT checked
+      against the pinned schema" all stay.
+    before_blob: 554d6536c2e9d7fcff55c5428b33df50e241862c
+    after_blob: fa9b34f6677f694ced3c44665d01850e49e7e2a7
+    old: |2
+              tmp_path, capsys):
+          """A skip is still legal — a checkout with no validator in it is a real
+          state — but the line must not blame a checkout that is present. It names the
+          two directories that were searched, so the human can see which one to fix.
+
+          On stderr, and leading with the consequence rather than the cause (the
+          wording PR #50 landed for the same line): a diagnostic that says "this
+          snapshot was NOT checked" must not be mistakable for the routine stdout
+          progress the surrounding `wrote …` lines are."""
+    new: |2
+              tmp_path, capsys, monkeypatch):
+          """A skip is still legal, but the line must not blame a checkout that is
+          present. Since plan 034 T061 (#1144 7.3; batch K) the roots never decide
+          where the validator is, so a skip has one cause left: the distribution
+          carries no validator of its own (an install built without its packaged
+          copy). That is the state staged here. The line still names both roots
+          openDox offered to search from, so neither is blamed on its own, and says
+          the validator is absent.
+
+          On stderr, and leading with the consequence rather than the cause (the
+          wording PR #50 landed for the same line): a diagnostic that says "this
+          snapshot was NOT checked" must not be mistakable for the routine stdout
+          progress the surrounding `wrote …` lines are."""
+          monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+          monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: None)
+  - suite: tests/test_snapshot_validation_launch.py
+    test: test_missing_validator_dependencies_warn_and_the_server_still_starts
+    landing: opensoft/openXdox-code#36
+    edit: admitted
+    reason: >-
+      One of batch K's ten (plan 034 T061, #1144 7.3). 7.3 moved where the
+      validator is found, not what a harness exit means, so the stub is
+      planted as the installed distribution's own validator (`product_root`
+      None, `_packaged_validator` the stub), which the real `find_validator`
+      answers whatever the start.
+    ruled: >-
+      Brett's ruling at opensoft/openxFactory#656 comment 5916000030 ("Reword
+      as reviewed entries"), on R1Q7 (a), comment 5817152735. It is recorded
+      in #1144's F5.2 by T007's batch K, and T061 lands only after batch K
+      does.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order, under
+      F5.2's `--chains`: the landing's diff for this suite is exactly the
+      chain's recorded texts, each inside its own named test, and this step's
+      is `old` to `new`, inside the test named. No assertion is weakened: rc
+      0, the server started, and "NOT checked against the pinned schema" stay.
+    before_blob: fa9b34f6677f694ced3c44665d01850e49e7e2a7
+    after_blob: 98c5ffad6df54868d13e30b567fdf6712e5a8c5b
+    old: |2
+              tmp_path, capsys):
+          """THE REGRESSION, in the shape Brett hit it: the validator is reachable, it
+          runs, and it exits non-zero because the interpreter running it has no
+          `jsonschema`. Nothing is known about the snapshot — which is not the same as
+          knowing it is bad, and only the second of those justifies withholding the
+          dashboard from the human who asked for it."""
+          repo_root = _corpus_with_a_reachable_validator(tmp_path,
+                                                         STUB_MISSING_DEPENDENCIES)
+    new: |2
+              tmp_path, capsys, monkeypatch):
+          """THE REGRESSION, in the shape Brett hit it: the validator is reachable, it
+          runs, and it exits non-zero because the interpreter running it has no
+          `jsonschema`. Nothing is known about the snapshot — which is not the same as
+          knowing it is bad, and only the second of those justifies withholding the
+          dashboard from the human who asked for it. (The stub is planted as the
+          distribution's own validator: plan 034 T061, #1144 7.3; batch K.)"""
+          repo_root = _corpus_with_a_reachable_validator(tmp_path,
+                                                         STUB_MISSING_DEPENDENCIES)
+          stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
+          monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+          monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: stub)
+  - suite: tests/test_snapshot_validation_launch.py
+    test: test_the_dependency_warning_carries_the_pip_remedy_and_clears_the_corpus
+    landing: opensoft/openXdox-code#36
+    edit: admitted
+    reason: >-
+      One of batch K's ten (plan 034 T061, #1144 7.3). As the case above: the
+      stub is planted as the installed distribution's own validator
+      (`product_root` None, `_packaged_validator` the stub), which the real
+      `find_validator` answers whatever the start.
+    ruled: >-
+      Brett's ruling at opensoft/openxFactory#656 comment 5916000030 ("Reword
+      as reviewed entries"), on R1Q7 (a), comment 5817152735. It is recorded
+      in #1144's F5.2 by T007's batch K, and T061 lands only after batch K
+      does.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order, under
+      F5.2's `--chains`: the landing's diff for this suite is exactly the
+      chain's recorded texts, each inside its own named test, and this step's
+      is `old` to `new`, inside the test named. No assertion is weakened: the
+      pip remedy, the validator's own diagnosis, "the ENVIRONMENT, not the
+      snapshot" and "SERVES this unchecked snapshot" all stay.
+    before_blob: 98c5ffad6df54868d13e30b567fdf6712e5a8c5b
+    after_blob: f24340ffb7ec201c954fa1993d61a1e2e6d7ba46
+    old: |2
+              tmp_path, capsys):
+          """A warning that does not say what to type is a warning that gets ignored.
+          It must also relay the validator's OWN diagnosis (it is the thing that knows
+          which library it wanted) and state plainly that the corpus is not the
+          accused — the wrong half of that sentence is what a stopped human reads
+          first."""
+          repo_root = _corpus_with_a_reachable_validator(tmp_path,
+                                                         STUB_MISSING_DEPENDENCIES)
+    new: |2
+              tmp_path, capsys, monkeypatch):
+          """A warning that does not say what to type is a warning that gets ignored.
+          It must also relay the validator's OWN diagnosis (it is the thing that knows
+          which library it wanted) and state plainly that the corpus is not the
+          accused — the wrong half of that sentence is what a stopped human reads
+          first. (The stub is planted as the distribution's own validator: plan 034
+          T061, #1144 7.3; batch K.)"""
+          repo_root = _corpus_with_a_reachable_validator(tmp_path,
+                                                         STUB_MISSING_DEPENDENCIES)
+          stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
+          monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+          monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: stub)
+  - suite: tests/test_snapshot_validation_launch.py
+    test: test_a_non_conformant_snapshot_still_blocks_and_blames_the_snapshot
+    landing: opensoft/openXdox-code#36
+    edit: admitted
+    reason: >-
+      One of batch K's ten (plan 034 T061, #1144 7.3). A verdict on the data
+      still blocks the serve; the stub is planted as the installed
+      distribution's own validator (`product_root` None, `_packaged_validator`
+      the stub), which the real `find_validator` answers whatever the start.
+    ruled: >-
+      Brett's ruling at opensoft/openxFactory#656 comment 5916000030 ("Reword
+      as reviewed entries"), on R1Q7 (a), comment 5817152735. It is recorded
+      in #1144's F5.2 by T007's batch K, and T061 lands only after batch K
+      does.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order, under
+      F5.2's `--chains`: the landing's diff for this suite is exactly the
+      chain's recorded texts, each inside its own named test, and this step's
+      is `old` to `new`, inside the test named. No assertion is weakened: rc
+      1, not served, REJECTED with the dangling edge, and no pip remedy stay.
+    before_blob: f24340ffb7ec201c954fa1993d61a1e2e6d7ba46
+    after_blob: 7accc587a9a3b7481b22a627e8f85237163d5576
+    old: |2
+              tmp_path, capsys):
+          """The other half of the distinction, and the one the fix must not spend: a
+          validator that RAN and rejected the data still stops the serve. The message
+          is about the snapshot, and it must not offer the dependency remedy — sending
+          someone to `pip install` over a dangling document edge is the same defect
+          pointing the other way."""
+          repo_root = _corpus_with_a_reachable_validator(tmp_path,
+                                                         STUB_NON_CONFORMANT)
+    new: |2
+              tmp_path, capsys, monkeypatch):
+          """The other half of the distinction, and the one the fix must not spend: a
+          validator that RAN and rejected the data still stops the serve. The message
+          is about the snapshot, and it must not offer the dependency remedy — sending
+          someone to `pip install` over a dangling document edge is the same defect
+          pointing the other way. (The stub is planted as the distribution's own
+          validator: plan 034 T061, #1144 7.3; batch K.)"""
+          repo_root = _corpus_with_a_reachable_validator(tmp_path,
+                                                         STUB_NON_CONFORMANT)
+          stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
+          monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+          monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: stub)
+  - suite: tests/test_snapshot_validation_launch.py
+    test: test_strict_makes_an_unrunnable_validator_fatal
+    landing: opensoft/openXdox-code#36
+    edit: admitted
+    reason: >-
+      One of batch K's ten (plan 034 T061, #1144 7.3). --strict still makes
+      "could not check" fatal; the stub is planted as the installed
+      distribution's own validator (`product_root` None, `_packaged_validator`
+      the stub), which the real `find_validator` answers whatever the start.
+    ruled: >-
+      Brett's ruling at opensoft/openxFactory#656 comment 5916000030 ("Reword
+      as reviewed entries"), on R1Q7 (a), comment 5817152735. It is recorded
+      in #1144's F5.2 by T007's batch K, and T061 lands only after batch K
+      does.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order, under
+      F5.2's `--chains`: the landing's diff for this suite is exactly the
+      chain's recorded texts, each inside its own named test, and this step's
+      is `old` to `new`, inside the test named. No assertion is weakened: rc
+      1, not served, "--strict was given", and no "SERVES" claim stay.
+    before_blob: 7accc587a9a3b7481b22a627e8f85237163d5576
+    after_blob: e1b2380e19ae6016689a64840e69be9fa8d2de68
+    old: |2
+      def test_strict_makes_an_unrunnable_validator_fatal(tmp_path, capsys):
+          """`--strict` is a demand for certainty, so "we could not check" is a
+          failure under it — otherwise the flag would quietly mean less than it
+          says."""
+          repo_root = _corpus_with_a_reachable_validator(tmp_path,
+                                                         STUB_MISSING_DEPENDENCIES)
+    new: |2
+      def test_strict_makes_an_unrunnable_validator_fatal(tmp_path, capsys, monkeypatch):
+          """`--strict` is a demand for certainty, so "we could not check" is a
+          failure under it — otherwise the flag would quietly mean less than it
+          says. (The stub is planted as the distribution's own validator: plan 034
+          T061, #1144 7.3; batch K.)"""
+          repo_root = _corpus_with_a_reachable_validator(tmp_path,
+                                                         STUB_MISSING_DEPENDENCIES)
+          stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
+          monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+          monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: stub)
+  - suite: tests/test_snapshot_validation_launch.py
+    test: test_strict_is_fatal_when_no_validator_is_reachable_either
+    landing: opensoft/openXdox-code#36
+    edit: admitted
+    reason: >-
+      One of batch K's ten (plan 034 T061, #1144 7.3). The other unavailable
+      sub-case under 7.3: the distribution carries no validator of its own
+      (`product_root` and `_packaged_validator` both None), the one way under
+      7.3 to have none.
+    ruled: >-
+      Brett's ruling at opensoft/openxFactory#656 comment 5916000030 ("Reword
+      as reviewed entries"), on R1Q7 (a), comment 5817152735. It is recorded
+      in #1144's F5.2 by T007's batch K, and T061 lands only after batch K
+      does.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order, under
+      F5.2's `--chains`: the landing's diff for this suite is exactly the
+      chain's recorded texts, each inside its own named test, and this step's
+      is `old` to `new`, inside the test named. No assertion is weakened: it
+      warns and serves without --strict, and is fatal with it, as before.
+    before_blob: e1b2380e19ae6016689a64840e69be9fa8d2de68
+    after_blob: f09d7d8634e527a97f6b827952a5474bdea88950
+    old: |2
+      def test_strict_is_fatal_when_no_validator_is_reachable_either(tmp_path, capsys):
+          """The same rule for the other unavailable sub-case. A `--strict` run that
+          found no validator at all learned exactly as much as one whose validator
+          would not start."""
+          import shutil
+    new: |2
+      def test_strict_is_fatal_when_no_validator_is_reachable_either(tmp_path, capsys,
+                                                                    monkeypatch):
+          """The same rule for the other unavailable sub-case. A `--strict` run that
+          found no validator at all learned exactly as much as one whose validator
+          would not start. Since plan 034 T061 (#1144 7.3; batch K) "no validator at
+          all" is a distribution that carries none of its own, which is staged here."""
+          import shutil
+          monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+          monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: None)
+  - suite: tests/test_snapshot_validation_launch.py
+    test: test_the_classifier_reads_the_exit_code_not_the_dependency_sentence
+    landing: opensoft/openXdox-code#36
+    edit: admitted
+    reason: >-
+      One of batch K's ten (plan 034 T061, #1144 7.3). The exit code, not the
+      sentence, still classifies; the stub is planted as the installed
+      distribution's own validator (`product_root` None, `_packaged_validator`
+      the stub), which the real `find_validator` answers whatever the start.
+    ruled: >-
+      Brett's ruling at opensoft/openxFactory#656 comment 5916000030 ("Reword
+      as reviewed entries"), on R1Q7 (a), comment 5817152735. It is recorded
+      in #1144's F5.2 by T007's batch K, and T061 lands only after batch K
+      does.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order, under
+      F5.2's `--chains`: the landing's diff for this suite is exactly the
+      chain's recorded texts, each inside its own named test, and this step's
+      is `old` to `new`, inside the test named. No assertion is weakened: rc
+      0, served, the stub's own diagnosis, and "NOT checked" stay.
+    before_blob: f09d7d8634e527a97f6b827952a5474bdea88950
+    after_blob: b843871e4c353c7548dec6e064fce564a58f3869
+    old: |2
+              tmp_path, capsys):
+          """The guard against fixing this brittlely. A different environmental
+          failure, with different words and no mention of jsonschema, is classified
+          the same way — because the signal is the validator's documented exit code
+          (2 = harness error), not a phrase that a future edit could reword."""
+          repo_root = _corpus_with_a_reachable_validator(tmp_path, STUB_MISSING_YAML)
+    new: |2
+              tmp_path, capsys, monkeypatch):
+          """The guard against fixing this brittlely. A different environmental
+          failure, with different words and no mention of jsonschema, is classified
+          the same way — because the signal is the validator's documented exit code
+          (2 = harness error), not a phrase that a future edit could reword. (The
+          stub is planted as the distribution's own validator: plan 034 T061, #1144
+          7.3; batch K.)"""
+          repo_root = _corpus_with_a_reachable_validator(tmp_path, STUB_MISSING_YAML)
+          stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
+          monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+          monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: stub)

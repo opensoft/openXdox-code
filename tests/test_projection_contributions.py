@@ -428,13 +428,16 @@ def test_the_change_rows_are_the_governed_enumeration_with_each_origin(monkeypat
 # the validator
 # --------------------------------------------------------------------------
 
-def test_the_validator_is_located_from_each_root_in_turn(monkeypatch, tmp_path) -> None:
+def test_the_validator_is_the_installed_distributions_own_whatever_the_roots(monkeypatch,
+                                                                           tmp_path) -> None:
+    """Plan 034 T061 (#1144 7.3): the lookup ignores its start, so the roots
+    openDox offers are not read, and the one validator runs."""
     found = tmp_path / "validator.py"
     asked = []
 
-    def find_validator(start):
+    def find_validator(start=None):
         asked.append(start)
-        return found if start == tmp_path / "second" else None
+        return found
 
     ran = []
     monkeypatch.setattr(snapshot_mod, "find_validator", find_validator)
@@ -443,16 +446,21 @@ def test_the_validator_is_located_from_each_root_in_turn(monkeypatch, tmp_path) 
     result = pc.VALIDATOR.validate(tmp_path / "s.json", strict=True,
                                    search_from=(tmp_path / "first", tmp_path / "second"))
     assert result == "result"
-    assert asked == [tmp_path / "first", tmp_path / "second"]
+    assert asked == [None]
     assert ran == [(tmp_path / "s.json", {"validator": found, "strict": True})]
 
 
-def test_no_validator_from_any_root_is_unavailable_naming_the_script(monkeypatch, tmp_path) -> None:
-    monkeypatch.setattr(snapshot_mod, "find_validator", lambda start: None)
+def test_the_locate_answer_is_snapshots_own(tmp_path) -> None:
+    assert pc.VALIDATOR.locate((tmp_path / "anywhere",)) == snapshot_mod.find_validator()
+
+
+def test_no_validator_of_its_own_is_unavailable_naming_the_script(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(snapshot_mod, "find_validator", lambda start=None: None)
     result = pc.VALIDATOR.validate(tmp_path / "s.json",
                                    search_from=(tmp_path / "a", tmp_path / "b"))
     assert result.outcome == projection_seams.VALIDATOR_UNAVAILABLE
     assert not result.available
     assert result.validator is None
-    assert str(snapshot_mod.VALIDATOR_RELPATH) in result.unavailable_reason
+    assert snapshot_mod.VALIDATOR_RELPATH.name in result.unavailable_reason
+    assert "never adopted" in result.unavailable_reason
     assert pc.VALIDATOR.dependency_remedy == snapshot_mod.DEPENDENCY_REMEDY

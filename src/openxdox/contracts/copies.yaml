@@ -1,0 +1,43 @@
+# THE RECORD of openXdox's packaged contract copies (plan 034 T061; #1144 7.3,
+# as T007's batch I amends it; R1Q14 (a) and R1Q27 (a), opensoft/openxFactory#656
+# comments 5850003126 and 5851950767).
+#
+# WHAT IT SAYS. Each schema under `schemas/` beside this file is, byte for byte,
+# the file its `path` names in `spec_leg` at `commit`, and `sha256` is that
+# file's digest. These are the consumer validator's own three kinds (7.1's
+# openXdox-spec three). The validator reads them from the installed
+# distribution, and recomputes each digest against this record before it reads
+# a copy: a copy that differs, one that is absent, and one whose digest is left
+# empty are all refused (`openxdox.contracts.verified_path`, and the same check
+# inside `validate-ideation-dashboard-contracts.py`).
+#
+# WHERE THE VALUES CAME FROM, read with `git show <commit>:<path> | sha256sum`
+# in opensoft/openXdox-spec.
+#
+# * `commit` is the spec-leg commit the openXdox root pins: its `spec` gitlink
+#   and `contracts/spec-pin.yaml` name f088b097 at opensoft/openXdox `main`
+#   57e2b8f2. It is the one commit all three copies were taken at.
+# * Each digest is the one the root's `contracts/manifest.yaml` records for that
+#   file at that commit.
+#
+# NEVER EDIT A COPY OR A DIGEST IN PLACE. openXdox-spec owns these schemas
+# (R1Q12 (a)). A copy changes in the spec leg. It arrives here when the spec
+# leg's file is copied at the pinned commit and its digest recorded, in one
+# commit, with `commit` moved to the spec pin that carries it.
+#
+# A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
+# (RULED OQ-C).
+schema_version: 1
+kind: packaged-contract-copies
+spec_leg: opensoft/openXdox-spec
+commit: "f088b09732e236279898b53ab9fb0f5ebc89509a"
+copies:
+  - id: gate-action-record
+    path: contracts/schemas/gate-action-record.schema.yaml
+    sha256: "6a6cf13c76e3e6f6792cd2a4be1ed2296b24525bee800a3e9173d608e0539189"
+  - id: ideation-dashboard-snapshot
+    path: contracts/schemas/ideation-dashboard-snapshot.schema.yaml
+    sha256: "054259fe96686e3cace3269a09740b9cd8846fbc2f88e52dd0c93f8974aeab3b"
+  - id: ideation-dashboard-snapshot-index
+    path: contracts/schemas/ideation-dashboard-snapshot-index.schema.yaml
+    sha256: "7fd9b797730e25f7a97c6acc3fb728ccce1b688643e950e7384eb0f9e9a0e296"

@@ -22,10 +22,11 @@ Four behaviours are pinned here, each of which fails without its hunk:
   * a root that IS a corpus but projects ZERO documents WARNS loudly and still
     succeeds: an empty corpus is legal, and failing on it would make an honestly
     empty repository unusable.
-  * "validation SKIPPED" says WHY — it names BOTH roots the search walked up
-    from (the OUTPUT path first, then `--repo-root`; see
-    `test_snapshot_validation_launch.py`, which pins the fallback), so a skip
-    blames neither on its own — instead of reading as routine.
+  * "validation SKIPPED" says WHY — it names BOTH roots openDox offered to
+    search from (the OUTPUT path first, then `--repo-root`), so a skip blames
+    neither on its own — instead of reading as routine. Since plan 034 T061
+    (#1144 7.3) neither root decides where the validator is: a skip means this
+    product carries no validator of its own, and the line says that too.
   * `serve.py --checkout-root` (the same value under a second spelling) refuses a
     path that cannot be a checkout, and `_checkout_real` means what its name says.
 
@@ -260,15 +261,21 @@ def test_a_corpus_with_documents_warns_about_nothing(tmp_path, capsys):
 # --------------------------------------------------------------------------
 
 def test_the_validation_skip_names_the_directory_it_searched_and_the_reason(
-        tmp_path, capsys):
+        tmp_path, capsys, monkeypatch):
     """The old line ("no reachable openxFactory checkout") read as routine and
     left the human believing the snapshot had been checked, while naming a
     checkout that was present and fine. The replacement leads with the
     consequence — NOT checked against the pinned schema — and names BOTH roots
-    that were walked up from, because since `_locate_validator` neither one on
-    its own is the reason (defect 8: the OUTPUT path is searched first, then
-    `--repo-root`). Here neither reaches a validator, which is what a skip now
-    means."""
+    openDox offered (defect 8: the OUTPUT path first, then `--repo-root`), so
+    neither is blamed on its own.
+
+    Since plan 034 T061 (#1144 7.3) the validator is this product's own,
+    whatever the roots, so a skip has one cause left: an install built without
+    its packaged validator. That is the case staged here (no source tree, no
+    packaged copy), and the line names the validator and says why it is
+    absent."""
+    monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+    monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: None)
     corpus_root = _corpus(tmp_path / "repo", document=DOC)
     out_dir = tmp_path / "out"
 
@@ -277,13 +284,13 @@ def test_the_validation_skip_names_the_directory_it_searched_and_the_reason(
 
     assert rc == 0                          # a skip is not a failure
     assert "NOT checked against the pinned schema" in err
-    assert str(snapshot_mod.VALIDATOR_RELPATH) in err
-    assert str(out_dir) in err               # WHERE it searched, first…
-    assert str(corpus_root) in err           # …and where it fell back to
-    assert snapshot_mod.find_validator(out_dir) is None, (
-        "this test's premise: no validator is reachable from the output dir")
-    assert snapshot_mod.find_validator(corpus_root) is None, (
-        "…nor from --repo-root, which is why the skip is legitimate here")
+    assert snapshot_mod.VALIDATOR_RELPATH.name in err
+    assert "installed without its packaged validator" in err
+    assert str(out_dir) in err               # WHERE it was offered, first…
+    assert str(corpus_root) in err           # …and then
+    for start in (out_dir, corpus_root, None):
+        assert snapshot_mod.find_validator(start) is None, (
+            "this test's premise: the product carries no validator, whatever the start")
 
 
 # --------------------------------------------------------------------------

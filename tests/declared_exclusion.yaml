@@ -43,8 +43,10 @@
 #     like each note, are one line. Every declared reason is named by at least
 #     one entry, and `only` lists exactly the files that name its reason, each
 #     once. A reason its ruling admits for named files alone carries exactly
-#     those in `only`: `consumer-schemas` is `tests/test_snapshot.py`'s alone
-#     (R1Q25 (b)).
+#     those in `only`: `consumer-schemas` was `tests/test_snapshot.py`'s alone
+#     (R1Q25 (b)), and left with that entry when 7.3 landed (plan 034 T061),
+#     which reads the consumer validator's own three schemas from the
+#     installed distribution.
 #   * An entry leaves in the pull request that clears its reason, and the count
 #     moves with it. A reason leaves with its last entry.
 #
@@ -57,7 +59,7 @@
 schema_version: 1
 kind: declared-test-exclusion
 
-count: 66
+count: 65
 
 reasons:
   - id: doc_health
@@ -72,11 +74,6 @@ reasons:
     reason: "reads openxFactory's contracts (the contract family's validator, schemas and examples, or its contracts/manifest.yaml) where openxFactory's tree keeps them, which is outside this checkout"
     ruled: "R1Q24 (a), openxFactory#656 comment 5850003126"
     open_until: "the doc_health direction arc (plan 034 T008)"
-  - id: consumer-schemas
-    reason: "needs the consumer validator's schemas, which neither a contracts/ in this tree nor CONTRACTS_DIR supplies until 7.3 finds them through the installed distribution"
-    ruled: "R1Q25 (b), openxFactory#656 comment 5850003126"
-    open_until: "7.3, the consumer's validator lookup (plan 034 T061, in phase 2)"
-    only: [tests/test_snapshot.py]
 
 entries:
   - {path: tests/test_authoring_agent.py, reasons: [doc_health]}
@@ -134,7 +131,6 @@ entries:
   - {path: tests/test_session_snapshot.py, reasons: [doc_health]}
   - {path: tests/test_session_transaction.py, reasons: [doc_health]}
   - {path: tests/test_session_verbs.py, reasons: [doc_health]}
-  - {path: tests/test_snapshot.py, reasons: [consumer-schemas], note: "a 5.4a protected suite; T061's landing (7.3) clears this entry"}
   - {path: tests/test_snapshot_determinism.py, reasons: [doc_health]}
   - {path: tests/test_snapshot_registry.py, reasons: [doc_health]}
   - {path: tests/test_snapshot_validation_launch.py, reasons: [doc_health], note: "a 5.4a protected suite"}
