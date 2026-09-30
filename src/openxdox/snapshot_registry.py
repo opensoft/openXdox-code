@@ -83,8 +83,8 @@ if str(_SCRIPTS_DIR) not in sys.path:
 # comes from the declaration that a verification guarding on the exact string
 # reads.
 #
-# IT IS IMPORTED WHERE IT IS READ, in `SnapshotEntry.index_entry` (plan 034
-# T059). This module is openXdox's contribution at openDox's snapshot registry
+# IT IS IMPORTED WHERE IT IS READ, in `SnapshotEntry.index_entry`, for an
+# entry with no revision of its own (plan 034 T059). This module is openXdox's contribution at openDox's snapshot registry
 # seam (`openxdox.projection_contributions`), and openDox probes a
 # registration's names when it is made. `pin_sentinels` is this module's one
 # reach into openxFactory's `doc_health`, which a lone openXdox-code checkout
@@ -301,15 +301,22 @@ class SnapshotEntry:
         only that the revision was not established: the repository is readable,
         and whether the snapshot's own generation lacked a revision, could not
         fetch one, or never recorded one is not knowable from here. Writing a
-        stronger member would assert a condition nobody established."""
-        from doc_health import pin_sentinels
+        stronger member would assert a condition nobody established.
 
+        `doc_health` is read only for the sentinel (plan 034 T059, Copilot on
+        openXdox-code#35, r4146580826), so an entry that carries its revision
+        is indexed where `doc_health` is absent too."""
+        source_revision = self.source_revision
+        if not source_revision:
+            from doc_health import pin_sentinels
+
+            source_revision = pin_sentinels.UNKNOWN
         out: dict[str, Any] = {
             "repository": self.repository,
             "ref": self.ref,
             "snapshot": self.location or (
                 self.snapshot_path.name if self.snapshot_path else f"{self.repository}-snapshot.json"),
-            "source_revision": self.source_revision or pin_sentinels.UNKNOWN,
+            "source_revision": source_revision,
         }
         if self.generated_at:
             out["generated_at"] = self.generated_at

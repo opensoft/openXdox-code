@@ -352,6 +352,24 @@ def test_without_doc_health_a_governed_generation_fails_on_doc_health() -> None:
     assert done.stdout.strip().splitlines()[-1] == "refused: doc_health"
 
 
+def test_without_doc_health_an_entry_that_carries_its_revision_is_indexed() -> None:
+    """`doc_health` is read only for the sentinel an entry with no revision
+    gets, so an index of entries that carry theirs is served without it, and
+    the sentinel alone still fails on `doc_health` (Copilot on #35)."""
+    done = _run_blocked('''
+        import json
+        from openxdox import snapshot_registry as reg
+        versioned = reg.SnapshotEntry(repository="alpha", ref="main", source_revision="a" * 40)
+        print(json.dumps(versioned.index_entry()["source_revision"]))
+        try:
+            reg.SnapshotEntry(repository="beta", ref="main").index_entry()
+        except ModuleNotFoundError as exc:
+            print("refused:", exc.name)
+    ''')
+    assert done.returncode == 0, done.stderr
+    assert done.stdout.strip().splitlines()[-2:] == ['"' + "a" * 40 + '"', "refused: doc_health"]
+
+
 def test_the_scanned_roots_are_read_when_used(monkeypatch) -> None:
     reads = []
 
