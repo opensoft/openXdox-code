@@ -285,7 +285,12 @@ def test_the_lawful_direction_is_actually_exercised() -> None:
 #: IMPLEMENTATION SURFACE here, where importing doc-health is lawful."
 #: MEASURED at the leg's own tree rather than carried: 13 statements over 8
 #: modules under `src/` (8 at import time, 5 deferred); 25 over 15 files
-#: counting the carved `tests/`. The box's "23" is a whole-package figure from
+#: counting the carved `tests/`. Plan 034 T059 moved `snapshot_registry.py`'s
+#: one statement from import time into `SnapshotEntry.index_entry`, where its
+#: sentinel is read, so this leg's registry can be registered at openDox's
+#: registry seam in a checkout without `doc_health`
+#: (`openxdox.projection_contributions`). The surface is the same 13
+#: statements over the same 8 modules, now 7 at import time and 6 deferred. The box's "23" is a whole-package figure from
 #: design § D3's `serve.py` paragraph and is not exactly measurable as written
 #: — recorded, on the reality check of 2026-09-10, as an arithmetic note and
 #: not a defect. What this test does is make the surface ENUMERATED, so a new
@@ -299,7 +304,7 @@ DOC_HEALTH_SURFACE: dict[str, tuple[int, int]] = {
     "src/openxdox/gate_routes.py":        (0, 1),
     "src/openxdox/generator.py":          (3, 0),
     "src/openxdox/round_trip.py":         (1, 0),
-    "src/openxdox/snapshot_registry.py":  (1, 0),
+    "src/openxdox/snapshot_registry.py":  (0, 1),
 }
 
 
@@ -343,9 +348,9 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 #: this repository has since had to sweep for. It happened once more: the pin
 #: named `5c137a90` (openDox-code#27, § 3.4 RULED Q7) from 2026-09-17, and
 #: this note went on saying so after #29 moved it, until plan 034 T043 swept
-#: it. The pin names `2d116415` (openDox-code#55, plan 034 T037) since
-#: 2026-09-27, and `_back_import_census()` recomputed against THAT tree returns
-#: exactly the five rows below. FROM `a99eba03` (#11, § 4.3) TO `5c137a90` THE
+#: it. The pin named `2d116415` (openDox-code#55, plan 034 T037) from
+#: 2026-09-27, and `_back_import_census()` recomputed against that tree
+#: returned exactly the five rows T040 carried. FROM `a99eba03` (#11, § 4.3) TO `5c137a90` THE
 #: PIN CROSSED THIRTEEN openDox-code LANDINGS, from #13 (`e86deb2`) to #27
 #: (`git rev-list --count --first-parent a99eba03..5c137a90` in openDox-code).
 #: This note named five of them, the correction Copilot's round-1 review of
@@ -361,6 +366,21 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 #: twenty-nine from `5c137a90` to `2d116415`, and every one returns exactly
 #: the five rows below. The numbers here are that measurement, not a
 #: carried-forward memory.
+#:
+#: PLAN 034 T059 LOWERED IT, the first fall since slice 2b. The pin moved from
+#: `2d116415` to openDox-code `e3ef506a`, the head of openDox-code#59 (T055,
+#: openDox's own snapshot registry and source, corpus-root predicate, writer
+#: and validator lookup behind seams of their own), twenty-three first-parent
+#: commits later. At that tree `_back_import_census()` returns three rows:
+#: `cli.py` (0, 1) and `serve.py` (0, 2) reach (0, 0) and leave the table, and
+#: `branch_session.py` falls from (0, 7) to (0, 2). The eight reaches T055
+#: closed are the ones its falsifier names: `branch_session`'s `_change_rows`,
+#: `session_entry`, `register_session_entry`, `refresh_session_snapshot` and
+#: `refresh_main_view`, `cli`'s `_session_registry`, and `serve`'s
+#: `_checkout_real` and `_refuse_impossible_checkout_root`. Each now asks a
+#: seam, and this leg contributes its governed mechanism there
+#: (`openxdox.projection_contributions`). The eleven that remain are plan 034
+#: T084's, and T086 takes the table to (0, 0).
 #:
 #: THE WHOLE OF THE INVERSION IS GONE, which is worth stating plainly because
 #: this table has never been able to say it before: no module of the pinned
@@ -397,10 +417,12 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 #: imports each converted module in a subprocess with `openxdox` blocked — and
 #: that is the right home for it: this leg measures a repository it does not
 #: write, and cannot import openDox's modules to find out. That file's
-#: `NEUTRAL_MODULES` is the asserted half, and at `2d116415` it holds nine:
+#: `NEUTRAL_MODULES` is the asserted half. At `2d116415` it held nine:
 #: `workbench`, `serve_workbench`, `consumer_reach`, `branch_session`,
-#: `domain_profile`, `profile_proxy`, `view_extension`, `cli` and `serve`. Its
-#: `STILL_REACHING` is empty there.
+#: `domain_profile`, `profile_proxy`, `view_extension`, `cli` and `serve`. At
+#: `e3ef506a` it holds thirteen, T055's four new modules with them:
+#: `projection_seams`, `default_registry`, `default_projection` and `rfc3339`.
+#: Its `STILL_REACHING` is empty at both.
 #:
 #: THE TWO MODULES THAT DID NOT IMPORT WITHOUT A CONSUMER NOW DO. This note
 #: said `opendox.serve` and `opendox.cli` were blocked by `ideation_dashboard`
@@ -419,9 +441,7 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 #: improvement as well as a regression, so the number in the tree stays true.
 OPENDOX_BACK_IMPORTS: dict[str, tuple[int, int]] = {
     # module                        (import-time, deferred)
-    "opendox/branch_session.py":    (0, 7),
-    "opendox/cli.py":               (0, 1),
-    "opendox/serve.py":             (0, 2),
+    "opendox/branch_session.py":    (0, 2),
     "opendox/serve_project.py":     (0, 2),
     "opendox/serve_workbench.py":   (0, 7),
 }

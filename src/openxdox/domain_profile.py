@@ -1095,6 +1095,17 @@ def register(profile: DomainProfile) -> DomainProfile:
     """THE one registration. Called by the host's own adapter at process start.
 
     Returns the profile so a host can register and hold it in one expression.
+
+    AND openXdox's GOVERNED PROJECTION WITH IT (plan 034 T059). A process that
+    registers openXdox's profile is a governed host, so this also registers
+    openXdox's generator, snapshot registry, corpus-root predicate, writer and
+    validators at openDox's seams (`openxdox.projection_contributions`), before
+    any of openDox's entry points reads a default. It is idempotent, and all
+    or none: a seam's refusal reaches the caller with no seam written and no
+    profile registered. `load()` registers nothing, so reading or validating
+    a profile never changes what a process serves. A host that registers its
+    profile with openDox alone, as openxFactory does, calls
+    `projection_contributions.register()` itself (plan 034 T064).
     """
     global _registered
     if not isinstance(profile, DomainProfile):
@@ -1117,6 +1128,9 @@ def register(profile: DomainProfile) -> DomainProfile:
             "already read the first. Call "
             "openxdox.domain_profile.unregister() first if the swap is "
             "deliberate.")
+    from . import projection_contributions
+
+    projection_contributions.register()
     _registered = profile
     return profile
 
