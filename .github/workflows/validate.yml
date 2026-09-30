@@ -275,16 +275,16 @@ jobs:
       # are named below, and none of them waits for `doc_health`.
       #
       # RAISED BY plan 034 T059 (openXdox-code#35), the same way: run
-      # 36738271008 (2026-09-30) measured `9d315537`, the head before this
-      # change, at openDox-code `814516b7`: selected 992, passed 988, skipped
-      # 4, failures 0, errors 0. The +107 on both floors has two reasons:
+      # 36740358207 (2026-09-30) measured `a1b75f3a`, the head before this
+      # change, at openDox-code `814516b7`: selected 993, passed 989, skipped
+      # 4, failures 0, errors 0. The +108 on both floors has two reasons:
       #   * +11 is T060's (openXdox-code#34), the `values` probes it added to
       #     `tests/test_gate_loop_probes.py`. #34 left the floors where they
       #     were, since the phase-2 draft rule kept it out of this file, and
       #     named the raise as the next writer's. That is this one.
-      #   * +96 is T059's: it adds three test files, of 43
+      #   * +97 is T059's: it adds three test files, of 43
       #     (`tests/test_protected_suite_check.py`), 27
-      #     (`tests/test_governed_registry_and_writer.py`) and 21
+      #     (`tests/test_governed_registry_and_writer.py`) and 22
       #     (`tests/test_projection_contributions.py`) cases, and
       #     `tests/test_seam_assembly_beside_gate_and_projection.py` leaves the
       #     declaration, so its six cases run here now and pass. The
@@ -323,8 +323,8 @@ jobs:
           # on a ruling, which lowers them with its reason (above). Set to
           # the measured values, which this suite has actually met on CI
           # rather than an aspiration.
-          MIN_SELECTED: "992"
-          MIN_PASSED: "988"
+          MIN_SELECTED: "993"
+          MIN_PASSED: "989"
           # EXACT - the load-bearing number.
           EXPECT_SKIPPED: "4"
         run: |
