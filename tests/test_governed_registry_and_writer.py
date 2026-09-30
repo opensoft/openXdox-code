@@ -71,6 +71,14 @@ def test_a_symlink_to_a_document_is_still_served(served_root: Path) -> None:
         served_root / "docs" / "note.md").resolve()
 
 
+def test_a_source_root_that_is_a_symlink_loop_serves_nothing(tmp_path: Path) -> None:
+    """The root is resolved under the same guard as the path, so a malformed
+    root refuses instead of raising out of the route."""
+    loop = tmp_path / "loop"
+    loop.symlink_to(tmp_path / "loop")
+    assert reg.resolve_within(loop, "docs/note.md") is None
+
+
 def test_the_spelled_rule_still_refuses_first(served_root: Path) -> None:
     assert reg.resolve_within(served_root, ".git/config") is None
     assert reg.resolve_within(served_root, "%2egit/config") is None

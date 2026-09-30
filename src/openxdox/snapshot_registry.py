@@ -430,8 +430,11 @@ def resolve_within(root: Path, url_tail: str) -> Path | None:
     parts = [p for p in rel.replace("\\", "/").split("/") if p not in ("", ".")]
     if _names_something_hidden(parts):
         return None
-    root = Path(root).resolve()
+    # The ROOT is resolved inside the guard too (Copilot on openXdox-code#35):
+    # a source root that is itself a symlink loop refuses, as a path through
+    # one does, rather than raising out of the `/source` route.
     try:
+        root = Path(root).resolve()
         resolved = (root / rel).resolve()
     except (OSError, RuntimeError, ValueError):
         return None

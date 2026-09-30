@@ -8,15 +8,15 @@ extension, which `tests/test_role_authority_projection_seam.py`'s docstring
 states first. The fourth, (d), is that the extension assembles cleanly beside
 the OTHER existing contribution columns, in either declaration order. Two of
 those columns are `serve_gate.GateRoutesExtension` and
-`serve_projection.ProjectionRoutesExtension`, and `serve_projection` reaches
-openxFactory's `doc_health` when it is imported, through `snapshot_registry`.
-So each suite imported the two behind a guard that SKIPPED when `doc_health`
-was absent, saying "doc_health reachability is BUILD-arc work (§ 3.5/3.6) ...
-this test will assert for real once that lands". A lone checkout never has
-`doc_health`, so the six cases behind that guard skipped on every run of this
-leg's required check. 9.4 names them: "every one of openXdox's six skips
-carries the same reason ... The whole-product assertions are precisely the
-ones that skip".
+`serve_projection.ProjectionRoutesExtension`, and until plan 034 T059
+`serve_projection` reached openxFactory's `doc_health` when it was imported,
+through `snapshot_registry`. So each suite imported the two behind a guard
+that SKIPPED when `doc_health` was absent, saying "doc_health reachability is
+BUILD-arc work (§ 3.5/3.6) ... this test will assert for real once that
+lands". A lone checkout never has `doc_health`, so the six cases behind that
+guard skipped on every run of this leg's required check until T044. 9.4 named
+them: "every one of openXdox's six skips carries the same reason ... The
+whole-product assertions are precisely the ones that skip".
 
 WHAT T044 DID. It removed the guard, so each case asserts for real, and it
 moved the six here. Each keeps its body and its comments, except that the
@@ -68,10 +68,11 @@ from openxdox.role_authority_projection import (
 )
 
 # The two ALREADY-LANDED contribution columns every case below assembles
-# beside. `serve_projection` reaches `doc_health` when it is imported
-# (through `snapshot_registry`), so in a lone checkout this module stops at
-# its import, at collection, on `doc_health` alone. That is the failure the
-# declaration holds this file to. No guard turns it into a skip any more.
+# beside. From T044 to T059 `serve_projection` reached `doc_health` when it
+# was imported (through `snapshot_registry`), so in a lone checkout this
+# module stopped at its import, on `doc_health` alone, and the declaration
+# held it to that failure. Since T059 both import in a lone checkout, and
+# this module runs in the required check. No guard turns a case into a skip.
 from openxdox.serve_gate import GateRoutesExtension
 from openxdox.serve_projection import ProjectionRoutesExtension
 
