@@ -311,6 +311,10 @@ jobs:
       #   * -1, `tests/test_declared_exclusion.py`, which loses
       #     `tests/test_snapshot.py`'s case.
       # Every selected test passes, and the four skips are the same four.
+      # AT THE PIN MAIN NOW CARRIES. #35 landed (`839492d9`) and moved the pin
+      # to openDox-code `047bb4fa`, T062's commit. Run 36784210624 measured
+      # `8d891652`, this branch with that `main` merged in, and read the same
+      # triple: 1076, 1072 and 4. So the floors stand.
       #
       # THE SKIPS ARE NAMED, which is why the exact pin is safe to take. All
       # FOUR are `tests/test_aggregation_register_instance.py`'s, which the
