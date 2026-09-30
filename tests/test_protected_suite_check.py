@@ -208,6 +208,36 @@ def test_a_protected_suite_renamed_away_is_refused(repo) -> None:
     assert finding.path == SUITE
 
 
+def test_an_entry_admits_one_landing_and_a_replay_is_refused(repo) -> None:
+    """Two reviewed landings take the suite X -> Y and back to X. A third,
+    unreviewed, repeats the first edit: the suite is at entry 1's
+    `before_blob` again and its diff is entry 1's text, but entry 1 has
+    admitted its landing and admits no second one (Copilot on #35)."""
+    first = repo.commit({SUITE: AFTER}, f"reviewed edit\n\n{ARC}")
+    second = repo.commit({SUITE: BEFORE}, f"reviewed revert\n\n{ARC}")
+    replay = repo.commit({SUITE: AFTER}, f"the same edit, unreviewed\n\n{ARC}")
+    entries = [_entry(repo),
+               _entry(repo, before=AFTER, after=BEFORE, old=NEW, new=OLD)]
+    findings = {f.landing: f for f in _check(repo, entries)}
+    assert findings[first].admitted_by == 1
+    assert findings[second].admitted_by == 2
+    assert findings[replay].admitted_by is None
+    assert f"it admitted {first[:12]} already" in findings[replay].why
+
+
+def test_the_landings_are_taken_oldest_first_in_any_order(repo) -> None:
+    """The falsifier lists landings newest first; the check does not depend
+    on it."""
+    first = repo.commit({SUITE: AFTER}, f"reviewed edit\n\n{ARC}")
+    repo.commit({SUITE: BEFORE}, "an unentered revert, no landing")
+    replay = repo.commit({SUITE: AFTER}, f"the same edit again\n\n{ARC}")
+    for order in ([first, replay], [replay, first]):
+        findings = {f.landing: f for f in
+                    ps.check(repo.root, order, {SUITE}, [_entry(repo)])}
+        assert findings[first].admitted_by == 1
+        assert findings[replay].admitted_by is None
+
+
 def test_a_commit_without_the_trailer_is_not_a_landing(repo) -> None:
     repo.commit({SUITE: AFTER}, "an edit that is no arc landing")
     assert _check(repo, []) == []
@@ -303,6 +333,9 @@ def _valid_entry(**changes) -> dict:
     ({"schema_version": 1, "kind": "other", "entries": []}, "kind"),
     ({"schema_version": 1, "kind": ps.KIND, "entries": [], "extra": 1}, "carries"),
     ({"schema_version": 1, "kind": ps.KIND, "entries": [_valid_entry(edit="rewrite")]}, "edit is"),
+    ({"schema_version": 1, "kind": ps.KIND, "entries": [_valid_entry(edit=[])]}, "edit is"),
+    ("schema_version: 1\nkind: protected-suite-respellings\nentries: []\n? [a]\n: 1\n",
+     "plain scalar"),
     ({"schema_version": 1, "kind": ps.KIND, "entries": [_valid_entry(respelled="x")]}, "carries"),
     ({"schema_version": 1, "kind": ps.KIND,
       "entries": [{k: v for k, v in _valid_entry().items() if k != "review"}]}, "carries"),

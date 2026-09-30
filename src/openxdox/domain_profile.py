@@ -1136,7 +1136,20 @@ def register(profile: DomainProfile) -> DomainProfile:
 
 
 def unregister() -> None:
-    """Drop the registration. For test isolation and for a host tearing down."""
+    """Drop the registration. For test isolation and for a host tearing down.
+
+    THE GOVERNED CONTRIBUTIONS STAY (plan 034 T059). `register()` also
+    registers openXdox's governed projection at openDox's seams
+    (`projection_contributions.register()`), and this leaves it there. It is
+    the process's, not the profile's: a host registers it without this module
+    too (openxFactory does, plan 034 T064), and openDox's seams refuse a
+    governed registration once one of their defaults has been read. A
+    teardown that took it back would therefore make registering the same
+    profile again fail wherever anything was served from a default in
+    between, so a test that takes the profile away for one case could not put
+    it back. A host that tears the governed projection down as well calls
+    `projection_contributions.unregister()`, which empties only what it holds.
+    """
     global _registered
     _registered = None
 

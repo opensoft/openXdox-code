@@ -243,6 +243,28 @@ def test_registering_openxdoxs_profile_registers_the_contributions(isolated_seam
             domain_profile.register(held)
 
 
+def test_unregistering_the_profile_leaves_the_contributions(isolated_seams) -> None:
+    """The profile's teardown drops the profile only. The contributions are the
+    process's, and a teardown that took them back could not be undone once a
+    default had been read (the docstring of `domain_profile.unregister`)."""
+    held = _registered_profile()
+    domain_profile.unregister()
+    try:
+        profile = domain_profile.load(PROFILE_FIXTURE)
+        domain_profile.register(profile)
+        domain_profile.unregister()
+        assert not domain_profile.is_registered()
+        assert pc.is_registered()
+        domain_profile.register(profile)                  # and back, as a fixture does
+        assert domain_profile.is_registered()
+        pc.unregister()
+        assert not pc.is_registered()
+    finally:
+        domain_profile.unregister()
+        if held is not None:
+            domain_profile.register(held)
+
+
 def test_a_refused_contribution_leaves_no_profile_registered(isolated_seams) -> None:
     class OtherWriter:
         @staticmethod

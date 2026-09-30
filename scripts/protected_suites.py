@@ -48,6 +48,13 @@ at L when all of these are true:
 A landing that touches a protected suite is admitted for that suite only if one
 entry holds at it. Every other protected path it touches is refused.
 
+AN ENTRY ADMITS ONE LANDING (Copilot on openXdox-code#35). The landings are
+taken oldest first, and an entry that has admitted one is spent: a later
+landing that repeats the same edit, after the suite came back to the entry's
+`before_blob`, is refused unless an entry of its own holds. An entry names its
+landing by pull request, not by commit (T019's rule), so the commit it admits
+is found here, once.
+
 THE ALLOW-LIST'S OWN RULES are checked before anything is subtracted, and a
 file that breaks one refuses the whole check (exit 2) rather than subtracting
 less: `schema_version` 1, `kind` `protected-suite-respellings`, no key given
@@ -107,6 +114,10 @@ def _mapping(loader: _UniqueKeyLoader, node: yaml.MappingNode, deep: bool = Fals
     seen: set[Any] = set()
     for key_node, _value in node.value:
         key = loader.construct_object(key_node, deep=deep)
+        if not isinstance(key, (str, int, float, bool)) and key is not None:
+            raise AllowListInvalid(
+                f"a key is a {type(key).__name__} (line {key_node.start_mark.line + 1}), "
+                "and every key is a plain scalar")
         if key in seen:
             raise AllowListInvalid(
                 f"the key {key!r} is given twice (line {key_node.start_mark.line + 1})")
@@ -160,7 +171,7 @@ def _check_keys(entry: Any, where: str) -> None:
     if not isinstance(entry, dict):
         raise AllowListInvalid(f"{where} is not a mapping")
     edit = entry.get("edit")
-    if edit not in EDIT_KEYS:
+    if not isinstance(edit, str) or edit not in EDIT_KEYS:
         raise AllowListInvalid(f"{where}: edit is {edit!r}, not one of {sorted(EDIT_KEYS)}")
     wanted = COMMON_KEYS | EDIT_KEYS[edit]
     if set(entry) != wanted:
@@ -282,13 +293,18 @@ class Finding:
     why: str
 
 
-def _admitting(repo: Path, landing: str, path: str,
-               entries: list[dict]) -> tuple[int | None, list[str]]:
+def _admitting(repo: Path, landing: str, path: str, entries: list[dict],
+               spent: dict[int, str]) -> tuple[int | None, list[str]]:
     """The entry (1-based) for `path` that holds at `landing`, or None and
-    every entry's reason for not holding."""
+    every entry's reason for not holding. An entry in `spent` has admitted
+    another landing already and admits no second one."""
     reasons = []
     for n, entry in enumerate(entries, 1):
         if entry["suite"] != path:
+            continue
+        if n in spent:
+            reasons.append(f"entry {n}: it admitted {spent[n][:12]} already, "
+                           "and an entry admits one landing")
             continue
         why = entry_holds(repo, landing, entry)
         if why is None:
@@ -300,9 +316,14 @@ def _admitting(repo: Path, landing: str, path: str,
 def check(repo: Path, landings: list[str], protected: set[str],
           entries: list[dict]) -> list[Finding]:
     """One finding per protected path each landing touched: admitted by the
-    entry (1-based) that holds there, or refused with every entry's reason."""
+    entry (1-based) that holds there, or refused with every entry's reason.
+    The landings are taken oldest first, whatever order they come in, and
+    each entry admits one of them at most."""
     findings: list[Finding] = []
-    for landing in landings:
+    spent: dict[int, str] = {}
+    ancestors = {landing: int(_git(repo, "rev-list", "--count", landing).strip())
+                 for landing in landings}
+    for landing in sorted(landings, key=ancestors.__getitem__):
         # --no-renames: a protected suite renamed away is a deletion at its
         # own path, never only the destination's addition.
         touched = {line.strip() for line in
@@ -310,7 +331,9 @@ def check(repo: Path, landings: list[str], protected: set[str],
                         f"{landing}^1", landing).splitlines()
                    if line.strip()}
         for path in sorted(touched & protected):
-            admitted, reasons = _admitting(repo, landing, path, entries)
+            admitted, reasons = _admitting(repo, landing, path, entries, spent)
+            if admitted is not None:
+                spent[admitted] = landing
             findings.append(Finding(
                 landing, path, admitted,
                 "" if admitted else ("; ".join(reasons) or "no entry names this suite")))
