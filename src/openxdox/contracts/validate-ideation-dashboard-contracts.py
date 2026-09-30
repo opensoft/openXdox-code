@@ -136,6 +136,12 @@ ROOT = Path(__file__).resolve().parents[1]
 _DECLARED_CONTRACTS = os.environ.get("CONTRACTS_DIR", "")
 _OWN_CONTRACTS = ROOT / "contracts"
 _OWN_SCHEMAS = _OWN_CONTRACTS / "schemas"
+# THE PACKAGED LAYOUT (plan 034 T061): this script sits INSIDE the contracts
+# directory it reads, as `openxdox/contracts/validate-ideation-dashboard-
+# contracts.py` does in an install, beside its packaged copies and their record.
+# It is told by where the script is, never by whether the record is there, so a
+# package whose `copies.yaml` is missing is refused rather than read around.
+_PACKAGED_LAYOUT = Path(__file__).resolve().parent == _OWN_CONTRACTS
 # A `contracts/` or `contracts/schemas/` that is a LINK OUT OF THIS TREE is
 # somebody else's contracts under this tree's own name: the escaping-link case
 # `openxdox.snapshot.find_validator` refuses for `scripts/`. It is never read,
@@ -174,9 +180,10 @@ EXAMPLES_DIR = CONTRACTS.parent / "examples" / "ideation-dashboard"
 # schemas. So each family schema is found in ONE of three places, in this order:
 #   1. this tree's own `contracts/schemas/`, read first, as before. openxFactory's
 #      farm (`doxbench_contracts._composed_validator`) supplies the whole family
-#      that way, and the packaged copy of this script
-#      (`openxdox/contracts/validate-ideation-dashboard-contracts.py`) finds the
-#      three packaged copies beside it that way;
+#      that way. The packaged copy of this script
+#      (`openxdox/contracts/validate-ideation-dashboard-contracts.py`) reads its
+#      three packaged copies beside it that way too, and there each is held to
+#      the record, which must be present (`_PACKAGED_LAYOUT`);
 #   2. for the three, the INSTALLED openxdox distribution's packaged copies
 #      (`openxdox/contracts/schemas/`), found through the import system and never
 #      by position. That is where a source checkout's `scripts/` copy, which has
@@ -247,9 +254,11 @@ def schema_source(name: str) -> tuple[Path | None, str]:
     """Where this run reads the family schema `name`, and through which channel,
     or (None, why no channel supplies it)."""
     own = _OWN_SCHEMAS / name
+    if name in OWN_KIND_SCHEMAS and _PACKAGED_LAYOUT:
+        # Always held to the record beside it: a missing record, or a missing
+        # copy, is refused by `verified_copy` (harness exit 2), never skipped.
+        return verified_copy(_OWN_CONTRACTS, name), "this validator's own packaged copies"
     if own.is_file():
-        if name in OWN_KIND_SCHEMAS and (_OWN_CONTRACTS / COPIES_RECORD).is_file():
-            return verified_copy(_OWN_CONTRACTS, name), "this tree's own packaged copies"
         return own, "this tree's own contracts/"
     if name in OWN_KIND_SCHEMAS:
         distribution = distribution_contracts()

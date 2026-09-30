@@ -223,6 +223,28 @@ def test_the_packaged_validator_reads_the_copies_beside_it(tmp_path):
     assert "is not the spec leg's file" in proc.stderr
 
 
+@pytest.mark.parametrize("missing", ["copies.yaml", "schemas/gate-action-record.schema.yaml"])
+def test_the_packaged_layout_is_refused_without_its_record_or_a_copy(tmp_path, missing):
+    """FAIL CLOSED (Copilot on openXdox-code#36). The packaged layout is told by
+    where the script sits, not by whether its record is there. So a package
+    whose `copies.yaml` is missing is refused by name (harness exit 2), rather
+    than having its copies read unchecked as a tree's own `contracts/`. A copy
+    missing beside a present record is refused the same way. And a stricter
+    snapshot schema on `CONTRACTS_DIR` never stands in for either."""
+    site = tmp_path / "site"
+    shutil.copytree(PACKAGED, site / "openxdox" / "contracts",
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    (site / "openxdox" / "contracts" / missing).unlink()
+    script = site / "openxdox" / "contracts" / VALIDATOR.name
+    record = _write(tmp_path / "out" / "g.yaml", {"schema_version": 1, "kind": "gate-action-record"})
+    stand_in = _spec_contracts(tmp_path / "spec")
+    proc = _run(script, record, cwd=tmp_path, contracts_dir=stand_in,
+                pythonpath=_decoy_distribution(tmp_path / "decoy"))
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert "cannot be read" in proc.stderr, proc.stderr
+    assert "0 error(s)" not in proc.stdout
+
+
 def test_a_referentially_broken_snapshot_is_a_verdict_not_a_harness_error(tmp_path):
     """(i) It is a real run, not an early exit: the validator's own snapshot
     rule fires on a dangling cluster edge — a FINDING (exit 1), which is what
