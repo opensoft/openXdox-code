@@ -172,11 +172,24 @@ def _inside(path: Path, root: Path) -> bool:
     return Path(path).resolve().is_relative_to(root.resolve())
 
 
+def _packaged_candidate() -> tuple[Path, Path]:
+    """This installed package's directory, and where its packaged validator
+    sits in it: `openxdox/contracts/`, beside this module."""
+    package = Path(__file__).resolve().parent
+    return package, package / "contracts" / VALIDATOR_RELPATH.name
+
+
 def _packaged_validator() -> Path | None:
-    """The installed distribution's packaged validator, beside this module in
-    `openxdox/contracts/`, or None where this install carries none."""
-    candidate = Path(__file__).resolve().parent / "contracts" / VALIDATOR_RELPATH.name
-    return candidate if candidate.is_file() else None
+    """The installed distribution's packaged validator, or None where this
+    install carries none. `is_file()` follows a symlink, so containment is
+    checked on the RESOLVED path too, as the source-tree branch of
+    `find_validator` checks it: a `contracts/` or a validator that links out of
+    the installed package is somebody else's script, and is never run
+    (Copilot on openXdox-code#36)."""
+    package, candidate = _packaged_candidate()
+    if candidate.is_file() and _inside(candidate, package):
+        return candidate
+    return None
 
 
 def find_validator(start: Path | None = None) -> Path | None:
@@ -216,10 +229,19 @@ def _validator_not_found_reason(search_from: Path | None) -> str:
     not one of them: it is ignored (plan 034 T061)."""
     root = product_root()
     if root is None:
-        where = ("this openxdox is installed without its packaged validator "
-                 f"(openxdox/contracts/{VALIDATOR_RELPATH.name})")
+        package, candidate = _packaged_candidate()
+        if candidate.is_file() and not _inside(candidate, package):
+            where = (f"this openxdox's packaged validator ({candidate}) resolves "
+                     "outside the installed package, so it is not run")
+        else:
+            where = ("this openxdox is installed without its packaged validator "
+                     f"(openxdox/contracts/{VALIDATOR_RELPATH.name})")
     else:
-        where = f"{root / VALIDATOR_RELPATH} does not exist"
+        candidate = root / VALIDATOR_RELPATH
+        if candidate.is_file() and not _inside(candidate, root):
+            where = f"{candidate} resolves outside this product's tree, so it is not run"
+        else:
+            where = f"{candidate} does not exist"
     return (f"{where}; a validator in an enclosing checkout is never adopted — "
             "pass validator= to use one explicitly")
 

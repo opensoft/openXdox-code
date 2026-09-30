@@ -267,6 +267,27 @@ def test_an_install_answers_its_packaged_validator_whatever_the_start(tmp_path):
     assert answer == str((installed / "contracts" / contracts.VALIDATOR_NAME).resolve())
 
 
+@pytest.mark.parametrize("linked", ["validator", "contracts"])
+def test_an_install_whose_validator_links_out_of_the_package_answers_none(tmp_path, linked):
+    """CONFINED (Copilot on openXdox-code#36). A packaged validator, or a
+    `contracts/` directory, that is a symlink out of the installed package is
+    somebody else's script: `find_validator` answers None and says why, as the
+    source-tree branch does for a `scripts/` link out of the tree."""
+    installed = _installed_copy(tmp_path / "site")
+    outside = tmp_path / "elsewhere"
+    shutil.copytree(installed / "contracts", outside)
+    if linked == "validator":
+        (installed / "contracts" / contracts.VALIDATOR_NAME).unlink()
+        (installed / "contracts" / contracts.VALIDATOR_NAME).symlink_to(
+            outside / contracts.VALIDATOR_NAME)
+    else:
+        shutil.rmtree(installed / "contracts")
+        (installed / "contracts").symlink_to(outside, target_is_directory=True)
+    answer, reason = _probe(tmp_path / "site", tmp_path, tmp_path, REPO_ROOT)
+    assert answer == "None"
+    assert "resolves outside the installed package" in reason
+
+
 def test_an_install_without_its_packaged_validator_answers_none_and_says_so(tmp_path):
     installed = _installed_copy(tmp_path / "site")
     (installed / "contracts" / contracts.VALIDATOR_NAME).unlink()
