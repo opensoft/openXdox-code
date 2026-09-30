@@ -19,10 +19,12 @@ HOW EACH FALSIFIER CALLS IT. The protected set and the landings are computed in
 the falsifier's own block, as #1144 writes them. The last step, the inline
 Python that intersected them, becomes this call, from the checkout's root:
 
-    python3 scripts/protected_suites.py --landings="$(cat "$W/x-arc.txt")" \
+    python3 scripts/protected_suites.py --chains --landings="$(cat "$W/x-arc.txt")" \
         --suites="$(cat "$W/gen-suites.txt")"                                   # F5.2
     python3 scripts/protected_suites.py --landings="$(cat "$W/x-arc.txt")" \
         --suites="$(cat "$W/governed.txt")"                                     # 12.5
+
+(`--chains` is F5.2's alone, since T061; see SEVERAL EDITS IN ONE LANDING.)
 
 Each option carries its LIST, one item per line, and never a path to one: the
 landings, each a full commit id as `git log --format=%H` prints it, and the
@@ -53,8 +55,8 @@ at L when all of these are true:
   added after, and may lie in a neighbouring test, which it leaves as it was.
 
 A landing that touches a protected suite is admitted for that suite only if one
-entry holds at it, or a CHAIN of entries does. Every other protected path it
-touches is refused.
+entry holds at it, or, in F5.2's call, a CHAIN of entries does. Every other
+protected path it touches is refused.
 
 SEVERAL EDITS IN ONE LANDING (plan 034 T061; T007's batch K, on Brett's ruling
 at openxFactory#656 comment 5916000030). A landing may edit one suite in more
@@ -77,6 +79,12 @@ each to the text the one before it leaves. They admit the landing together when:
 So the landing's diff for that suite is exactly those entries' recorded texts,
 each inside its own test, and nothing else. Every entry of the chain is spent by
 that landing.
+
+F5.2'S CALL ALONE. Brett's ruling admits T061's ten under F5.2, whose protected
+set they are in, and 12.5's governed set holds neither of their suites. So a
+chain is admitted only when the call passes `--chains`, which F5.2's does and
+12.5's does not. Without it, a landing's edits to one suite are admitted by one
+entry or not at all, as T059 wired the check, and a chain is refused.
 
 AN ENTRY ADMITS ONE LANDING (Copilot on openXdox-code#35). The landings are
 taken oldest first, and an entry that has admitted one is spent: a later
@@ -406,13 +414,14 @@ class Finding:
 
 
 def _admitting(repo: Path, landing: str, path: str, entries: list[dict],
-               spent: dict[int, str]) -> tuple[tuple[int, ...], list[str]]:
-    """The entries (1-based) for `path` that admit `landing`, one or a chain,
-    or () and every candidate's reason for not holding. A candidate starts at
-    an unspent entry for `path` and runs on through the entries for `path`
-    that follow it in the list, until one records the suite at the landing.
-    An entry in `spent` has admitted another landing already and admits no
-    second one."""
+               spent: dict[int, str], chains: bool) -> tuple[tuple[int, ...], list[str]]:
+    """The entries (1-based) for `path` that admit `landing`, one or (with
+    `chains`) a chain, or () and every candidate's reason for not holding. A
+    candidate starts at an unspent entry for `path` and, with `chains`, runs on
+    through the entries for `path` that follow it in the list, until one
+    records the suite at the landing. Without `chains` a candidate is its one
+    entry. An entry in `spent` has admitted another landing already and admits
+    no second one."""
     reasons = []
     ours = [n for n, entry in enumerate(entries, 1) if entry["suite"] == path]
     after = _blob(repo, landing, path)
@@ -422,7 +431,7 @@ def _admitting(repo: Path, landing: str, path: str, entries: list[dict],
                            "and an entry admits one landing")
             continue
         run = [n]
-        for m in ours[i + 1:]:
+        for m in (ours[i + 1:] if chains else ()):
             if entries[run[-1] - 1]["after_blob"] == after or m in spent:
                 break
             run.append(m)
@@ -435,11 +444,12 @@ def _admitting(repo: Path, landing: str, path: str, entries: list[dict],
 
 
 def check(repo: Path, landings: list[str], protected: set[str],
-          entries: list[dict]) -> list[Finding]:
+          entries: list[dict], *, chains: bool = False) -> list[Finding]:
     """One finding per protected path each landing touched: admitted by the
-    entry (1-based) that holds there, or refused with every entry's reason.
-    The landings are taken oldest first, whatever order they come in, and
-    each entry admits one of them at most."""
+    entry (1-based) that holds there, or, with `chains` (F5.2's call), by the
+    chain of entries that does, or refused with every candidate's reason. The
+    landings are taken oldest first, whatever order they come in, and each
+    entry admits one of them at most."""
     findings: list[Finding] = []
     spent: dict[int, str] = {}
     ancestors = {landing: int(_git(repo, "rev-list", "--count", landing).strip())
@@ -452,7 +462,7 @@ def check(repo: Path, landings: list[str], protected: set[str],
                         f"{landing}^1", landing).splitlines()
                    if line.strip()}
         for path in sorted(touched & protected):
-            chain, reasons = _admitting(repo, landing, path, entries, spent)
+            chain, reasons = _admitting(repo, landing, path, entries, spent, chains)
             for n in chain:
                 spent[n] = landing
             findings.append(Finding(
@@ -482,6 +492,9 @@ def main(argv: list[str] | None = None) -> int:
                         help="the arc's landings, one full commit id per line")
     parser.add_argument("--suites", required=True,
                         help="the protected suites, one tests/test_<name>.py per line")
+    parser.add_argument("--chains", action="store_true",
+                        help="admit a chain of entries for one landing's several edits "
+                             "to a suite (F5.2's call alone; plan 034 T061, batch K)")
     try:
         args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     except SystemExit as exc:
@@ -500,7 +513,7 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return 2
     try:
-        findings = check(repo, landings, suites, entries)
+        findings = check(repo, landings, suites, entries, chains=args.chains)
     except subprocess.CalledProcessError as exc:
         # A landing this checkout does not hold, or one with no parent: the
         # history the check needs is not here, which is not a refusal.

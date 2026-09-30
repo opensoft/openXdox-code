@@ -18,9 +18,10 @@ commit carrying the `Arc:` line. Each case holds one rule of the check:
 * an ADDED test (plan 034 T061) is admitted only where the edit adds it and
   nothing else;
 * SEVERAL EDITS IN ONE LANDING (plan 034 T061; T007's batch K) are admitted by
-  a chain of entries, one per edit, applied in order: only where every step
-  holds on its own texts, the steps in between record the blob of the text
-  they leave, and the chain's texts are the landing's diff and nothing else.
+  a chain of entries, one per edit, applied in order: only in F5.2's call
+  (`--chains`), and only where every step holds on its own texts, the steps
+  in between record the blob of the text they leave, and the chain's texts are
+  the landing's diff and nothing else. 12.5's call refuses a chain.
 
 The last cases hold this repository's own allow-list to those rules. Which
 landing each entry holds at is the falsifier's to show, at the head it runs
@@ -111,10 +112,10 @@ def _entry(repo: Repo, *, before: str = BEFORE, after: str = AFTER, old: str = O
     return entry
 
 
-def _check(repo: Repo, entries: list[dict]) -> list[ps.Finding]:
+def _check(repo: Repo, entries: list[dict], *, chains: bool = False) -> list[ps.Finding]:
     landings = repo.git("log", "--first-parent", "--format=%H", f"--grep=^{ARC}$",
                         "HEAD").splitlines()
-    return ps.check(repo.root, landings, {SUITE}, entries)
+    return ps.check(repo.root, landings, {SUITE}, entries, chains=chains)
 
 
 # --------------------------------------------------------------------------
@@ -336,16 +337,35 @@ def _two_step_chain(repo: Repo, **second_over) -> list[dict]:
 
 def test_one_landing_with_two_edits_is_admitted_by_a_chain_of_two_entries(repo) -> None:
     repo.commit({SUITE: BOTH}, f"two edits\n\n{ARC}")
-    [finding] = _check(repo, _two_step_chain(repo))
+    [finding] = _check(repo, _two_step_chain(repo), chains=True)
     assert finding.admitted_by == 1
     assert finding.chain == (1, 2)
+
+
+def test_a_chain_is_refused_in_12_5s_call(repo, monkeypatch) -> None:
+    """Chains are F5.2's alone (Brett's ruling admits T061's ten under F5.2;
+    batch K). 12.5's call passes no `--chains`, so its rule stays one entry per
+    suite per landing: each entry of the chain is tried alone, and neither
+    turns the suite before the landing into the suite at it."""
+    repo.commit({SUITE: BOTH}, f"two edits\n\n{ARC}")
+    chain = _two_step_chain(repo)
+    [finding] = _check(repo, chain)
+    assert finding.admitted_by is None and finding.chain == ()
+    assert "entry 1:" in finding.why and "entries 1-2" not in finding.why
+    allow = repo.root / ps.ALLOW_LIST
+    monkeypatch.chdir(repo.root)
+    allow.parent.mkdir(parents=True, exist_ok=True)
+    allow.write_text(yaml.safe_dump({"schema_version": 1, "kind": ps.KIND, "entries": chain}),
+                     encoding="utf-8")
+    assert ps.main(_command(repo)) == 1                   # 12.5's call
+    assert ps.main(["--chains", *_command(repo)]) == 0    # F5.2's call
 
 
 def test_a_chain_is_spent_whole_by_its_landing(repo) -> None:
     landing = repo.commit({SUITE: BOTH}, f"two edits\n\n{ARC}")
     repo.commit({SUITE: BEFORE}, "a revert, no landing")
     replay = repo.commit({SUITE: BOTH}, f"the same two edits again\n\n{ARC}")
-    findings = {f.landing: f for f in _check(repo, _two_step_chain(repo))}
+    findings = {f.landing: f for f in _check(repo, _two_step_chain(repo), chains=True)}
     assert findings[landing].chain == (1, 2)
     assert findings[replay].admitted_by is None
     assert "admitted" in findings[replay].why and "already" in findings[replay].why
@@ -357,14 +377,14 @@ def test_a_chain_whose_middle_blob_is_not_the_text_between_is_refused(repo) -> N
     wrong = repo.blob(AFTER + "\n")
     chain[0]["after_blob"] = wrong
     chain[1]["before_blob"] = wrong
-    [finding] = _check(repo, chain)
+    [finding] = _check(repo, chain, chains=True)
     assert finding.admitted_by is None
     assert "does not record the text in between" in finding.why
 
 
 def test_a_chain_step_outside_its_named_test_is_refused(repo) -> None:
     repo.commit({SUITE: BOTH}, f"two edits\n\n{ARC}")
-    [finding] = _check(repo, _two_step_chain(repo, test="test_second"))
+    [finding] = _check(repo, _two_step_chain(repo, test="test_second"), chains=True)
     assert finding.admitted_by is None
     assert "step 2: the entry's old text is not inside test_second" in finding.why
 
@@ -374,14 +394,15 @@ def test_a_landing_with_an_edit_no_step_records_is_refused(repo) -> None:
     repo.commit({SUITE: extra}, f"two edits and a third\n\n{ARC}")
     chain = _two_step_chain(repo)
     chain[1]["after_blob"] = repo.blob(extra)
-    [finding] = _check(repo, chain)
+    [finding] = _check(repo, chain, chains=True)
     assert finding.admitted_by is None
     assert "do not give the suite at the landing" in finding.why
 
 
 def test_a_chain_naming_two_landings_is_refused(repo) -> None:
     repo.commit({SUITE: BOTH}, f"two edits\n\n{ARC}")
-    [finding] = _check(repo, _two_step_chain(repo, landing="opensoft/openXdox-code#2"))
+    [finding] = _check(repo, _two_step_chain(repo, landing="opensoft/openXdox-code#2"),
+                       chains=True)
     assert finding.admitted_by is None
     assert "more than one landing" in finding.why
 
