@@ -94,8 +94,8 @@ jobs:
       # would drift. The declaration is the list, and the run prints it.
       # Requirement 9 is met for this leg only once the declaration is empty.
       # Its `doc_health`, rail and contracts entries wait for the doc_health
-      # direction arc (plan 034 T008), and its consumer-schemas entry waits
-      # for 7.3 (T061, in phase 2). So the extraction stays open until then,
+      # direction arc (plan 034 T008). Its consumer-schemas entry left when 7.3
+      # landed (T061, in phase 2). So the extraction stays open until T008,
       # and T097 ticks 9.2 with that note.
       #
       # ONE TEST IS LEFT OUT BESIDE THEM, WITH ITS STATED REASON, UNTIL T008:
