@@ -158,15 +158,20 @@ def test_an_enclosing_pre_shed_validator_is_never_adopted(tmp_path, load_copy):
 
 
 def test_a_start_outside_the_product_is_refused_not_walked(tmp_path, load_copy):
-    """(iii) `start` CONFINES. Every directory above or beside the product —
-    the enclosing checkout's root, its `openxFactory/`, a run directory — answers
-    None; none of them is walked to the enclosing validator sitting right there."""
+    """(iii) `start` IS IGNORED (#1144 7.3, plan 034 T061, RULED R1Q14 (a); this
+    case's expected answer revised under T007's batch F, entered in
+    `tests/protected_suite_respellings.yaml`). The lookup answers the installed
+    distribution's own validator whatever it is asked from. Every directory
+    above or beside the product — the enclosing checkout's root, its
+    `openxFactory/`, a run directory — answers the product's own; none of them
+    is walked to the enclosing validator sitting right there. Until 7.3 a start
+    outside the product CONFINED the answer to None."""
     agg, enclosing, product, module = _enclosed_product(tmp_path, load_copy)
+    own = product / "scripts" / "validate-ideation-dashboard-contracts.py"
     assert enclosing.is_file()
     for start in (agg, agg / "openxFactory", agg / "work", agg / "work" / "out"):
-        assert module.find_validator(start) is None, start
-    assert module.find_validator(product / "src") == \
-        product / "scripts" / "validate-ideation-dashboard-contracts.py"
+        assert module.find_validator(start) == own, start
+    assert module.find_validator(product / "src") == own
 
 
 def test_with_no_validator_of_its_own_the_product_refuses_rather_than_adopting(
