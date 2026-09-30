@@ -113,17 +113,18 @@ def _served(captured) -> bool:
 def test_the_default_shaped_launch_validates_from_the_repo_root(tmp_path, capsys,
                                                                monkeypatch):
     """THE DEFECT: the run dir is OUTSIDE any aggregation checkout — the shape
-    `tempfile.mkdtemp()` always produces — and the snapshot is validated anyway,
-    because `--repo-root` is a checkout and the validator lives in it.
+    `tempfile.mkdtemp()` always produces — and the snapshot is validated anyway.
 
     A real temp dir is not used, because a test that wrote to /tmp/<random> would
     be asserting the same thing with less control; what matters is that the run
     dir has NO aggregation ancestor, which `tmp_path/run` also has not.
 
-    SINCE PLAN 034 T061 (#1144 7.3; admitted by T007's batch K, on Brett's
-    ruling at openxFactory#656 comment 5916000030) the validator is the
-    installed distribution's own, and no walk finds it. So the stub is planted
-    as the distribution's own validator, and the run dir's start answers it."""
+    WHY IT VALIDATES. It once did because `--repo-root` was a checkout and the
+    walk found the validator in it. Since plan 034 T061 (#1144 7.3; admitted by
+    T007's batch K, on Brett's ruling at openxFactory#656 comment 5916000030)
+    neither root is searched: the validator is the installed distribution's own,
+    whatever the start. So the stub is planted as the distribution's own
+    validator, and the run dir's start answers it."""
     repo_root = _corpus_with_a_reachable_validator(tmp_path)
     stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
     monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
@@ -174,19 +175,18 @@ def test_a_run_dir_beside_a_checkout_still_uses_that_one_first(tmp_path, capsys,
 
 def test_when_neither_root_reaches_a_validator_the_message_names_both(
         tmp_path, capsys, monkeypatch):
-    """A skip is still legal — a checkout with no validator in it is a real
-    state — but the line must not blame a checkout that is present. It names the
-    two directories that were searched, so the human can see which one to fix.
+    """A skip is still legal, but the line must not blame a checkout that is
+    present. Since plan 034 T061 (#1144 7.3; batch K) the roots never decide
+    where the validator is, so a skip has one cause left: the distribution
+    carries no validator of its own (an install built without its packaged
+    copy). That is the state staged here. The line still names both roots
+    openDox offered to search from, so neither is blamed on its own, and says
+    the validator is absent.
 
     On stderr, and leading with the consequence rather than the cause (the
     wording PR #50 landed for the same line): a diagnostic that says "this
     snapshot was NOT checked" must not be mistakable for the routine stdout
-    progress the surrounding `wrote …` lines are.
-
-    Since plan 034 T061 (#1144 7.3; batch K) the roots never decide where the
-    validator is, so a skip has one cause left: the distribution carries no
-    validator of its own (an install built without its packaged copy). That is
-    the state staged here, and the line still names both roots it was offered."""
+    progress the surrounding `wrote …` lines are."""
     monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
     monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: None)
     corpus = tmp_path / "corpus"
