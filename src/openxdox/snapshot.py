@@ -8,7 +8,9 @@ newline, and NO wall-clock — this module never reads the clock; any
 date by the generator. List ordering is the generator's responsibility.
 
 Writes go through the interactivity boundary (never around it): `write_snapshot`
-takes an `OutputBoundary` and writes only under a declared output path.
+takes an `OutputBoundary` and writes only under a declared output path. The
+write is atomic, and a value JSON cannot carry is refused rather than written
+(plan 034 T059: this module is openXdox's writer at openDox's writer seam).
 
 Validation is DELEGATED to this product's own validator, in this repository
 (`scripts/validate-ideation-dashboard-contracts.py`) — the schema is never
@@ -19,13 +21,19 @@ unavailable — see the commentary above `VALIDATED` for why the third one exist
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
+import stat
 import subprocess
 import sys
 import tomllib
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from opendox import projection_seams
 
 # RELATIVE TO THIS PRODUCT'S OWN ROOT — the repository this module ships in —
 # never to an aggregation checkout above it. openxFactory's § 5.2 shed
@@ -42,13 +50,37 @@ class SnapshotInvalid(Exception):
     """A rendered snapshot failed the pinned validator (or it could not run)."""
 
 
+class SnapshotNotWritable(projection_seams.ProjectionSeamError, ValueError):
+    """The snapshot holds a value JSON cannot carry, so nothing is written.
+
+    A `ProjectionSeamError`, because this module is openXdox's writer at
+    openDox's writer seam, and openDox's generate verbs report that family as a
+    refusal. A `ValueError` too, which is what `json` itself raises for the
+    same value."""
+
+
 # --------------------------- canonical serialization ---------------------------
 
 def canonical_json(snapshot: dict[str, Any]) -> str:
     """Deterministic, diffable JSON: sorted keys, 2-space indent, trailing
     newline (the house canonical-render discipline — see doc_health/runner.py,
-    execution_lane/bundler.py)."""
-    return json.dumps(snapshot, indent=2, sort_keys=True, ensure_ascii=True) + "\n"
+    execution_lane/bundler.py).
+
+    NOTHING JSON CANNOT CARRY (plan 034 T059). NaN and the infinities are
+    refused (`allow_nan=False`) rather than written as the `NaN` and
+    `Infinity` that Python's `json` otherwise emits, which no JSON reader
+    parses: not the server's, not a browser's, not the validator's. So are a
+    value of no JSON type and a structure that contains itself. openDox's own
+    writer refuses the same values (openDox-code#59, r4125900060)."""
+    try:
+        return json.dumps(snapshot, indent=2, sort_keys=True, ensure_ascii=True,
+                          allow_nan=False) + "\n"
+    except (TypeError, ValueError) as exc:
+        raise SnapshotNotWritable(
+            f"the snapshot holds a value JSON cannot carry ({exc}). NaN, the "
+            "infinities and values of no JSON type have no JSON spelling, and "
+            "a file carrying one would be one no JSON reader parses, so "
+            "nothing was written") from exc
 
 
 def canonical_bytes(snapshot: dict[str, Any]) -> bytes:
@@ -61,8 +93,46 @@ def load_snapshot(path: Path | str) -> dict[str, Any]:
 
 def write_snapshot(snapshot: dict[str, Any], path: Path | str, boundary) -> Path:
     """Render canonically and write through the interactivity boundary. Every
-    snapshot write lands under the boundary's declared output allowlist."""
-    return boundary.write_output(path, canonical_json(snapshot))
+    snapshot write lands under the boundary's declared output allowlist.
+
+    ATOMICALLY (plan 034 T059). openDox's server answers `/snapshot.json` on
+    threads of its own while a refresh rewrites the very snapshot it serves,
+    and a write in place (truncate, then write) let a request read a truncated
+    file. So the bytes go to a temporary sibling first, and one `os.replace`
+    moves them over the target: a reader sees the whole old snapshot or the
+    whole new one, never part of either. openDox's own writer does the same
+    (openDox-code#59, r4126138808).
+
+    THE BOUNDARY STILL DECIDES THE DESTINATION. `permit_output` is the check
+    `write_output` makes, root and allowlist, with its refusal and its ledger,
+    and it runs before anything is written, so a refused target leaves
+    nothing behind. THE RENDERING RUNS BEFORE IT: a snapshot JSON cannot carry
+    is refused first, as `SnapshotNotWritable`, with nothing written and
+    nothing asked of the boundary, so a write that is wrong on both counts is
+    refused for its content. The sibling is created exclusively beside the
+    permitted target, with the mode an ordinary write would give it, or with
+    the target's own permission bits where the target exists, so a refresh
+    never widens a restricted snapshot. Its name is a dot-file with no
+    document extension, so `/source` never serves it, and it is removed if the
+    write or the move fails."""
+    data = canonical_json(snapshot).encode("ascii")
+    target = boundary.permit_output(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name(f".{target.name}.{uuid.uuid4().hex}.tmp")
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            with contextlib.suppress(FileNotFoundError):
+                os.fchmod(stream.fileno(), stat.S_IMODE(os.stat(target).st_mode))
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, target)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(temporary)
+        raise
+    return target
 
 
 # --------------------------- validator location ---------------------------

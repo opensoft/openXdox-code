@@ -31,7 +31,7 @@ WHAT IS VERBATIM, AND WHAT CHANGED ON ARRIVAL. The helpers
 `_ST_DECLARATION` and `_declared_st_tokens`) and the `GATE_EXCLUSIVE` tuple are
 openDox-code's text at `55194335`, the last commit that carried all five, byte
 for byte. The tuple and the three helpers openDox-code kept are unchanged at
-`2d116415`. Their comments are kept too, so "Copilot review, round N" in them
+`2d116415`, at `814516b7` and at `047bb4fa`. Their comments are kept too, so "Copilot review, round N" in them
 is a round on openDox-code#27, where that file was written. Four things changed,
 each because this is the composition and not a lone leg:
   1. A missing assembly FAILS here, where it skipped there. The composition is

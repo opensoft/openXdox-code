@@ -82,7 +82,16 @@ if str(_SCRIPTS_DIR) not in sys.path:
 # `scripts/` and the path insertion above already reaches it, so the spelling
 # comes from the declaration that a verification guarding on the exact string
 # reads.
-from doc_health import pin_sentinels  # noqa: E402
+#
+# IT IS IMPORTED WHERE IT IS READ, in `SnapshotEntry.index_entry`, for an
+# entry with no revision of its own (plan 034 T059). This module is openXdox's contribution at openDox's snapshot registry
+# seam (`openxdox.projection_contributions`), and openDox probes a
+# registration's names when it is made. `pin_sentinels` is this module's one
+# reach into openxFactory's `doc_health`, which a lone openXdox-code checkout
+# does not carry (R1Q6 (d), openxFactory#656 comment 5817152735). Read at
+# module level, it made the registration itself fail there, and with it every
+# process that registers a profile. Read in `index_entry`, it fails where the
+# sentinel is written, on `doc_health`, as before, and nowhere else.
 
 DEFAULT_REF = "main"
 INDEX_KIND = "ideation-dashboard-snapshot-index"
@@ -292,13 +301,22 @@ class SnapshotEntry:
         only that the revision was not established: the repository is readable,
         and whether the snapshot's own generation lacked a revision, could not
         fetch one, or never recorded one is not knowable from here. Writing a
-        stronger member would assert a condition nobody established."""
+        stronger member would assert a condition nobody established.
+
+        `doc_health` is read only for the sentinel (plan 034 T059, Copilot on
+        openXdox-code#35, r4146580826), so an entry that carries its revision
+        is indexed where `doc_health` is absent too."""
+        source_revision = self.source_revision
+        if not source_revision:
+            from doc_health import pin_sentinels
+
+            source_revision = pin_sentinels.UNKNOWN
         out: dict[str, Any] = {
             "repository": self.repository,
             "ref": self.ref,
             "snapshot": self.location or (
                 self.snapshot_path.name if self.snapshot_path else f"{self.repository}-snapshot.json"),
-            "source_revision": self.source_revision or pin_sentinels.UNKNOWN,
+            "source_revision": source_revision,
         }
         if self.generated_at:
             out["generated_at"] = self.generated_at
@@ -401,27 +419,51 @@ def resolve_within(root: Path, url_tail: str) -> Path | None:
 
     A `.git` (or any dot-directory) named as the LAST component is refused by
     the `is_file()` check below, so the first half needs no special case for
-    it."""
+    it.
+
+    THE RULE IS APPLIED TWICE (plan 034 T059): to the path as the URL spells
+    it, and to the CANONICAL path, relative to `root`, once symlinks are
+    resolved. The spelling alone let a symlink inside the root lead to what the
+    rule refuses by name: `link -> .git` served `/source/link/config`, which is
+    `.git/config`, and `notes.md -> .env` served `.env`. Both resolve inside
+    the root, to a regular file, so confinement never saw them. openDox's own
+    default registry closed the same gap in its review round
+    (openDox-code#59, r4125556296), and this module is registered at the same
+    seam (`openxdox.projection_contributions`)."""
     rel = urllib.parse.unquote(url_tail)
     rel = rel.split("?", 1)[0].split("#", 1)[0]
     if not rel or rel.startswith("/") or "\x00" in rel:
         return None
     parts = [p for p in rel.replace("\\", "/").split("/") if p not in ("", ".")]
-    if any(p.startswith(".") and p != ".." for p in parts[:-1]):
+    if _names_something_hidden(parts):
         return None
-    if parts and parts[-1].startswith(".") and parts[-1] != "..":
-        if PurePosixPath(parts[-1]).suffix not in SERVED_DOTFILE_SUFFIXES:
-            return None
-    root = Path(root).resolve()
+    # The ROOT is resolved inside the guard too (Copilot on openXdox-code#35):
+    # a source root that is itself a symlink loop refuses, as a path through
+    # one does, rather than raising out of the `/source` route.
     try:
+        root = Path(root).resolve()
         resolved = (root / rel).resolve()
     except (OSError, RuntimeError, ValueError):
         return None
     if resolved != root and not resolved.is_relative_to(root):
         return None
+    if _names_something_hidden(resolved.relative_to(root).parts):
+        return None
     if not resolved.is_file():
         return None
     return resolved
+
+
+def _names_something_hidden(parts: list[str] | tuple[str, ...]) -> bool:
+    """Whether a relative path's components name what `/source` never serves:
+    a dot-directory anywhere but the last component, or a last component that
+    is a dot-file without a projected extension. `..` is not a name, and the
+    escape check decides it."""
+    if any(p.startswith(".") and p != ".." for p in parts[:-1]):
+        return True
+    last = parts[-1] if parts else ""
+    return (last.startswith(".") and last != ".."
+            and PurePosixPath(last).suffix not in SERVED_DOTFILE_SUFFIXES)
 
 
 # --------------------------- the registry ---------------------------
@@ -502,32 +544,55 @@ class SnapshotRegistry:
             return aggregate
 
     def drop(self, repository: str, ref: str | None = None) -> None:
+        """Remove an entry. Dropping the ACTIVE entry clears the active key
+        (plan 034 T059), so no ref-less request meets a key with nothing
+        behind it, and the next entry registered becomes active, as the first
+        one did. Left set, the stale key also kept every later registration
+        from becoming active, since `register` promotes only while nothing is,
+        so the registry held entries and answered no active one."""
         with self._lock:
-            self._entries.pop(snapshot_key(repository, ref), None)
+            key = snapshot_key(repository, ref)
+            self._entries.pop(key, None)
+            if self._active == key:
+                self._active = None
 
     # ---- lookup ----
+    #
+    # EVERY READ HOLDS THE LOCK (plan 034 T059). A block `atomically()` holds
+    # is a read-modify-write, and a reader that did not wait for it could
+    # answer from its middle: the active key moved and not yet put back, for
+    # one. openDox's own default registry closed the same gap in its review
+    # round (openDox-code#59, r4136863481). The lock is re-entrant, so a read
+    # inside a held block, or inside another read, is safe.
     def get(self, repository: str, ref: str | None = None) -> SnapshotEntry | None:
         """Ref-less lookups resolve to `main` (D4)."""
-        return self._entries.get(snapshot_key(repository, ref))
+        key = snapshot_key(repository, ref)
+        with self._lock:
+            return self._entries.get(key)
 
     def entries(self) -> list[SnapshotEntry]:
         """Registered entries, ordered by (repository, ref) — a stable roster."""
-        return [self._entries[k] for k in sorted(self._entries)]
+        with self._lock:
+            return [self._entries[k] for k in sorted(self._entries)]
 
     def aggregates(self) -> list[Aggregate]:
-        return [self._aggregates[k] for k in sorted(self._aggregates)]
+        with self._lock:
+            return [self._aggregates[k] for k in sorted(self._aggregates)]
 
     def keys(self) -> list[tuple[str, str]]:
-        return sorted(self._entries)
+        with self._lock:
+            return sorted(self._entries)
 
     def __len__(self) -> int:
-        return len(self._entries)
+        with self._lock:
+            return len(self._entries)
 
     @property
     def active(self) -> SnapshotEntry | None:
-        if self._active is None:
-            return None
-        return self._entries.get(self._active)
+        with self._lock:
+            if self._active is None:
+                return None
+            return self._entries.get(self._active)
 
     def set_active(self, repository: str, ref: str | None = None) -> SnapshotEntry | None:
         with self._lock:
@@ -540,9 +605,10 @@ class SnapshotRegistry:
         """The one resolution every route uses: a named pair, or the ACTIVE entry
         when no repository is named (which is what `/snapshot.json` with no query
         means — today's behaviour, unchanged)."""
-        if repository is None or repository == "":
-            return self.active
-        return self.get(repository, ref)
+        with self._lock:
+            if repository is None or repository == "":
+                return self.active
+            return self.get(repository, ref)
 
     # ---- per-entry source confinement (task 2.2) ----
     def resolve_source(self, repository: str | None, ref: str | None, tail: str) -> Path | None:
@@ -567,12 +633,22 @@ class SnapshotRegistry:
         second place this document carries `(repository, ref)` pairs and nothing
         checked it, so a published index could name the branch of unmerged work.
         The check is here, over BOTH collections, so the premise is true of the
-        document rather than of one field."""
-        entries = self.entries()
+        document rather than of one field.
+
+        READ IN ONE WINDOW (plan 034 T059, Copilot on openXdox-code#35,
+        r4139816732). The entries, the aggregates and the active key are taken
+        under one hold of the lock, so the document never names an active key
+        its own entries do not carry, as it could when a writer ran between
+        three separate reads. The document is composed after the lock is let
+        go, from that one reading."""
+        with self._lock:
+            entries = self.entries()
+            aggregates = self.aggregates()
+            active = self._active
         if published:
             for entry in entries:
                 assert_publishable(entry.repository, entry.ref)
-            for aggregate in self.aggregates():
+            for aggregate in aggregates:
                 for repository, ref in aggregate.members:
                     assert_publishable(repository, ref)
         doc: dict[str, Any] = {
@@ -583,18 +659,17 @@ class SnapshotRegistry:
         newest = [e.generated_at for e in entries if e.generated_at]
         if newest:
             doc["generated_at"] = max(newest)
-        aggregates = self.aggregates()
         if aggregates:
             doc["aggregates"] = [{
                 "id": a.id,
                 **({"display_name": a.display_name} if a.display_name else {}),
                 "members": [{"repository": r, "ref": f} for r, f in a.members],
             } for a in aggregates]
-        if not published and self._active is not None:
+        if not published and active is not None:
             # Serving-side only: which entry the server considers ACTIVE. Additive,
             # ignored by any consumer that does not know it (and absent from a
             # published index, which has no notion of "active").
-            doc["active"] = {"repository": self._active[0], "ref": self._active[1]}
+            doc["active"] = {"repository": active[0], "ref": active[1]}
         return doc
 
     # ---- aggregate composition (from the index, never a repository scan) ----
@@ -607,11 +682,17 @@ class SnapshotRegistry:
         `repository` so a renderer can badge it. Members with no available
         snapshot are skipped (degrade, never refuse). `aggregate` lets a caller
         compose one it resolved itself (a register-DERIVED project aggregate,
-        add-project-merged-projection D11) without registering it."""
-        aggregate = aggregate or self._aggregates.get(aggregate_id)
-        if aggregate is None:
-            return None
-        members = [self.get(repo, ref) for repo, ref in aggregate.members]
+        add-project-merged-projection D11) without registering it.
+
+        The aggregate and its members are looked up in one hold of the lock
+        (plan 034 T059, r4139816732), so a writer cannot drop or replace a
+        member between two lookups. The members' snapshots are read after it
+        is let go."""
+        with self._lock:
+            aggregate = aggregate or self._aggregates.get(aggregate_id)
+            if aggregate is None:
+                return None
+            members = [self.get(repo, ref) for repo, ref in aggregate.members]
         snapshots = [(m, m.read_json()) for m in members if m is not None]
         loaded = [(m, doc) for m, doc in snapshots if isinstance(doc, dict)]
         return compose_snapshots(aggregate, loaded)

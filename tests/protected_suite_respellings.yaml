@@ -33,10 +33,12 @@
 # entry. Each later admitted edit appends its own entry in the pull request
 # that makes the edit.
 #
-# WHO READS IT. F5.2 and 12.5's falsifier, once plan 034 T059 and T086 wire the
-# subtraction into both checks (batch C). Until then nothing reads this file,
-# and both falsifiers still refuse every protected path an arc landing touches,
-# as written.
+# WHO READS IT. `scripts/protected_suites.py`, since plan 034 T059 (batch C's
+# wiring). It is the last step of F5.2 and of 12.5's falsifier, in place of the
+# inline intersection each ended with: the falsifier still lists the landings
+# and the protected suites itself, and the script subtracts the entries that
+# hold. Its docstring gives both calls. Until T059 nothing read this file, and
+# both falsifiers refused every protected path an arc landing touched.
 #
 # THE RULES.
 #   * `schema_version` is the integer 1, and `kind` is
@@ -62,7 +64,10 @@
 #     is `after_blob`; and replacing `old`, which occurs exactly once in the
 #     `before_blob` text, with `new` gives the `after_blob` text byte for byte.
 #     A landing whose diff for a protected path matches no entry is refused,
-#     exactly as an unentered edit is (batch C).
+#     exactly as an unentered edit is (batch C). The check T059 wired holds a
+#     fourth, from `test`: `old` lies inside the named test in the
+#     `before_blob` text, and `new` inside it in the `after_blob` text, so an
+#     entry cannot admit an edit to another test of the suite.
 #   * Entries for one suite CHAIN: each one's `before_blob` is the previous
 #     one's `after_blob`, because each edit is made to the suite the last one
 #     left.
@@ -133,3 +138,144 @@ entries:
                                             "retired": "rejected",
                                             "superseded": "superseded"}},
           }
+  - suite: tests/test_gate_loop_views.py
+    test: test_the_overlay_changes_four_words_and_the_named_absence_and_nothing_else
+    landing: opensoft/openXdox-code#35
+    edit: admitted
+    reason: >-
+      5.3a's `values` block at a pin past plan 034 T054 (plan 034 T059). At
+      that pin openDox's `SNAPSHOT_VALUES` defaults are its neutral snapshot's
+      values, so the DISPLAY facet's `values` block (T060) changes six
+      `values.*` leaves of the served display beside the four stage words and
+      the named absence. The test that pins what the overlay changes now
+      expects those six leaves too, and its docstring says why. No other
+      assertion of the suite changes. This is the second of the two edits
+      batch I admits; T060 made the first.
+    ruled: >-
+      R1Q26 (a), opensoft/openxFactory#656 comment 5851950767 (kept at
+      5852513402), on R1Q11 (a), comment 5850003126. It is recorded in #1144's
+      12.5 falsifier by T007's batch I (openxFactory#1180, landed as 8421603a).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. Its diff for
+      this suite is exactly `old` to `new`, inside the one test named. The
+      test still compares the whole set of changed leaves by equality, so a
+      leaf the overlay changed and the test did not name would still fail it;
+      the six added leaves are each the governed value over openDox's neutral
+      default, measured at the pin (T060's body lists the same six). No
+      assertion is weakened.
+    before_blob: a56906c6c56b1c2db5e45aee5e93e6f07740484a
+    after_blob: a5ce00cc7cafb54928e64d9f7a7db34a7d252c39
+    old: |
+      def test_the_overlay_changes_four_words_and_the_named_absence_and_nothing_else(
+              register_host) -> None:
+          """Against the same host WITHOUT the facet: five leaves differ, and they are these.
+
+          Both payloads come through the same chain. The facet-less host is registered
+          second, after an explicit `unregister()`, because the registry refuses a
+          second, different profile over a first.
+          """
+          from opendox import domain_profile as registry
+
+          display_profile, view_extension = _display_profile_or_skip()
+          register_host(_engineering_host("DISPLAY"))
+          declared = _flatten(_served_display(display_profile, view_extension))
+          registry.unregister()
+          register_host(_engineering_host())
+          absent = _flatten(_served_display(display_profile, view_extension))
+          assert absent["host_facet"] == "absent"
+          assert declared.keys() == absent.keys()
+          changed = {path: (absent[path], declared[path])
+                     for path in declared if declared[path] != absent[path]}
+          assert changed == {
+              "host_facet": ("absent", "declared"),
+              "stages.completion.one": ("completed item", IMPLEMENTED_ITEM),
+              "stages.completion.many": ("completed items", IMPLEMENTED_ITEMS),
+              "stages.completion.short": ("completed", IMPLEMENTED),
+              "stages.completion.label": ("completed", IMPLEMENTED),
+    new: |
+      def test_the_overlay_changes_four_words_and_the_named_absence_and_nothing_else(
+              register_host) -> None:
+          """Against the same host WITHOUT the facet: eleven leaves differ, and they are these.
+
+          Both payloads come through the same chain. The facet-less host is registered
+          second, after an explicit `unregister()`, because the registry refuses a
+          second, different profile over a first.
+
+          SIX OF THEM ARE THE `values` BLOCK'S, which is not a stage (plan 034 T059,
+          RULED R1Q26 (a), `opensoft/openxFactory#656` comment `5851950767`, on R1Q11
+          (a), comment `5850003126`). At this pin openDox's `SNAPSHOT_VALUES`
+          defaults are its neutral snapshot's values (T054), so the facet's block
+          changes the six values a view matches the governed snapshot by. The edit
+          that admitted them is entered, with its reason, in
+          `tests/protected_suite_respellings.yaml`.
+          """
+          from opendox import domain_profile as registry
+
+          display_profile, view_extension = _display_profile_or_skip()
+          register_host(_engineering_host("DISPLAY"))
+          declared = _flatten(_served_display(display_profile, view_extension))
+          registry.unregister()
+          register_host(_engineering_host())
+          absent = _flatten(_served_display(display_profile, view_extension))
+          assert absent["host_facet"] == "absent"
+          assert declared.keys() == absent.keys()
+          changed = {path: (absent[path], declared[path])
+                     for path in declared if declared[path] != absent[path]}
+          assert changed == {
+              "host_facet": ("absent", "declared"),
+              "stages.completion.one": ("completed item", IMPLEMENTED_ITEM),
+              "stages.completion.many": ("completed items", IMPLEMENTED_ITEMS),
+              "stages.completion.short": ("completed", IMPLEMENTED),
+              "stages.completion.label": ("completed", IMPLEMENTED),
+              "values.document_stage.captured": ("source", "brainstorm"),
+              "values.document_stage.organized": ("grouping", "staged"),
+              "values.register_state.captured": ("unselected", "latent"),
+              "values.register_state.proposed": ("selected", "picked"),
+              "values.register_state.retired": ("declined", "rejected"),
+              "values.register_state.superseded": ("replaced", "superseded"),
+  - suite: tests/test_session_snapshot.py
+    test: test_the_session_source_read_is_the_existing_confinement_mechanism
+    landing: opensoft/openXdox-code#35
+    edit: respelling
+    respelled: >-
+      The route's call into the confinement, as openDox-code#59 (T055) moved it:
+      `self.source.registry.resolve_source(` to `resolve_source_path(Path(root),
+      rest)`, the route's one entry point, which applies the registered
+      registry's `resolve_within` to the resolved entry's own root
+      (r4136863569). The docstring names the same move.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735, recorded in
+      #1144's F5.2 and 12.5 falsifiers by T007's batch C. The holder's ruling
+      on T059 (2026-09-30) accepted this entry as a respelling, citing T055's
+      r4136863569, with the expected call respelled and the second assertion
+      left unchanged.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. Its diff for
+      this suite is exactly `old` to `new`, inside the one test named. The
+      first assertion still pins the route's own source to the one call that
+      confines the path, so a re-implementation of containment beside it
+      still fails; the second assertion, that the registry's `resolve_source`
+      reaches `resolve_within` exactly once, is unchanged. No assertion is
+      weakened.
+    before_blob: b5e1be021b0a23c891ffa0694682dca331cb982c
+    after_blob: f78c4452aebb9d2601f9043ceb8d9c552040e9b6
+    old: |
+      def test_the_session_source_read_is_the_existing_confinement_mechanism():
+          """T035: the confinement is `registry.resolve_source` + `resolve_within`, not
+          a new check bolted onto the session path. Pinned on the route's own source so
+          a later "simplification" cannot re-implement containment beside it."""
+          import inspect
+
+          source = inspect.getsource(serve_mod.DashboardHandler._serve_source)
+          assert "self.source.registry.resolve_source(" in source
+    new: |
+      def test_the_session_source_read_is_the_existing_confinement_mechanism():
+          """T035: the confinement is the registry's per-entry `resolve_within`, reached
+          through the route's one entry point `resolve_source_path` over the resolved
+          entry's own root (openDox-code#59, r4136863569), not a new check bolted onto
+          the session path. Pinned on the route's own source so a later
+          "simplification" cannot re-implement containment beside it."""
+          import inspect
+
+          source = inspect.getsource(serve_mod.DashboardHandler._serve_source)
+          assert "resolve_source_path(Path(root), rest)" in source

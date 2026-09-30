@@ -8,15 +8,15 @@ extension, which `tests/test_role_authority_projection_seam.py`'s docstring
 states first. The fourth, (d), is that the extension assembles cleanly beside
 the OTHER existing contribution columns, in either declaration order. Two of
 those columns are `serve_gate.GateRoutesExtension` and
-`serve_projection.ProjectionRoutesExtension`, and `serve_projection` reaches
-openxFactory's `doc_health` when it is imported, through `snapshot_registry`.
-So each suite imported the two behind a guard that SKIPPED when `doc_health`
-was absent, saying "doc_health reachability is BUILD-arc work (§ 3.5/3.6) ...
-this test will assert for real once that lands". A lone checkout never has
-`doc_health`, so the six cases behind that guard skipped on every run of this
-leg's required check. 9.4 names them: "every one of openXdox's six skips
-carries the same reason ... The whole-product assertions are precisely the
-ones that skip".
+`serve_projection.ProjectionRoutesExtension`, and until plan 034 T059
+`serve_projection` reached openxFactory's `doc_health` when it was imported,
+through `snapshot_registry`. So each suite imported the two behind a guard
+that SKIPPED when `doc_health` was absent, saying "doc_health reachability is
+BUILD-arc work (§ 3.5/3.6) ... this test will assert for real once that
+lands". A lone checkout never has `doc_health`, so the six cases behind that
+guard skipped on every run of this leg's required check until T044. 9.4 named
+them: "every one of openXdox's six skips carries the same reason ... The
+whole-product assertions are precisely the ones that skip".
 
 WHAT T044 DID. It removed the guard, so each case asserts for real, and it
 moved the six here. Each keeps its body and its comments, except that the
@@ -26,18 +26,21 @@ assembles, since three of the six were all called
 `test_assembly_is_order_insensitive`. The two columns are imported at module
 level, beside the three § 4.5 extensions, because every case in this file
 needs both. Where `doc_health` is present, as it is with openxFactory's
-`scripts/` on `PYTHONPATH`, all six run and pass. In a lone checkout this
-module cannot be imported, so it fails at collection, on `doc_health` alone.
+`scripts/` on `PYTHONPATH`, all six run and pass.
 
-WHY IT IS DECLARED. That makes this file one that a lone checkout cannot run.
-So `tests/declared_exclusion.yaml` lists it under `doc_health` (R1Q6 (d),
-openxFactory#656 comment 5817152735), and the root `conftest.py` leaves it
-out of every whole-suite run and reports it as an OPEN extraction.
-`tests/test_declared_exclusion.py` holds it to that entry: run alone, it must
-fail, and only on `doc_health`. Once the doc_health direction arc (plan 034
-T008) lets these modules import in a lone checkout, this file stops failing
-and that check turns red. The file then leaves the declaration, in the pull
-request that clears the reason.
+WHY IT WAS DECLARED, AND WHY IT IS NOT NOW. At T044 this module could not be
+imported in a lone checkout: `serve_projection` imports `snapshot_registry`,
+which read openxFactory's `doc_health` at module level. So
+`tests/declared_exclusion.yaml` listed this file under `doc_health` (R1Q6 (d),
+openxFactory#656 comment 5817152735), and the root `conftest.py` left it out
+of every whole-suite run. Plan 034 T059 moved that read into the one method
+that uses it (`SnapshotEntry.index_entry`), so openXdox's registry can be
+registered at openDox's registry seam in a checkout without `doc_health`
+(`openxdox.projection_contributions`). The module now imports in a lone
+checkout, and all six cases pass there, so `tests/test_declared_exclusion.py`
+turned red on this file's entry, as it is built to. The entry left the
+declaration in T059, the pull request that cleared its reason, and the six
+cases run in this leg's required check.
 
 WHAT STAYS BEHIND. The 24 seam cases that need neither column stay in their
 three suites, in the required check. They cover structural conformance, the
@@ -65,10 +68,11 @@ from openxdox.role_authority_projection import (
 )
 
 # The two ALREADY-LANDED contribution columns every case below assembles
-# beside. `serve_projection` reaches `doc_health` when it is imported
-# (through `snapshot_registry`), so in a lone checkout this module stops at
-# its import, at collection, on `doc_health` alone. That is the failure the
-# declaration holds this file to. No guard turns it into a skip any more.
+# beside. From T044 to T059 `serve_projection` reached `doc_health` when it
+# was imported (through `snapshot_registry`), so in a lone checkout this
+# module stopped at its import, on `doc_health` alone, and the declaration
+# held it to that failure. Since T059 both import in a lone checkout, and
+# this module runs in the required check. No guard turns a case into a skip.
 from openxdox.serve_gate import GateRoutesExtension
 from openxdox.serve_projection import ProjectionRoutesExtension
 

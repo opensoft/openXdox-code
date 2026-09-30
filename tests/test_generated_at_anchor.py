@@ -219,8 +219,16 @@ def test_the_predicate_checks_the_instant_not_only_the_shape():
 def test_a_pinned_anchor_passes_strict_validation(tmp_path, monkeypatch):
     """`--strict` is the lane's gate (design Decision 3 step 3), so the anchor
     has to satisfy the schema's `format: date-time` for real, not merely the
-    CLI's own predicate."""
-    monkeypatch.setattr(cli_mod, "_locate_validator", lambda *a, **k: VALIDATOR)
+    CLI's own predicate.
+
+    The validator is the one registered for the snapshot's kind at openDox's
+    validator lookup (plan 034 T059, `openxdox.projection_contributions`),
+    which replaced `cli._locate_validator` (T055). So the pinned validator is
+    handed to that registration's `locate`."""
+    from openxdox import projection_contributions
+
+    monkeypatch.setattr(projection_contributions.VALIDATOR, "locate",
+                        lambda *a, **k: VALIDATOR)
     output = tmp_path / "out" / "snapshot.json"
     assert cli_mod.main([
         "generate", "--repo-root", str(BASE_REPO), "--repository", "fixture-repo",

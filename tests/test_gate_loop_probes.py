@@ -194,7 +194,7 @@ def bundle(tmp_path) -> Path:
         # Its four-row table is there, not restated here. Round 1 of the review on
         # #21 found this file claiming the install "came from somewhere older than
         # the declared pin" on a check that only tested for a marker. UNDER THAT
-        # CHECK, had the DECLARED leg (`0b4e8bbf` then, `2d116415` now) itself ever
+        # CHECK, had the DECLARED leg (`0b4e8bbf` then, `047bb4fa` now) itself ever
         # stopped shipping `web/**`, all thirteen
         # probes below would have skipped and this required check would have stayed
         # green over the regression. UNDER THE TABLE THEY OBEY NOW THEY FAIL: the

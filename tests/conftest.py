@@ -363,3 +363,60 @@ def unregistered_profile():
         _domain_profile.unregister()
         if previous is not None:
             _domain_profile.register(previous)
+
+
+# ---------------------------------------------------------------------------
+# THE HOME CORPUS, REGISTERED AS openxFactory'S HOST REGISTERS IT (plan 034
+# T059; holder's ruling on T059, 2026-09-30).
+#
+# openDox's `authoring.create_scaffold` asks the registered home corpus which
+# fields it obliges (`scaffold_lead_fields()`, openDox-code#57, plan 034 T054),
+# and with nothing registered it refuses, as #1144's 4.1a has every seam do:
+# "A process in which no entry point was built and nothing registered anything
+# — an import, a test, a library caller — still refuses with 4.2's
+# ADAPTER_NOT_REGISTERED, so the default is a registration the entry point
+# makes and never a fallback inside the seam." This leg's governed suites call
+# the gate verbs in-process, as a library caller, so from that pin they refused
+# on the home corpus where they passed before.
+#
+# So this harness registers the home a host would, as the root `conftest.py`
+# registers the profile a host would: the SAME factory openxFactory's host
+# registers (`corpus_adapter_openxfactory.home_corpus`, through
+# `scripts/opendox_host.register_seams()`). It is found where F5.2's
+# environment composes openxFactory's `scripts/` on `PYTHONPATH` (T007 batch G,
+# R1Q23 (a)). The governed layout the suites were written against is that
+# adapter's answer: it obliges neither `title` nor `summary`, so a scaffold
+# keeps its H1 first.
+#
+# WHERE IT IS ABSENT, NOTHING IS REGISTERED. A lone checkout carries no
+# openxFactory `scripts/`, and there the suites refuse as 4.1a says, which is
+# the right answer. Every suite that reaches the home corpus also reaches
+# `doc_health`, so each is in the declared exclusion already
+# (`tests/declared_exclusion.yaml`), and its evidence is unchanged. Only a
+# missing `corpus_adapter_openxfactory` itself means "absent": a present one
+# that cannot be imported fails here, loudly.
+#
+# THE SUITES KEEP READING WHAT THIS CHECKOUT RESOLVES. openxFactory's adapter
+# puts its own pinned openDox leg's `src/` FIRST on `sys.path` when it is
+# imported (`corpus_adapter_openxfactory/adapter.py`), because that is how
+# openxFactory consumes the interface. `opendox` itself is already imported by
+# then, from the installed distribution, so its modules keep coming from there.
+# The two top-level modules beside it, `route_extension` and
+# `subcommand_extension`, are not imported yet, and a later import would have
+# found the aggregation's pinned copies ahead of the ones this checkout's own
+# path finds (`src/`, then the installed openDox). So both are imported first,
+# from there.
+import route_extension  # noqa: E402,F401
+import subcommand_extension  # noqa: E402,F401
+
+try:
+    import corpus_adapter_openxfactory as _openxfactory_corpus  # noqa: E402
+except ModuleNotFoundError as _absent:
+    if _absent.name != "corpus_adapter_openxfactory":
+        raise
+    _openxfactory_corpus = None
+
+if _openxfactory_corpus is not None:
+    from opendox import corpus_adapter as _corpus_adapter  # noqa: E402
+
+    _corpus_adapter.register_home(_openxfactory_corpus.home_corpus)

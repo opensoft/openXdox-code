@@ -14,14 +14,14 @@ OTHER two existing contribution columns, in either declaration order.
 
 (d) IS ASSERTED ELSEWHERE, since plan 034 task T044. The two columns are
 `serve_gate.GateRoutesExtension` and `serve_projection.ProjectionRoutesExtension`,
-and `serve_projection` reaches openxFactory's `doc_health` when it is imported
-(through `snapshot_registry`), which no lone checkout supplies. So this
-suite's two cases for (d) sat behind a guard that skipped on every lone run,
-until T044 made them assert for real and moved them to
-`tests/test_seam_assembly_beside_gate_and_projection.py`. That file is in the
-declared exclusion (`tests/declared_exclusion.yaml`) under `doc_health`. It
-runs wherever `doc_health` is present, and everywhere else it is reported as
-an open extraction.
+and `serve_projection` reached openxFactory's `doc_health` when it was
+imported (through `snapshot_registry`), which no lone checkout supplies. So
+this suite's two cases for (d) sat behind a guard that skipped on every lone
+run, until T044 made them assert for real and moved them to
+`tests/test_seam_assembly_beside_gate_and_projection.py`. That file was in the
+declared exclusion (`tests/declared_exclusion.yaml`) under `doc_health` until
+plan 034 T059 moved `snapshot_registry`'s one `doc_health` read out of its
+module level. It runs in this leg's required check now.
 """
 
 from __future__ import annotations
