@@ -20,13 +20,13 @@ this reasoning first.
 authority alone, which needs nothing a lone checkout lacks, it is asserted
 below. Beside the gate and projection columns it is asserted in
 `tests/test_seam_assembly_beside_gate_and_projection.py`, because
-`serve_projection` reaches openxFactory's `doc_health` when it is imported
+`serve_projection` reached openxFactory's `doc_health` when it was imported
 (through `snapshot_registry`), which no lone checkout supplies. Those two
 cases sat here behind a guard that skipped on every lone run, until T044 made
-them assert for real and moved them. That file is in the declared exclusion
-(`tests/declared_exclusion.yaml`) under `doc_health`. It runs wherever
-`doc_health` is present, and everywhere else it is reported as an open
-extraction.
+them assert for real and moved them. That file was in the declared exclusion
+(`tests/declared_exclusion.yaml`) under `doc_health` until plan 034 T059 moved
+`snapshot_registry`'s one `doc_health` read out of its module level. It runs
+in this leg's required check now.
 """
 
 from __future__ import annotations

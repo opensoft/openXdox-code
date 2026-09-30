@@ -131,9 +131,10 @@ jobs:
       # `tests/integration/`. The chain was off because `tests/conftest.py`
       # imported carved session fixtures that reached `ideation_dashboard` and
       # `doc_health`, two packages neither leg carries. At the openDox this
-      # leg now pins (openDox-code `2d116415`, since plan 034 T040), the chain
-      # loads in a lone checkout, and what still reaches openxFactory is what
-      # the declaration and `LEFT_OUT` hold. Each of the sixteen files'
+      # leg pinned from plan 034 T040 (openDox-code `2d116415`), and at the one
+      # it pins since plan 034 T059 (`e3ef506a`), the chain loads in a lone
+      # checkout, and what still reaches openxFactory is what the declaration
+      # and `LEFT_OUT` hold. Each of the sixteen files'
       # account of itself (why it joined the list, its counts, its review
       # rounds) is in this file's history at `d84b5048`
       # (`git show d84b5048:.github/workflows/validate.yml`), and is not
@@ -261,8 +262,8 @@ jobs:
       # gap were the three seam suites' `doc_health` pairs. T044 made each of
       # them assert for real and moved the six into
       # `tests/test_seam_assembly_beside_gate_and_projection.py`, which the
-      # declaration lists under `doc_health` (R1Q6 (d)), so SELECTED and
-      # SKIPPED each lose those six. The declaration's own check gains one
+      # declaration then listed under `doc_health` (R1Q6 (d); it left in plan
+      # 034 T059, below), so SELECTED and SKIPPED each lose those six. The declaration's own check gains one
       # case, that file run alone, which passes, so SELECTED and PASSED each
       # gain one. SELECTED goes 890 -> 885, PASSED 880 -> 881 and SKIPPED
       # 10 -> 4. The 24 seam cases that need neither column stay where they
@@ -286,8 +287,9 @@ jobs:
       # `tests/test_model_scenario_workbench_seam.py` and
       # `tests/test_role_authority_projection_seam.py` into
       # `tests/test_seam_assembly_beside_gate_and_projection.py`, which the
-      # declaration lists under `doc_health`. So none of them is a skip any
-      # more, and none is in these numbers. None comes from
+      # declaration listed under `doc_health` until plan 034 T059 took it
+      # out. So none of them is a skip any more: from T044 to T059 none was
+      # in these numbers, and since T059 all six are, as passes. None comes from
       # `tests/integration/`, where nothing skips (its rule 2). If the count
       # moves, move the pin WITH the reason — never relax the comparison.
       # SKIPPED is `==` where the other two are `>=` because a file that
