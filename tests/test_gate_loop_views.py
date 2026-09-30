@@ -1732,11 +1732,19 @@ def test_every_other_stage_still_renders_the_neutral_word(register_host) -> None
 
 def test_the_overlay_changes_four_words_and_the_named_absence_and_nothing_else(
         register_host) -> None:
-    """Against the same host WITHOUT the facet: five leaves differ, and they are these.
+    """Against the same host WITHOUT the facet: eleven leaves differ, and they are these.
 
     Both payloads come through the same chain. The facet-less host is registered
     second, after an explicit `unregister()`, because the registry refuses a
     second, different profile over a first.
+
+    SIX OF THEM ARE THE `values` BLOCK'S, which is not a stage (plan 034 T059,
+    RULED R1Q26 (a), `opensoft/openxFactory#656` comment `5851950767`, on R1Q11
+    (a), comment `5850003126`). At this pin openDox's `SNAPSHOT_VALUES`
+    defaults are its neutral snapshot's values (T054), so the facet's block
+    changes the six values a view matches the governed snapshot by. The edit
+    that admitted them is entered, with its reason, in
+    `tests/protected_suite_respellings.yaml`.
     """
     from opendox import domain_profile as registry
 
@@ -1756,6 +1764,12 @@ def test_the_overlay_changes_four_words_and_the_named_absence_and_nothing_else(
         "stages.completion.many": ("completed items", IMPLEMENTED_ITEMS),
         "stages.completion.short": ("completed", IMPLEMENTED),
         "stages.completion.label": ("completed", IMPLEMENTED),
+        "values.document_stage.captured": ("source", "brainstorm"),
+        "values.document_stage.organized": ("grouping", "staged"),
+        "values.register_state.captured": ("unselected", "latent"),
+        "values.register_state.proposed": ("selected", "picked"),
+        "values.register_state.retired": ("declined", "rejected"),
+        "values.register_state.superseded": ("replaced", "superseded"),
     }
 
 
