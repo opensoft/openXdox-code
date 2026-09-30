@@ -623,12 +623,22 @@ class SnapshotRegistry:
         second place this document carries `(repository, ref)` pairs and nothing
         checked it, so a published index could name the branch of unmerged work.
         The check is here, over BOTH collections, so the premise is true of the
-        document rather than of one field."""
-        entries = self.entries()
+        document rather than of one field.
+
+        READ IN ONE WINDOW (plan 034 T059, Copilot on openXdox-code#35,
+        r4139816732). The entries, the aggregates and the active key are taken
+        under one hold of the lock, so the document never names an active key
+        its own entries do not carry, as it could when a writer ran between
+        three separate reads. The document is composed after the lock is let
+        go, from that one reading."""
+        with self._lock:
+            entries = self.entries()
+            aggregates = self.aggregates()
+            active = self._active
         if published:
             for entry in entries:
                 assert_publishable(entry.repository, entry.ref)
-            for aggregate in self.aggregates():
+            for aggregate in aggregates:
                 for repository, ref in aggregate.members:
                     assert_publishable(repository, ref)
         doc: dict[str, Any] = {
@@ -639,18 +649,17 @@ class SnapshotRegistry:
         newest = [e.generated_at for e in entries if e.generated_at]
         if newest:
             doc["generated_at"] = max(newest)
-        aggregates = self.aggregates()
         if aggregates:
             doc["aggregates"] = [{
                 "id": a.id,
                 **({"display_name": a.display_name} if a.display_name else {}),
                 "members": [{"repository": r, "ref": f} for r, f in a.members],
             } for a in aggregates]
-        if not published and self._active is not None:
+        if not published and active is not None:
             # Serving-side only: which entry the server considers ACTIVE. Additive,
             # ignored by any consumer that does not know it (and absent from a
             # published index, which has no notion of "active").
-            doc["active"] = {"repository": self._active[0], "ref": self._active[1]}
+            doc["active"] = {"repository": active[0], "ref": active[1]}
         return doc
 
     # ---- aggregate composition (from the index, never a repository scan) ----
@@ -663,11 +672,17 @@ class SnapshotRegistry:
         `repository` so a renderer can badge it. Members with no available
         snapshot are skipped (degrade, never refuse). `aggregate` lets a caller
         compose one it resolved itself (a register-DERIVED project aggregate,
-        add-project-merged-projection D11) without registering it."""
-        aggregate = aggregate or self._aggregates.get(aggregate_id)
-        if aggregate is None:
-            return None
-        members = [self.get(repo, ref) for repo, ref in aggregate.members]
+        add-project-merged-projection D11) without registering it.
+
+        The aggregate and its members are looked up in one hold of the lock
+        (plan 034 T059, r4139816732), so a writer cannot drop or replace a
+        member between two lookups. The members' snapshots are read after it
+        is let go."""
+        with self._lock:
+            aggregate = aggregate or self._aggregates.get(aggregate_id)
+            if aggregate is None:
+                return None
+            members = [self.get(repo, ref) for repo, ref in aggregate.members]
         snapshots = [(m, m.read_json()) for m in members if m is not None]
         loaded = [(m, doc) for m, doc in snapshots if isinstance(doc, dict)]
         return compose_snapshots(aggregate, loaded)

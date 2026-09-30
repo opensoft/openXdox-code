@@ -13,7 +13,8 @@ registers this leg's mechanisms:
    truncated snapshot (r4126138808), and `canonical_json` wrote NaN and
    Infinity, which no JSON reader parses (r4125900060).
 4. `SnapshotRegistry` read without its lock, so a reader could answer from the
-   middle of a block `atomically()` holds (r4136863481).
+   middle of a block `atomically()` holds (r4136863481). The index and an
+   aggregate's composition are also one reading each (r4139816732, on #35).
 
 Each case below is red against the code before T059.
 
@@ -214,6 +215,66 @@ READS = {
     "len": lambda r: len(r),
     "aggregates": lambda r: r.aggregates(),
 }
+
+
+def _hold_between(registry, method: str, writer) -> threading.Thread:
+    """Run `writer` on another thread between `method`'s return and whatever
+    its caller reads next, as a writer interleaving there would."""
+    between = threading.Event()
+    real = getattr(registry, method)
+
+    def paused(*args, **kwargs):
+        out = real(*args, **kwargs)
+        between.set()
+        time.sleep(0.2)
+        return out
+
+    setattr(registry, method, paused)
+
+    def run() -> None:
+        between.wait(5)
+        writer()
+
+    thread = threading.Thread(target=run)
+    thread.start()
+    return thread
+
+
+def test_the_index_is_one_reading_of_the_registry(monkeypatch) -> None:
+    """A writer that runs between the index's reads cannot give it an active
+    key its own entries do not carry (Copilot, r4139816732)."""
+    monkeypatch.setattr(reg.SnapshotEntry, "index_entry",
+                        lambda self: {"repository": self.repository, "ref": self.ref})
+    registry = reg.SnapshotRegistry()
+    registry.register(_entry("alpha"))
+
+    def writer() -> None:
+        registry.drop("alpha")
+        registry.register(_entry("beta"), active=True)
+
+    thread = _hold_between(registry, "entries", writer)
+    document = registry.index_document()
+    thread.join(timeout=5)
+    carried = {(e["repository"], e["ref"]) for e in document["entries"]}
+    assert (document["active"]["repository"], document["active"]["ref"]) in carried
+
+
+def test_an_aggregate_is_composed_from_one_reading_of_its_members(monkeypatch) -> None:
+    """A writer that drops a member between two member lookups cannot leave
+    the aggregate composed from half of them."""
+    composed = []
+    monkeypatch.setattr(reg.SnapshotEntry, "read_json", lambda self: {})
+    monkeypatch.setattr(reg, "compose_snapshots",
+                        lambda aggregate, loaded: composed.extend(m.repository for m, _ in loaded))
+    registry = reg.SnapshotRegistry()
+    registry.register(_entry("alpha"))
+    registry.register(_entry("beta"))
+    registry.register_aggregate(reg.Aggregate(id="agg", members=[("alpha", "main"),
+                                                                 ("beta", "main")]))
+    thread = _hold_between(registry, "get", lambda: registry.drop("beta"))
+    registry.compose_aggregate("agg")
+    thread.join(timeout=5)
+    assert composed == ["alpha", "beta"]
 
 
 @pytest.mark.parametrize("read", sorted(READS))

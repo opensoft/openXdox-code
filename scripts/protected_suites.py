@@ -145,7 +145,8 @@ def _document(path: Path) -> dict:
         raise AllowListInvalid(
             f"{path} carries {sorted(map(str, raw))}, not schema_version, kind and entries")
     version = raw["schema_version"]
-    if isinstance(version, bool) or version != SCHEMA_VERSION:
+    # The integer itself: not a bool, and not `1.0`, which equals 1 in Python.
+    if type(version) is not int or version != SCHEMA_VERSION:
         raise AllowListInvalid(f"schema_version is {version!r}, not {SCHEMA_VERSION}")
     if raw["kind"] != KIND:
         raise AllowListInvalid(f"kind is {raw['kind']!r}, not {KIND!r}")
@@ -302,8 +303,11 @@ def check(repo: Path, landings: list[str], protected: set[str],
     entry (1-based) that holds there, or refused with every entry's reason."""
     findings: list[Finding] = []
     for landing in landings:
+        # --no-renames: a protected suite renamed away is a deletion at its
+        # own path, never only the destination's addition.
         touched = {line.strip() for line in
-                   _git(repo, "diff", "--name-only", f"{landing}^1", landing).splitlines()
+                   _git(repo, "diff", "--no-renames", "--name-only",
+                        f"{landing}^1", landing).splitlines()
                    if line.strip()}
         for path in sorted(touched & protected):
             admitted, reasons = _admitting(repo, landing, path, entries)

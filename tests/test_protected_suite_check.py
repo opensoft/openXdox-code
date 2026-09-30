@@ -65,8 +65,11 @@ class Repo:
         self.git("init", "-q", "-b", "main")
 
     def git(self, *args: str) -> str:
-        return subprocess.run(("git", "-C", str(self.root), *args), check=True,
-                              capture_output=True, text=True, env=self.env).stdout.strip()
+        # Signing off, whatever the developer's own configuration says, as this
+        # repository's other git fixtures do (tests/test_trust_gaps.py).
+        return subprocess.run(("git", "-C", str(self.root), "-c", "commit.gpgsign=false",
+                               *args), check=True, capture_output=True, text=True,
+                              env=self.env).stdout.strip()
 
     def commit(self, files: dict[str, str], message: str) -> str:
         for rel, text in files.items():
@@ -195,6 +198,16 @@ def test_an_edit_that_moves_test_code_out_of_the_test_is_refused(repo) -> None:
     assert "new text is not inside test_second" in finding.why
 
 
+def test_a_protected_suite_renamed_away_is_refused(repo) -> None:
+    """A rename is the suite's deletion at its own path, whatever the
+    destination: rename detection must not hide it."""
+    repo.git("mv", SUITE, "tests/renamed_away.py")
+    repo.git("commit", "-q", "-m", f"rename\n\n{ARC}")
+    [finding] = _check(repo, [])
+    assert finding.admitted_by is None
+    assert finding.path == SUITE
+
+
 def test_a_commit_without_the_trailer_is_not_a_landing(repo) -> None:
     repo.commit({SUITE: AFTER}, "an edit that is no arc landing")
     assert _check(repo, []) == []
@@ -286,6 +299,7 @@ def _valid_entry(**changes) -> dict:
 @pytest.mark.parametrize("broken, why", [
     ({"schema_version": 2, "kind": ps.KIND, "entries": []}, "schema_version"),
     ({"schema_version": True, "kind": ps.KIND, "entries": []}, "schema_version"),
+    ({"schema_version": 1.0, "kind": ps.KIND, "entries": []}, "schema_version"),
     ({"schema_version": 1, "kind": "other", "entries": []}, "kind"),
     ({"schema_version": 1, "kind": ps.KIND, "entries": [], "extra": 1}, "carries"),
     ({"schema_version": 1, "kind": ps.KIND, "entries": [_valid_entry(edit="rewrite")]}, "edit is"),
