@@ -472,7 +472,7 @@ entries:
       0, not SKIPPED on either stream, the stub's verdict line, and the
       snapshot written all stay.
     before_blob: 1fb53b56ac219b4c7d8020c3263b300a141e6e27
-    after_blob: 6c3f5e9e261473c61ccd84b366c8ad06e1a08630
+    after_blob: 3057f6c3a5853f5111d4f4ccf3bd6c942482b87a
     old: |2
       def test_the_default_shaped_launch_validates_from_the_repo_root(tmp_path, capsys):
           """THE DEFECT: the run dir is OUTSIDE any aggregation checkout — the shape
@@ -489,17 +489,18 @@ entries:
       def test_the_default_shaped_launch_validates_from_the_repo_root(tmp_path, capsys,
                                                                      monkeypatch):
           """THE DEFECT: the run dir is OUTSIDE any aggregation checkout — the shape
-          `tempfile.mkdtemp()` always produces — and the snapshot is validated anyway,
-          because `--repo-root` is a checkout and the validator lives in it.
+          `tempfile.mkdtemp()` always produces — and the snapshot is validated anyway.
 
           A real temp dir is not used, because a test that wrote to /tmp/<random> would
           be asserting the same thing with less control; what matters is that the run
           dir has NO aggregation ancestor, which `tmp_path/run` also has not.
 
-          SINCE PLAN 034 T061 (#1144 7.3; admitted by T007's batch K, on Brett's
-          ruling at openxFactory#656 comment 5916000030) the validator is the
-          installed distribution's own, and no walk finds it. So the stub is planted
-          as the distribution's own validator, and the run dir's start answers it."""
+          WHY IT VALIDATES. It once did because `--repo-root` was a checkout and the
+          walk found the validator in it. Since plan 034 T061 (#1144 7.3; admitted by
+          T007's batch K, on Brett's ruling at openxFactory#656 comment 5916000030)
+          neither root is searched: the validator is the installed distribution's own,
+          whatever the start. So the stub is planted as the distribution's own
+          validator, and the run dir's start answers it."""
           repo_root = _corpus_with_a_reachable_validator(tmp_path)
           stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
           monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
@@ -531,8 +532,8 @@ entries:
       is `old` to `new`, inside the test named. No assertion is weakened: rc 0
       stays, and the case now asserts both that the beside validator did not
       run and that the distribution's own did.
-    before_blob: 6c3f5e9e261473c61ccd84b366c8ad06e1a08630
-    after_blob: 94b95b33fb298b0c8de24a84f827e0872fd74ec4
+    before_blob: 3057f6c3a5853f5111d4f4ccf3bd6c942482b87a
+    after_blob: 554d6536c2e9d7fcff55c5428b33df50e241862c
     old: |2
       def test_a_run_dir_beside_a_checkout_still_uses_that_one_first(tmp_path, capsys):
           """The output path keeps PRIORITY: a run dir deliberately placed inside an
@@ -604,8 +605,8 @@ entries:
       is `old` to `new`, inside the test named. No assertion is weakened: rc
       0, SKIPPED on stderr only, both offered roots named, and "NOT checked
       against the pinned schema" all stay.
-    before_blob: 94b95b33fb298b0c8de24a84f827e0872fd74ec4
-    after_blob: a00b60881d240215ad04166982309245b503fc22
+    before_blob: 554d6536c2e9d7fcff55c5428b33df50e241862c
+    after_blob: fa9b34f6677f694ced3c44665d01850e49e7e2a7
     old: |2
               tmp_path, capsys):
           """A skip is still legal — a checkout with no validator in it is a real
@@ -618,19 +619,18 @@ entries:
           progress the surrounding `wrote …` lines are."""
     new: |2
               tmp_path, capsys, monkeypatch):
-          """A skip is still legal — a checkout with no validator in it is a real
-          state — but the line must not blame a checkout that is present. It names the
-          two directories that were searched, so the human can see which one to fix.
+          """A skip is still legal, but the line must not blame a checkout that is
+          present. Since plan 034 T061 (#1144 7.3; batch K) the roots never decide
+          where the validator is, so a skip has one cause left: the distribution
+          carries no validator of its own (an install built without its packaged
+          copy). That is the state staged here. The line still names both roots
+          openDox offered to search from, so neither is blamed on its own, and says
+          the validator is absent.
 
           On stderr, and leading with the consequence rather than the cause (the
           wording PR #50 landed for the same line): a diagnostic that says "this
           snapshot was NOT checked" must not be mistakable for the routine stdout
-          progress the surrounding `wrote …` lines are.
-
-          Since plan 034 T061 (#1144 7.3; batch K) the roots never decide where the
-          validator is, so a skip has one cause left: the distribution carries no
-          validator of its own (an install built without its packaged copy). That is
-          the state staged here, and the line still names both roots it was offered."""
+          progress the surrounding `wrote …` lines are."""
           monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
           monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: None)
   - suite: tests/test_snapshot_validation_launch.py
@@ -655,8 +655,8 @@ entries:
       chain's recorded texts, each inside its own named test, and this step's
       is `old` to `new`, inside the test named. No assertion is weakened: rc
       0, the server started, and "NOT checked against the pinned schema" stay.
-    before_blob: a00b60881d240215ad04166982309245b503fc22
-    after_blob: 8a1e67670c5ad064d71345102b1d54ea0341ca18
+    before_blob: fa9b34f6677f694ced3c44665d01850e49e7e2a7
+    after_blob: 98c5ffad6df54868d13e30b567fdf6712e5a8c5b
     old: |2
               tmp_path, capsys):
           """THE REGRESSION, in the shape Brett hit it: the validator is reachable, it
@@ -701,8 +701,8 @@ entries:
       is `old` to `new`, inside the test named. No assertion is weakened: the
       pip remedy, the validator's own diagnosis, "the ENVIRONMENT, not the
       snapshot" and "SERVES this unchecked snapshot" all stay.
-    before_blob: 8a1e67670c5ad064d71345102b1d54ea0341ca18
-    after_blob: e69afab186efc62531db003d52a303d7a34f389c
+    before_blob: 98c5ffad6df54868d13e30b567fdf6712e5a8c5b
+    after_blob: f24340ffb7ec201c954fa1993d61a1e2e6d7ba46
     old: |2
               tmp_path, capsys):
           """A warning that does not say what to type is a warning that gets ignored.
@@ -746,8 +746,8 @@ entries:
       chain's recorded texts, each inside its own named test, and this step's
       is `old` to `new`, inside the test named. No assertion is weakened: rc
       1, not served, REJECTED with the dangling edge, and no pip remedy stay.
-    before_blob: e69afab186efc62531db003d52a303d7a34f389c
-    after_blob: 068ee1632dd7fe3e52d90ab9ed054fc90fca8943
+    before_blob: f24340ffb7ec201c954fa1993d61a1e2e6d7ba46
+    after_blob: 7accc587a9a3b7481b22a627e8f85237163d5576
     old: |2
               tmp_path, capsys):
           """The other half of the distinction, and the one the fix must not spend: a
@@ -791,8 +791,8 @@ entries:
       chain's recorded texts, each inside its own named test, and this step's
       is `old` to `new`, inside the test named. No assertion is weakened: rc
       1, not served, "--strict was given", and no "SERVES" claim stay.
-    before_blob: 068ee1632dd7fe3e52d90ab9ed054fc90fca8943
-    after_blob: 92c43770604369e19c904e4347580882020f4c6f
+    before_blob: 7accc587a9a3b7481b22a627e8f85237163d5576
+    after_blob: e1b2380e19ae6016689a64840e69be9fa8d2de68
     old: |2
       def test_strict_makes_an_unrunnable_validator_fatal(tmp_path, capsys):
           """`--strict` is a demand for certainty, so "we could not check" is a
@@ -832,8 +832,8 @@ entries:
       chain's recorded texts, each inside its own named test, and this step's
       is `old` to `new`, inside the test named. No assertion is weakened: it
       warns and serves without --strict, and is fatal with it, as before.
-    before_blob: 92c43770604369e19c904e4347580882020f4c6f
-    after_blob: cb20a9d2dc7e4a5e3297901d9f57d209ee58fc2a
+    before_blob: e1b2380e19ae6016689a64840e69be9fa8d2de68
+    after_blob: f09d7d8634e527a97f6b827952a5474bdea88950
     old: |2
       def test_strict_is_fatal_when_no_validator_is_reachable_either(tmp_path, capsys):
           """The same rule for the other unavailable sub-case. A `--strict` run that
@@ -871,8 +871,8 @@ entries:
       chain's recorded texts, each inside its own named test, and this step's
       is `old` to `new`, inside the test named. No assertion is weakened: rc
       0, served, the stub's own diagnosis, and "NOT checked" stay.
-    before_blob: cb20a9d2dc7e4a5e3297901d9f57d209ee58fc2a
-    after_blob: c91f7bf7aa5b0dc08aa68f6d7846d4e3e5af3013
+    before_blob: f09d7d8634e527a97f6b827952a5474bdea88950
+    after_blob: b843871e4c353c7548dec6e064fce564a58f3869
     old: |2
               tmp_path, capsys):
           """The guard against fixing this brittlely. A different environmental
