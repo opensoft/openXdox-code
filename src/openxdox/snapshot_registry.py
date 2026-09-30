@@ -82,7 +82,16 @@ if str(_SCRIPTS_DIR) not in sys.path:
 # `scripts/` and the path insertion above already reaches it, so the spelling
 # comes from the declaration that a verification guarding on the exact string
 # reads.
-from doc_health import pin_sentinels  # noqa: E402
+#
+# IT IS IMPORTED WHERE IT IS READ, in `SnapshotEntry.index_entry` (plan 034
+# T059). This module is openXdox's contribution at openDox's snapshot registry
+# seam (`openxdox.projection_contributions`), and openDox probes a
+# registration's names when it is made. `pin_sentinels` is this module's one
+# reach into openxFactory's `doc_health`, which a lone openXdox-code checkout
+# does not carry (R1Q6 (d), openxFactory#656 comment 5817152735). Read at
+# module level, it made the registration itself fail there, and with it every
+# process that registers a profile. Read in `index_entry`, it fails where the
+# sentinel is written, on `doc_health`, as before, and nowhere else.
 
 DEFAULT_REF = "main"
 INDEX_KIND = "ideation-dashboard-snapshot-index"
@@ -293,6 +302,8 @@ class SnapshotEntry:
         and whether the snapshot's own generation lacked a revision, could not
         fetch one, or never recorded one is not knowable from here. Writing a
         stronger member would assert a condition nobody established."""
+        from doc_health import pin_sentinels
+
         out: dict[str, Any] = {
             "repository": self.repository,
             "ref": self.ref,
@@ -401,17 +412,24 @@ def resolve_within(root: Path, url_tail: str) -> Path | None:
 
     A `.git` (or any dot-directory) named as the LAST component is refused by
     the `is_file()` check below, so the first half needs no special case for
-    it."""
+    it.
+
+    THE RULE IS APPLIED TWICE (plan 034 T059): to the path as the URL spells
+    it, and to the CANONICAL path, relative to `root`, once symlinks are
+    resolved. The spelling alone let a symlink inside the root lead to what the
+    rule refuses by name: `link -> .git` served `/source/link/config`, which is
+    `.git/config`, and `notes.md -> .env` served `.env`. Both resolve inside
+    the root, to a regular file, so confinement never saw them. openDox's own
+    default registry closed the same gap in its review round
+    (openDox-code#59, r4125556296), and this module is registered at the same
+    seam (`openxdox.projection_contributions`)."""
     rel = urllib.parse.unquote(url_tail)
     rel = rel.split("?", 1)[0].split("#", 1)[0]
     if not rel or rel.startswith("/") or "\x00" in rel:
         return None
     parts = [p for p in rel.replace("\\", "/").split("/") if p not in ("", ".")]
-    if any(p.startswith(".") and p != ".." for p in parts[:-1]):
+    if _names_something_hidden(parts):
         return None
-    if parts and parts[-1].startswith(".") and parts[-1] != "..":
-        if PurePosixPath(parts[-1]).suffix not in SERVED_DOTFILE_SUFFIXES:
-            return None
     root = Path(root).resolve()
     try:
         resolved = (root / rel).resolve()
@@ -419,9 +437,23 @@ def resolve_within(root: Path, url_tail: str) -> Path | None:
         return None
     if resolved != root and not resolved.is_relative_to(root):
         return None
+    if _names_something_hidden(resolved.relative_to(root).parts):
+        return None
     if not resolved.is_file():
         return None
     return resolved
+
+
+def _names_something_hidden(parts: list[str] | tuple[str, ...]) -> bool:
+    """Whether a relative path's components name what `/source` never serves:
+    a dot-directory anywhere but the last component, or a last component that
+    is a dot-file without a projected extension. `..` is not a name, and the
+    escape check decides it."""
+    if any(p.startswith(".") and p != ".." for p in parts[:-1]):
+        return True
+    last = parts[-1] if parts else ""
+    return (last.startswith(".") and last != ".."
+            and PurePosixPath(last).suffix not in SERVED_DOTFILE_SUFFIXES)
 
 
 # --------------------------- the registry ---------------------------
@@ -502,32 +534,55 @@ class SnapshotRegistry:
             return aggregate
 
     def drop(self, repository: str, ref: str | None = None) -> None:
+        """Remove an entry. Dropping the ACTIVE entry clears the active key
+        (plan 034 T059), so no ref-less request meets a key with nothing
+        behind it, and the next entry registered becomes active, as the first
+        one did. Left set, the stale key also kept every later registration
+        from becoming active, since `register` promotes only while nothing is,
+        so the registry held entries and answered no active one."""
         with self._lock:
-            self._entries.pop(snapshot_key(repository, ref), None)
+            key = snapshot_key(repository, ref)
+            self._entries.pop(key, None)
+            if self._active == key:
+                self._active = None
 
     # ---- lookup ----
+    #
+    # EVERY READ HOLDS THE LOCK (plan 034 T059). A block `atomically()` holds
+    # is a read-modify-write, and a reader that did not wait for it could
+    # answer from its middle: the active key moved and not yet put back, for
+    # one. openDox's own default registry closed the same gap in its review
+    # round (openDox-code#59, r4136863481). The lock is re-entrant, so a read
+    # inside a held block, or inside another read, is safe.
     def get(self, repository: str, ref: str | None = None) -> SnapshotEntry | None:
         """Ref-less lookups resolve to `main` (D4)."""
-        return self._entries.get(snapshot_key(repository, ref))
+        key = snapshot_key(repository, ref)
+        with self._lock:
+            return self._entries.get(key)
 
     def entries(self) -> list[SnapshotEntry]:
         """Registered entries, ordered by (repository, ref) — a stable roster."""
-        return [self._entries[k] for k in sorted(self._entries)]
+        with self._lock:
+            return [self._entries[k] for k in sorted(self._entries)]
 
     def aggregates(self) -> list[Aggregate]:
-        return [self._aggregates[k] for k in sorted(self._aggregates)]
+        with self._lock:
+            return [self._aggregates[k] for k in sorted(self._aggregates)]
 
     def keys(self) -> list[tuple[str, str]]:
-        return sorted(self._entries)
+        with self._lock:
+            return sorted(self._entries)
 
     def __len__(self) -> int:
-        return len(self._entries)
+        with self._lock:
+            return len(self._entries)
 
     @property
     def active(self) -> SnapshotEntry | None:
-        if self._active is None:
-            return None
-        return self._entries.get(self._active)
+        with self._lock:
+            if self._active is None:
+                return None
+            return self._entries.get(self._active)
 
     def set_active(self, repository: str, ref: str | None = None) -> SnapshotEntry | None:
         with self._lock:
@@ -540,9 +595,10 @@ class SnapshotRegistry:
         """The one resolution every route uses: a named pair, or the ACTIVE entry
         when no repository is named (which is what `/snapshot.json` with no query
         means — today's behaviour, unchanged)."""
-        if repository is None or repository == "":
-            return self.active
-        return self.get(repository, ref)
+        with self._lock:
+            if repository is None or repository == "":
+                return self.active
+            return self.get(repository, ref)
 
     # ---- per-entry source confinement (task 2.2) ----
     def resolve_source(self, repository: str | None, ref: str | None, tail: str) -> Path | None:
