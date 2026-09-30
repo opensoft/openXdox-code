@@ -156,6 +156,18 @@ def test_an_old_text_that_occurs_twice_is_refused(repo) -> None:
     assert "occurs 2 times" in finding.why
 
 
+def test_an_old_text_that_is_the_tail_of_a_line_is_refused(repo) -> None:
+    """`old` ends in a newline, but it is only the end of a line: the entry
+    would admit a change to part of an assertion, never shown whole
+    (Copilot on #35)."""
+    after = BEFORE.replace("assert 1 == 1", "assert 2 == 2")
+    repo.commit({SUITE: after}, f"edit\n\n{ARC}")
+    [finding] = _check(repo, [_entry(repo, after=after, test="test_first",
+                                     old="1 == 1\n", new="2 == 2\n")])
+    assert finding.admitted_by is None
+    assert "does not start a line" in finding.why
+
+
 def test_an_edit_outside_the_named_test_is_refused(repo) -> None:
     """The text is exact, but it lies in `test_second`, and the entry names
     `test_first`."""

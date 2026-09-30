@@ -40,8 +40,9 @@ at L when all of these are true:
 
 * `git rev-parse L^1:<suite>` is its `before_blob`, and `git rev-parse
   L:<suite>` is its `after_blob`;
-* its `old` text occurs exactly once in the `before_blob` text, and replacing
-  it with `new` gives the `after_blob` text byte for byte;
+* its `old` text occurs exactly once in the `before_blob` text, starting a
+  line (it ends one, by the file's rules), and replacing it with `new` gives
+  the `after_blob` text byte for byte;
 * the replaced text lies inside the one test the entry names, in the before
   text, and its replacement lies inside that test in the after text. So an
   entry cannot admit an edit to any other test of the suite.
@@ -277,6 +278,9 @@ def entry_holds(repo: Path, landing: str, entry: dict) -> str | None:
     if before_text.count(old) != 1:
         return f"the entry's old text occurs {before_text.count(old)} times before the landing, not once"
     at = before_text.index(old)
+    if at and before_text[at - 1] != "\n":
+        # Whole lines: the occurrence starts a line, as it ends one.
+        return "the entry's old text does not start a line before the landing, so it is not whole lines"
     if before_text.replace(old, new, 1) != after_text:
         return "replacing the entry's old text with its new text does not give the suite at the landing"
     if not _inside_the_test(before_text, at, old, entry["test"]):
