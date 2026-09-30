@@ -31,7 +31,8 @@ begins with a dash a value.) So the check opens no file a caller names, and it
 refuses an item of neither shape (exit 2) rather than handing it to git. The one file it reads is the allow-list, at its fixed path
 under the checkout it runs in. It exits 0 when no landing touched a protected
 suite outside an entry that holds, 1 when one did (naming each landing and
-path), and 2 when its input or the allow-list itself breaks its rules.
+path), and 2 when its input or the allow-list itself breaks its rules, or when
+the checkout does not hold the history a landing needs.
 
 WHEN AN ENTRY HOLDS (the file's own header states the rule, and T060 wrote it).
 For a landing L that touches a protected `suite`, an entry for that suite holds
@@ -377,7 +378,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"FAIL: {ALLOW_LIST} breaks its own rules, so nothing is subtracted: {exc}",
               file=sys.stderr)
         return 2
-    findings = check(repo, landings, suites, entries)
+    try:
+        findings = check(repo, landings, suites, entries)
+    except subprocess.CalledProcessError as exc:
+        # A landing this checkout does not hold, or one with no parent: the
+        # history the check needs is not here, which is not a refusal.
+        detail = (exc.stderr or "").strip().splitlines()
+        print(f"FAIL: git could not read the history the check needs "
+              f"({' '.join(map(str, exc.cmd[3:]))}: {detail[0] if detail else exc.returncode}), "
+              "so nothing is checked", file=sys.stderr)
+        return 2
     refused = []
     for f in findings:
         if f.admitted_by is not None:

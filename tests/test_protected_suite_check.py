@@ -301,6 +301,17 @@ def test_an_item_of_neither_shape_is_refused_before_anything_is_checked(
     assert "so nothing is checked" in capsys.readouterr().err
 
 
+def test_a_landing_this_checkout_does_not_hold_is_an_input_refusal(repo, monkeypatch,
+                                                                   capsys) -> None:
+    """A well-formed commit id with no object behind it is missing history,
+    not an edit the arc made: exit 2, never 1 (Copilot on #35)."""
+    monkeypatch.chdir(repo.root)
+    (repo.root / ps.ALLOW_LIST).write_text(yaml.safe_dump(
+        {"schema_version": 1, "kind": ps.KIND, "entries": []}), encoding="utf-8")
+    assert ps.main(_command(repo, landings="0" * 40 + "\n")) == 2
+    assert "git could not read the history" in capsys.readouterr().err
+
+
 def test_a_missing_option_is_a_usage_refusal(repo, monkeypatch) -> None:
     monkeypatch.chdir(repo.root)
     assert ps.main([f"--suites={SUITE}"]) == 2
