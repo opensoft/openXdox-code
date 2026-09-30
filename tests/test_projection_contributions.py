@@ -120,8 +120,11 @@ def test_openDoxs_own_kinds_keep_openDoxs_validator(isolated_seams) -> None:
     projection_seams.register_defaults()
     from opendox import default_projection
 
+    # openDox-code 047bb4fa (plan 034 T058) registers one validator per own
+    # kind, `default_projection.VALIDATORS[kind]`, where 814516b7 had one
+    # stand-in, `VALIDATOR`, for all of them.
     for kind in default_projection.OWN_KINDS:
-        assert projection_seams.validators.for_kind(kind) is default_projection.VALIDATOR
+        assert projection_seams.validators.for_kind(kind) is default_projection.VALIDATORS[kind]
     for kind in pc.GOVERNED_KINDS:
         assert projection_seams.validators.for_kind(kind) is pc.VALIDATOR
     assert projection_seams.registry.current() is snapshot_registry
@@ -220,7 +223,7 @@ def test_unregister_empties_only_what_it_holds(isolated_seams) -> None:
     from opendox import default_projection
 
     projection_seams.validators.register_default(
-        "opendox-snapshot", default_projection.VALIDATOR)
+        "opendox-snapshot", default_projection.VALIDATORS["opendox-snapshot"])
     pc.unregister()
     assert not generator_seam.is_registered()
     assert not projection_seams.writer.is_registered()

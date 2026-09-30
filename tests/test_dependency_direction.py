@@ -422,7 +422,10 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 #: `domain_profile`, `profile_proxy`, `view_extension`, `cli` and `serve`. At
 #: `814516b7` it holds thirteen, T055's four new modules with them:
 #: `projection_seams`, `default_registry`, `default_projection` and `rfc3339`.
-#: Its `STILL_REACHING` is empty at both.
+#: Its `STILL_REACHING` is empty at both. At `047bb4fa`, where the pin moved
+#: next (phase 2's openDox-code after T058, which T062 pins at the openDox
+#: root), both are unchanged, and `_back_import_census()` returns the same
+#: three rows the table below holds, so the ratchet does not move.
 #:
 #: THE TWO MODULES THAT DID NOT IMPORT WITHOUT A CONSUMER NOW DO. This note
 #: said `opendox.serve` and `opendox.cli` were blocked by `ideation_dashboard`
