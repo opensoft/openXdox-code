@@ -110,17 +110,26 @@ def _served(captured) -> bool:
     return "  serving http://" in captured.out
 
 
-def test_the_default_shaped_launch_validates_from_the_repo_root(tmp_path, capsys):
+def test_the_default_shaped_launch_validates_from_the_repo_root(tmp_path, capsys,
+                                                               monkeypatch):
     """THE DEFECT: the run dir is OUTSIDE any aggregation checkout — the shape
     `tempfile.mkdtemp()` always produces — and the snapshot is validated anyway,
     because `--repo-root` is a checkout and the validator lives in it.
 
     A real temp dir is not used, because a test that wrote to /tmp/<random> would
     be asserting the same thing with less control; what matters is that the run
-    dir has NO aggregation ancestor, which `tmp_path/run` also has not."""
+    dir has NO aggregation ancestor, which `tmp_path/run` also has not.
+
+    SINCE PLAN 034 T061 (#1144 7.3; admitted by T007's batch K, on Brett's
+    ruling at openxFactory#656 comment 5916000030) the validator is the
+    installed distribution's own, and no walk finds it. So the stub is planted
+    as the distribution's own validator, and the run dir's start answers it."""
     repo_root = _corpus_with_a_reachable_validator(tmp_path)
+    stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
+    monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+    monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: stub)
     run_dir = tmp_path / "outside" / "run"          # no validator above it
-    assert snapshot_mod.find_validator(run_dir.parent) is None
+    assert snapshot_mod.find_validator(run_dir.parent) == stub   # the start is ignored
 
     rc = _launch(repo_root, run_dir)
     captured = capsys.readouterr()
@@ -132,12 +141,22 @@ def test_the_default_shaped_launch_validates_from_the_repo_root(tmp_path, capsys
     assert (run_dir / "snapshot.json").is_file()
 
 
-def test_a_run_dir_beside_a_checkout_still_uses_that_one_first(tmp_path, capsys):
-    """The output path keeps PRIORITY: a run dir deliberately placed inside an
-    aggregation checkout is validated by THAT checkout's validator, as before.
-    `--repo-root` is the fallback that makes the ordinary launch validate, not a
-    replacement for the search that already worked."""
+def test_a_run_dir_beside_a_checkout_still_uses_that_one_first(tmp_path, capsys,
+                                                               monkeypatch):
+    """Before plan 034 T061 the output path kept PRIORITY: a run dir placed
+    inside another aggregation checkout was validated by THAT checkout's
+    validator, found by walking up from it.
+
+    7.3 ENDS THAT (#1144 7.3, "no parent walk remains"; admitted by T007's
+    batch K, on Brett's ruling at openxFactory#656 comment 5916000030). An
+    enclosing tree's validator is never adopted, so the one planted beside the
+    run dir is not run, and the distribution's own validator (the stub) is. The
+    name is kept, since an entry admits an edit inside one named test; this is
+    the one case whose expected answer inverts, as C3's did under batch F."""
     repo_root = _corpus_with_a_reachable_validator(tmp_path)
+    stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
+    monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+    monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: stub)
     beside = tmp_path / "other-aggregation"
     marker = beside / snapshot_mod.VALIDATOR_RELPATH
     marker.parent.mkdir(parents=True, exist_ok=True)
@@ -149,11 +168,12 @@ def test_a_run_dir_beside_a_checkout_still_uses_that_one_first(tmp_path, capsys)
     out = capsys.readouterr().out
 
     assert rc == 0
-    assert "beside-validator" in out, out
+    assert "beside-validator" not in out, out
+    assert "validation: stub-validator: 0 error(s), 0 warning(s)" in out, out
 
 
 def test_when_neither_root_reaches_a_validator_the_message_names_both(
-        tmp_path, capsys):
+        tmp_path, capsys, monkeypatch):
     """A skip is still legal — a checkout with no validator in it is a real
     state — but the line must not blame a checkout that is present. It names the
     two directories that were searched, so the human can see which one to fix.
@@ -161,7 +181,14 @@ def test_when_neither_root_reaches_a_validator_the_message_names_both(
     On stderr, and leading with the consequence rather than the cause (the
     wording PR #50 landed for the same line): a diagnostic that says "this
     snapshot was NOT checked" must not be mistakable for the routine stdout
-    progress the surrounding `wrote …` lines are."""
+    progress the surrounding `wrote …` lines are.
+
+    Since plan 034 T061 (#1144 7.3; batch K) the roots never decide where the
+    validator is, so a skip has one cause left: the distribution carries no
+    validator of its own (an install built without its packaged copy). That is
+    the state staged here, and the line still names both roots it was offered."""
+    monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+    monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: None)
     corpus = tmp_path / "corpus"
     import shutil
     shutil.copytree(BASE_REPO, corpus)
@@ -182,14 +209,18 @@ def test_when_neither_root_reaches_a_validator_the_message_names_both(
 # ---------------------------------------------------------------------------
 
 def test_missing_validator_dependencies_warn_and_the_server_still_starts(
-        tmp_path, capsys):
+        tmp_path, capsys, monkeypatch):
     """THE REGRESSION, in the shape Brett hit it: the validator is reachable, it
     runs, and it exits non-zero because the interpreter running it has no
     `jsonschema`. Nothing is known about the snapshot — which is not the same as
     knowing it is bad, and only the second of those justifies withholding the
-    dashboard from the human who asked for it."""
+    dashboard from the human who asked for it. (The stub is planted as the
+    distribution's own validator: plan 034 T061, #1144 7.3; batch K.)"""
     repo_root = _corpus_with_a_reachable_validator(tmp_path,
                                                    STUB_MISSING_DEPENDENCIES)
+    stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
+    monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+    monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: stub)
     rc = _launch(repo_root, tmp_path / "run")
     captured = capsys.readouterr()
 
@@ -199,14 +230,18 @@ def test_missing_validator_dependencies_warn_and_the_server_still_starts(
 
 
 def test_the_dependency_warning_carries_the_pip_remedy_and_clears_the_corpus(
-        tmp_path, capsys):
+        tmp_path, capsys, monkeypatch):
     """A warning that does not say what to type is a warning that gets ignored.
     It must also relay the validator's OWN diagnosis (it is the thing that knows
     which library it wanted) and state plainly that the corpus is not the
     accused — the wrong half of that sentence is what a stopped human reads
-    first."""
+    first. (The stub is planted as the distribution's own validator: plan 034
+    T061, #1144 7.3; batch K.)"""
     repo_root = _corpus_with_a_reachable_validator(tmp_path,
                                                    STUB_MISSING_DEPENDENCIES)
+    stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
+    monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+    monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: stub)
     _launch(repo_root, tmp_path / "run")
     err = capsys.readouterr().err
 
@@ -217,14 +252,18 @@ def test_the_dependency_warning_carries_the_pip_remedy_and_clears_the_corpus(
 
 
 def test_a_non_conformant_snapshot_still_blocks_and_blames_the_snapshot(
-        tmp_path, capsys):
+        tmp_path, capsys, monkeypatch):
     """The other half of the distinction, and the one the fix must not spend: a
     validator that RAN and rejected the data still stops the serve. The message
     is about the snapshot, and it must not offer the dependency remedy — sending
     someone to `pip install` over a dangling document edge is the same defect
-    pointing the other way."""
+    pointing the other way. (The stub is planted as the distribution's own
+    validator: plan 034 T061, #1144 7.3; batch K.)"""
     repo_root = _corpus_with_a_reachable_validator(tmp_path,
                                                    STUB_NON_CONFORMANT)
+    stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
+    monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+    monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: stub)
     rc = _launch(repo_root, tmp_path / "run")
     captured = capsys.readouterr()
 
@@ -235,12 +274,16 @@ def test_a_non_conformant_snapshot_still_blocks_and_blames_the_snapshot(
     assert "jsonschema" not in captured.err, captured.err
 
 
-def test_strict_makes_an_unrunnable_validator_fatal(tmp_path, capsys):
+def test_strict_makes_an_unrunnable_validator_fatal(tmp_path, capsys, monkeypatch):
     """`--strict` is a demand for certainty, so "we could not check" is a
     failure under it — otherwise the flag would quietly mean less than it
-    says."""
+    says. (The stub is planted as the distribution's own validator: plan 034
+    T061, #1144 7.3; batch K.)"""
     repo_root = _corpus_with_a_reachable_validator(tmp_path,
                                                    STUB_MISSING_DEPENDENCIES)
+    stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
+    monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+    monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: stub)
     rc = _launch(repo_root, tmp_path / "run", "--strict")
     captured = capsys.readouterr()
 
@@ -251,11 +294,15 @@ def test_strict_makes_an_unrunnable_validator_fatal(tmp_path, capsys):
     assert "SERVES this unchecked snapshot" not in captured.err, captured.err
 
 
-def test_strict_is_fatal_when_no_validator_is_reachable_either(tmp_path, capsys):
+def test_strict_is_fatal_when_no_validator_is_reachable_either(tmp_path, capsys,
+                                                              monkeypatch):
     """The same rule for the other unavailable sub-case. A `--strict` run that
     found no validator at all learned exactly as much as one whose validator
-    would not start."""
+    would not start. Since plan 034 T061 (#1144 7.3; batch K) "no validator at
+    all" is a distribution that carries none of its own, which is staged here."""
     import shutil
+    monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+    monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: None)
 
     corpus = tmp_path / "corpus"
     shutil.copytree(BASE_REPO, corpus)
@@ -267,12 +314,17 @@ def test_strict_is_fatal_when_no_validator_is_reachable_either(tmp_path, capsys)
 
 
 def test_the_classifier_reads_the_exit_code_not_the_dependency_sentence(
-        tmp_path, capsys):
+        tmp_path, capsys, monkeypatch):
     """The guard against fixing this brittlely. A different environmental
     failure, with different words and no mention of jsonschema, is classified
     the same way — because the signal is the validator's documented exit code
-    (2 = harness error), not a phrase that a future edit could reword."""
+    (2 = harness error), not a phrase that a future edit could reword. (The
+    stub is planted as the distribution's own validator: plan 034 T061, #1144
+    7.3; batch K.)"""
     repo_root = _corpus_with_a_reachable_validator(tmp_path, STUB_MISSING_YAML)
+    stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
+    monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
+    monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: stub)
     rc = _launch(repo_root, tmp_path / "run")
     captured = capsys.readouterr()
 
