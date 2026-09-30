@@ -95,6 +95,7 @@ import argparse
 import hashlib
 import importlib.util
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -218,24 +219,83 @@ def distribution_contracts() -> Path | None:
     return Path(next(iter(spec.submodule_search_locations))).resolve()
 
 
-def verified_copy(contracts: Path, name: str) -> Path:
-    """`<contracts>/schemas/<name>`, once its sha256 equals the digest the record
-    beside it (`<contracts>/copies.yaml`) gives for it. `ContractRefused`
-    otherwise: an unreadable record, no digest for the name, a copy that cannot
-    be read, or a copy that differs."""
-    record_path = contracts / COPIES_RECORD
+#: The record's fixed values, and the shapes of its fields: the same contract
+#: `openxdox.contracts.record()` holds it to, which this script cannot import
+#: wherever it runs. tests/test_packaged_validator.py runs every one of that
+#: module's record refusals through this script too, so the two cannot differ.
+COPIES_KIND = "packaged-contract-copies"
+COPIES_SPEC_LEG = "opensoft/openXdox-spec"
+_COPY_ID = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+_FULL_COMMIT = re.compile(r"[0-9a-f]{40}")
+_FULL_SHA256 = re.compile(r"[0-9a-f]{64}")
+
+
+def _untrusted(record_path: Path, detail: str) -> ContractRefused:
+    return ContractRefused(f"{record_path} cannot be trusted: {detail}, so no packaged "
+                           "copy is read")
+
+
+def _record_row(record_path: Path, index: int, row: object) -> tuple[str, str]:
+    """One `copies` row, checked, as (its schema file name, its sha256)."""
+    where = f"copies[{index}]"
+    if not isinstance(row, dict) or set(row) != {"id", "path", "sha256"}:
+        raise _untrusted(record_path, f"{where} is not a mapping of exactly id, path and sha256")
+    copy_id, path, digest = row["id"], row["path"], row["sha256"]
+    if not isinstance(copy_id, str) or not _COPY_ID.fullmatch(copy_id):
+        raise _untrusted(record_path, f"{where}.id is {copy_id!r}, not a lowercase hyphenated id")
+    if path != f"contracts/schemas/{copy_id}.schema.yaml":
+        raise _untrusted(record_path, f"{where}.path is {path!r}, not "
+                                      f"'contracts/schemas/{copy_id}.schema.yaml'")
+    if not isinstance(digest, str) or not _FULL_SHA256.fullmatch(digest):
+        raise _untrusted(record_path, f"{where}.sha256 is {digest!r}, not a 64-hex digest")
+    return f"{copy_id}.schema.yaml", digest
+
+
+def record_digests(record_path: Path) -> dict[str, str]:
+    """`copies.yaml`'s digest for each of the three, by schema file name, once
+    the whole record holds to its contract: exactly its five keys,
+    `schema_version` the integer 1, its kind and spec leg, a full commit id, and
+    one well-formed row for each of this validator's own three kinds and no
+    other. `ContractRefused` otherwise, before any digest is used."""
     try:
         record = yaml.safe_load(record_path.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as exc:
+    except (OSError, yaml.YAMLError, RecursionError, ValueError) as exc:
         raise ContractRefused(f"{record_path} cannot be read ({type(exc).__name__}), "
-                              f"so the packaged {name} is not read") from exc
-    rows = record.get("copies") if isinstance(record, dict) else None
-    wanted = {Path(str(row.get("path", ""))).name: row.get("sha256")
-              for row in (rows if isinstance(rows, list) else []) if isinstance(row, dict)}
-    digest = wanted.get(name)
-    if not isinstance(digest, str) or len(digest) != 64:
-        raise ContractRefused(f"{record_path} records no sha256 for {name}, so the "
-                              "packaged copy is not read")
+                              "so no packaged copy is read") from exc
+    expected = {"schema_version", "kind", "spec_leg", "commit", "copies"}
+    if not isinstance(record, dict) or set(record) != expected:
+        raise _untrusted(record_path, f"it is not a mapping of exactly {sorted(expected)}")
+    version = record["schema_version"]
+    if type(version) is not int or version != 1:
+        raise _untrusted(record_path, f"schema_version is {version!r}, not 1")
+    if record["kind"] != COPIES_KIND:
+        raise _untrusted(record_path, f"kind is {record['kind']!r}, not {COPIES_KIND!r}")
+    if record["spec_leg"] != COPIES_SPEC_LEG:
+        raise _untrusted(record_path, f"spec_leg is {record['spec_leg']!r}, not {COPIES_SPEC_LEG!r}")
+    commit = record["commit"]
+    if not isinstance(commit, str) or not _FULL_COMMIT.fullmatch(commit):
+        raise _untrusted(record_path, f"commit is {commit!r}, not a full 40-hex commit id")
+    rows = record["copies"]
+    if not isinstance(rows, list) or not rows:
+        raise _untrusted(record_path, "copies is not a non-empty list")
+    checked = [_record_row(record_path, index, row) for index, row in enumerate(rows)]
+    names = [name for name, _digest in checked]
+    if len(set(names)) != len(names):
+        raise _untrusted(record_path, f"an id is given twice in {names}")
+    if set(names) != OWN_KIND_SCHEMAS:
+        raise _untrusted(record_path, f"it records {sorted(names)}, not this validator's "
+                                      f"own three {sorted(OWN_KIND_SCHEMAS)}")
+    return dict(checked)
+
+
+def verified_copy(contracts: Path, name: str) -> Path:
+    """`<contracts>/schemas/<name>`, once the record beside it
+    (`<contracts>/copies.yaml`) holds to its contract (`record_digests`) and the
+    copy's sha256 equals the digest it gives. `ContractRefused` otherwise: an
+    unreadable or malformed record, a copy that cannot be read, or a copy that
+    differs."""
+    record_path = contracts / COPIES_RECORD
+    digest = record_digests(record_path)[name]
     path = contracts / "schemas" / name
     try:
         actual = hashlib.sha256(path.read_bytes()).hexdigest()

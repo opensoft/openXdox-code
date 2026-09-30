@@ -232,6 +232,12 @@ def verified_path(copy_id: str) -> Path:
 
 
 def validator_path() -> Path | None:
-    """The packaged validator, or None when this install carries none."""
-    candidate = package_dir() / VALIDATOR_NAME
-    return candidate if candidate.is_file() else None
+    """The packaged validator, or None when this install carries none, or when
+    the file there links out of this package. `is_file()` follows a symlink, so
+    containment is checked on the RESOLVED path, as `openxdox.snapshot` checks
+    it before running the validator (Copilot on openXdox-code#36)."""
+    package = package_dir()
+    candidate = package / VALIDATOR_NAME
+    if candidate.is_file() and candidate.resolve().is_relative_to(package.resolve()):
+        return candidate
+    return None

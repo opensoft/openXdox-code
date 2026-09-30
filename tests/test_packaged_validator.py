@@ -27,6 +27,7 @@ the pull request's evidence carries."""
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 import subprocess
 import sys
@@ -175,6 +176,60 @@ def test_an_absent_record_is_refused_by_name(staged):
     (staged / contracts.RECORD_NAME).unlink()
     with pytest.raises(contracts.CopyRefused, match="has no copies.yaml"):
         contracts.record()
+
+
+def test_the_packaged_validator_is_refused_where_it_links_out_of_the_package(staged, tmp_path):
+    """CONFINED (Copilot on openXdox-code#36): a validator file that links out
+    of `openxdox.contracts` is somebody else's script, so `validator_path()`
+    answers None, as `openxdox.snapshot` does before running one."""
+    outside = tmp_path / "elsewhere" / contracts.VALIDATOR_NAME
+    outside.parent.mkdir()
+    outside.write_bytes(SCRIPT.read_bytes())
+    (staged / contracts.VALIDATOR_NAME).symlink_to(outside)
+    assert contracts.validator_path() is None
+    (staged / contracts.VALIDATOR_NAME).unlink()
+    shutil.copy2(SCRIPT, staged / contracts.VALIDATOR_NAME)
+    assert contracts.validator_path() == staged / contracts.VALIDATOR_NAME
+
+
+def _run_packaged(site: Path, cwd: Path) -> subprocess.CompletedProcess:
+    """The packaged validator of an installed copy at `site`, run on one
+    gate-action-record, so that it reads the three packaged copies."""
+    instance = cwd / "g.yaml"
+    instance.write_text(yaml.safe_dump({"schema_version": 1, "kind": "gate-action-record"}),
+                        encoding="utf-8")
+    env = {k: v for k, v in os.environ.items() if k not in ("CONTRACTS_DIR", "PYTHONPATH")}
+    return subprocess.run(
+        [sys.executable, str(site / "openxdox" / "contracts" / contracts.VALIDATOR_NAME),
+         str(instance)], cwd=cwd, env=env, capture_output=True, text=True, check=False)
+
+
+@pytest.mark.parametrize("case", sorted(RECORD_REFUSALS))
+def test_the_packaged_validator_refuses_every_record_the_package_refuses(tmp_path, case):
+    """ONE CONTRACT, TWO READERS (Copilot on openXdox-code#36). The validator
+    script cannot import `openxdox.contracts` wherever it runs, so it checks the
+    record itself (`record_digests`). Each record the package refuses, the
+    installed validator refuses too, before any copy is read (harness exit 2)."""
+    site = tmp_path / "site"
+    shutil.copytree(PACKAGE, site / "openxdox" / "contracts",
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    change, _needle = RECORD_REFUSALS[case]
+    _edit_record(site / "openxdox" / "contracts", change)
+    proc = _run_packaged(site, tmp_path)
+    assert proc.returncode == 2, proc.stdout + proc.stderr
+    assert "copies.yaml cannot be trusted" in proc.stderr, proc.stderr
+    assert "0 error(s)" not in proc.stdout
+
+
+def test_the_packaged_validator_reads_its_record_as_the_package_does(tmp_path):
+    """The unedited record passes both readers: the run reaches a verdict on
+    the instance rather than a harness error."""
+    site = tmp_path / "site"
+    shutil.copytree(PACKAGE, site / "openxdox" / "contracts",
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    proc = _run_packaged(site, tmp_path)
+    assert proc.returncode in (0, 1), proc.stdout + proc.stderr
+    assert "cannot be trusted" not in proc.stderr
 
 
 def test_a_copy_edited_in_place_is_refused_not_read(staged):
