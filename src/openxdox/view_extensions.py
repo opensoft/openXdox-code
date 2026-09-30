@@ -23,23 +23,24 @@ WHY THE BINDINGS ARE DECLARED AS DATA AND MATERIALIZED LATE. This leg pins
 `a99eba03` and this paragraph said the pinned commit "is older than the view
 registry itself — `opendox.view_extension` does not exist there, and the
 `exports` field RULED Q2 adds is newer still". THAT IS NO LONGER TRUE, and the
-old wording is quoted here as provenance rather than deleted: the pin now names
-openDox-code#55 (`2d116415`, plan 034 T037's landing, since plan 034 T040),
-where `view_extension` is importable and `ViewBinding` takes `exports` —
+old wording is quoted here as provenance rather than deleted: the pin named
+openDox-code#55 (`2d116415`, plan 034 T037's landing) from plan 034 T040, and
+names openDox-code `e3ef506a` (the head of openDox-code#59, T055) since plan 034
+T059; at both `view_extension` is importable and `ViewBinding` takes `exports` —
 measured, and the three materialization assertions in
 `tests/test_gate_loop_views.py` run and pass against it instead of skipping.
 It first became true at `0b4e8bbf` (openDox-code#23, § 3.4 slice S8 leg B),
 which is where that wording was corrected; the pin then crossed `0e65b5f8`
 (#24) to `5c137a90` (openDox-code#27, § 3.4 RULED Q7), whose `ViewBinding`
 first carried a `styles` field — absent at `0b4e8bbf`, present at `5c137a90`
-and still at `2d116415`, measured by `dataclasses.fields()` in a venv at each
-pin. THE `5c137a90` BUMP ITSELF READ NOTHING, and the review of `ea6991b` was
+and still at `2d116415` and at `e3ef506a`, measured by `dataclasses.fields()`
+in a venv at each pin. THE `5c137a90` BUMP ITSELF READ NOTHING, and the review of `ea6991b` was
 right to check that: it materialized `VIEW_BINDING_SPECS` unchanged and asked
 nothing about the installed `ViewBinding`. THE READING IS THIS ACT'S, and this
 act is the pull request that bump named as waiting on it: `specs_for()` below
 reads `dataclasses.fields(binding_cls)` and drops `styles` where the installed
 dataclass has no such field. MEASURED IN A VENV AT THAT PIN, and again at
-`2d116415`: it has one, so nothing is dropped, every binding that owns
+`2d116415` and at `e3ef506a`: it has one, so nothing is dropped, every binding that owns
 selectors declares its sheet, and the four contributed stylesheets are LIVE
 rather than inert — which is the one thing they waited on that bump for.
 
@@ -518,7 +519,7 @@ def specs_for(binding_cls: Any) -> tuple[dict[str, Any], ...]:
     So the field is DROPPED where the installed class does not take it and the
     column mounts unstyled. AT THE PIN THIS LEG DECLARES TODAY THE DETECTION IS
     THE PLAIN PATH, not a fallback: `dataclasses.fields()` finds `styles` on
-    `2d116415`'s `ViewBinding`, as on `5c137a90`'s where the field first
+    `e3ef506a`'s `ViewBinding`, as on `2d116415`'s and on `5c137a90`'s where the field first
     reached the pin, every spec crosses whole, and the four contributed sheets
     are LIVE — same code, same behaviour, one branch not taken. This paragraph read "the pin bump that follows openDox-code's Q7 leg
     turns the sheets on with no edit here"; that bump landed, and that is what
