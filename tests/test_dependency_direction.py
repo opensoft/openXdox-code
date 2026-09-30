@@ -368,9 +368,9 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 #: carried-forward memory.
 #:
 #: PLAN 034 T059 LOWERED IT, the first fall since slice 2b. The pin moved from
-#: `2d116415` to openDox-code `e3ef506a`, the head of openDox-code#59 (T055,
+#: `2d116415` to openDox-code `814516b7`, the head of openDox-code#59 (T055,
 #: openDox's own snapshot registry and source, corpus-root predicate, writer
-#: and validator lookup behind seams of their own), twenty-three first-parent
+#: and validator lookup behind seams of their own), twenty-five first-parent
 #: commits later. At that tree `_back_import_census()` returns three rows:
 #: `cli.py` (0, 1) and `serve.py` (0, 2) reach (0, 0) and leave the table, and
 #: `branch_session.py` falls from (0, 7) to (0, 2). The eight reaches T055
@@ -420,7 +420,7 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 #: `NEUTRAL_MODULES` is the asserted half. At `2d116415` it held nine:
 #: `workbench`, `serve_workbench`, `consumer_reach`, `branch_session`,
 #: `domain_profile`, `profile_proxy`, `view_extension`, `cli` and `serve`. At
-#: `e3ef506a` it holds thirteen, T055's four new modules with them:
+#: `814516b7` it holds thirteen, T055's four new modules with them:
 #: `projection_seams`, `default_registry`, `default_projection` and `rfc3339`.
 #: Its `STILL_REACHING` is empty at both.
 #:
