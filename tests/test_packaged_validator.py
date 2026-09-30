@@ -17,6 +17,10 @@ tests hold each shipped piece to what it claims to be:
   match every data file in the package and nothing else, so a wheel ships the
   record, the three copies and the validator, and `__init__.py` alone is not
   what an install gets.
+* THE INSTALLED LAYOUT. Where `openxdox` is not running from this product's
+  source tree, `find_validator` answers the packaged copy, and no start it is
+  given changes that answer; an install built without it answers None, and
+  says so.
 
 The fresh-venv, non-editable run of the same claims is #1144's F7.1, which
 the pull request's evidence carries."""
@@ -24,6 +28,8 @@ from __future__ import annotations
 
 import hashlib
 import shutil
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 
@@ -214,3 +220,57 @@ def test_the_package_data_line_ships_every_data_file_and_nothing_else():
     assert shipped == {contracts.RECORD_NAME, contracts.VALIDATOR_NAME} | {
         f"schemas/{copy.filename}" for copy in contracts.record().copies}
 
+
+# ------------------------ the installed layout ------------------------
+
+def _installed_copy(site: Path) -> Path:
+    """This checkout's `openxdox` package, copied into `site` as an install
+    lays it out: no `src/`, no `pyproject.toml`, no `scripts/` beside it."""
+    shutil.copytree(REPO_ROOT / "src" / "openxdox", site / "openxdox",
+                    ignore=shutil.ignore_patterns("__pycache__"))
+    return site / "openxdox"
+
+
+PROBE = """
+import sys
+from pathlib import Path
+from openxdox import snapshot
+assert snapshot.product_root() is None, snapshot.product_root()
+starts = [None] + [Path(arg) for arg in sys.argv[1:]]
+answers = {str(snapshot.find_validator(start)) for start in starts}
+print(answers.pop() if len(answers) == 1 else f"DIFFERING {sorted(answers)}")
+print(snapshot._validator_not_found_reason(None))
+"""
+
+
+def _probe(site: Path, cwd: Path, *starts: Path) -> list[str]:
+    proc = subprocess.run(
+        [sys.executable, "-I", "-c", f"import sys; sys.path.insert(0, {str(site)!r})\n{PROBE}",
+         *map(str, starts)],
+        cwd=cwd, capture_output=True, text=True, check=False)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    return proc.stdout.splitlines()
+
+
+def test_an_install_answers_its_packaged_validator_whatever_the_start(tmp_path):
+    """The planted tree is the one the old parent walk adopted: an
+    `openxFactory/scripts/validate-...py` above the start and the cwd, which
+    exits 0 whatever it is given."""
+    installed = _installed_copy(tmp_path / "site")
+    planted = tmp_path / "preshed"
+    decoy = planted / "openxFactory" / "scripts" / contracts.VALIDATOR_NAME
+    decoy.parent.mkdir(parents=True)
+    decoy.write_text("raise SystemExit(0)\n", encoding="utf-8")
+    (planted / "work").mkdir()
+    answer, _ = _probe(tmp_path / "site", planted / "work",
+                       planted / "work", planted, tmp_path / "nowhere", REPO_ROOT)
+    assert answer == str((installed / "contracts" / contracts.VALIDATOR_NAME).resolve())
+
+
+def test_an_install_without_its_packaged_validator_answers_none_and_says_so(tmp_path):
+    installed = _installed_copy(tmp_path / "site")
+    (installed / "contracts" / contracts.VALIDATOR_NAME).unlink()
+    answer, reason = _probe(tmp_path / "site", tmp_path, tmp_path, REPO_ROOT)
+    assert answer == "None"
+    assert "installed without its packaged validator" in reason
+    assert "never adopted" in reason
