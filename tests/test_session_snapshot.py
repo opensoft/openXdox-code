@@ -445,13 +445,15 @@ def test_the_keyed_source_returns_the_worktree_bytes_and_never_falls_back(
 
 
 def test_the_session_source_read_is_the_existing_confinement_mechanism():
-    """T035: the confinement is `registry.resolve_source` + `resolve_within`, not
-    a new check bolted onto the session path. Pinned on the route's own source so
-    a later "simplification" cannot re-implement containment beside it."""
+    """T035: the confinement is the registry's per-entry `resolve_within`, reached
+    through the route's one entry point `resolve_source_path` over the resolved
+    entry's own root (openDox-code#59, r4136863569), not a new check bolted onto
+    the session path. Pinned on the route's own source so a later
+    "simplification" cannot re-implement containment beside it."""
     import inspect
 
     source = inspect.getsource(serve_mod.DashboardHandler._serve_source)
-    assert "self.source.registry.resolve_source(" in source
+    assert "resolve_source_path(Path(root), rest)" in source
     assert inspect.getsource(reg.SnapshotRegistry.resolve_source).count(
         "resolve_within(") == 1
 
