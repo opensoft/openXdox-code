@@ -274,6 +274,26 @@ jobs:
       # in this pin carries the gap, and none now does: the four skips left
       # are named below, and none of them waits for `doc_health`.
       #
+      # RAISED BY plan 034 T059 (openXdox-code#35), the same way: run
+      # 36655105352 (2026-09-30) measured `c34c0dea`, the head before this
+      # change, at openDox-code `814516b7`: selected 984, passed 980, skipped
+      # 4, failures 0, errors 0. The +99 on both floors has two reasons:
+      #   * +11 is T060's (openXdox-code#34), the `values` probes it added to
+      #     `tests/test_gate_loop_probes.py`. #34 left the floors where they
+      #     were, since the phase-2 draft rule kept it out of this file, and
+      #     named the raise as the next writer's. That is this one.
+      #   * +88 is T059's: it adds three test files, of 37
+      #     (`tests/test_protected_suite_check.py`), 26
+      #     (`tests/test_governed_registry_and_writer.py`) and 20
+      #     (`tests/test_projection_contributions.py`) cases, and
+      #     `tests/test_seam_assembly_beside_gate_and_projection.py` leaves the
+      #     declaration, so its six cases run here now and pass. The
+      #     declaration's own check loses that file's case (-1).
+      # Nothing that was collected before stopped being collected, no outcome
+      # changed, and the four skips are the same four (the reading compared
+      # with `main` `c41063d6` test by test). The floors sit ON the reading,
+      # as #25 set them and T044 kept them, so the margin is zero again.
+      #
       # THE SKIPS ARE NAMED, which is why the exact pin is safe to take. All
       # FOUR are `tests/test_aggregation_register_instance.py`'s, which the
       # sixteen-file list never ran: each skips because the "aggregation
@@ -303,8 +323,8 @@ jobs:
           # on a ruling, which lowers them with its reason (above). Set to
           # the measured values, which this suite has actually met on CI
           # rather than an aspiration.
-          MIN_SELECTED: "885"
-          MIN_PASSED: "881"
+          MIN_SELECTED: "984"
+          MIN_PASSED: "980"
           # EXACT - the load-bearing number.
           EXPECT_SKIPPED: "4"
         run: |
