@@ -115,7 +115,9 @@ requires-python = ">=3.12"
 # will not validate with `date-time` unenforced. Left out, a plain install
 # would carry a validator it cannot run, and every snapshot it generated would
 # read validator-unavailable. `tests/test_dependency_direction.py` holds the
-# packaged validator's imports to this list.
+# packaged validator's imports to this list, and #1144's F7.1, whose fresh
+# environment installs only this list and the `test` extra, goes red when
+# `rfc3339-validator` leaves it (measured on this change).
 # LOWER BOUNDS: `referencing>=0.28.4` is the floor `jsonschema>=4.18` itself
 # requires, so declaring it adds nothing an install of jsonschema would not
 # already bring. `rfc3339-validator>=0.1.4` is the floor the `test` extra
