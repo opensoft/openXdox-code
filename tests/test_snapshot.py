@@ -98,6 +98,50 @@ def test_referentially_broken_snapshot_is_rejected(tmp_path):
         snapshot.validate_or_raise(p, validator=validator)
 
 
+def test_the_validator_is_the_installed_consumers_own(tmp_path, monkeypatch):
+    """#1144 7.3 (plan 034 T061, RULED R1Q14 (a)): the lookup answers the INSTALLED
+    distribution's own validator, whatever it is asked from, and never an
+    enclosing tree's. The planted tree is F7.1's: a pre-shed
+    `openxFactory/scripts/validate-ideation-dashboard-contracts.py` above the
+    working directory, which exits 0 whatever it is given. And the validator
+    found checks a snapshot against the consumer's own schema, which it reads
+    from the distribution (R1Q27 (a)), with no `contracts/` of its own and no
+    `CONTRACTS_DIR`: a dangling edge is a verdict, and a conforming snapshot
+    validates. This test is added by T007's batch F, entered in
+    `tests/protected_suite_respellings.yaml`."""
+    import pathlib
+
+    planted = tmp_path / "preshed"
+    decoy = planted / "openxFactory" / "scripts" / "validate-ideation-dashboard-contracts.py"
+    decoy.parent.mkdir(parents=True)
+    decoy.write_text("raise SystemExit(0)\n", encoding="utf-8")
+    (planted / "work").mkdir()
+    monkeypatch.chdir(planted / "work")
+    monkeypatch.delenv("CONTRACTS_DIR", raising=False)
+
+    own = snapshot.find_validator()
+    assert own is not None, "the consumer found no validator of its own"
+    for start in (planted / "work", planted, planted / "openxFactory", tmp_path):
+        assert snapshot.find_validator(start) == own, start
+    assert planted.resolve() not in own.resolve().parents
+    root = snapshot.product_root()
+    home = root if root is not None else pathlib.Path(snapshot.__file__).resolve().parent
+    assert own.resolve().is_relative_to(home.resolve())
+
+    b = OutputBoundary(tmp_path, ["out/"])
+    good = snapshot.write_snapshot(_minimal_snapshot(), tmp_path / "out" / "s.json", b)
+    result = snapshot.validate_snapshot(good, search_from=planted / "work")
+    assert result.outcome == snapshot.VALIDATED, result.summary() + result.stdout + result.stderr
+    assert result.validator == own
+    bad = snapshot.write_snapshot(_minimal_snapshot(clusters=[{
+        "id": "cl-x", "name": "X", "topics": ["x"],
+        "document_edges": [{"document": "doc-missing", "matched_topics": ["x"]}]}]),
+        tmp_path / "out" / "bad.json", b)
+    refused = snapshot.validate_snapshot(bad, search_from=planted)
+    assert refused.outcome == snapshot.NOT_CONFORMANT, refused.stdout + refused.stderr
+    assert "dangling" in refused.stdout
+
+
 # ---- three outcomes: validated / not conformant / validator unavailable ----
 #
 # `ok = (returncode == 0)` answered "is this snapshot good?" with "did the check
