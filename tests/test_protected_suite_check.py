@@ -350,8 +350,10 @@ def test_a_chain_is_refused_in_12_5s_call(repo, monkeypatch) -> None:
     repo.commit({SUITE: BOTH}, f"two edits\n\n{ARC}")
     chain = _two_step_chain(repo)
     [finding] = _check(repo, chain)
-    assert finding.admitted_by is None and finding.chain == ()
-    assert "entry 1:" in finding.why and "entries 1-2" not in finding.why
+    assert finding.admitted_by is None
+    assert finding.chain == ()
+    assert "entry 1:" in finding.why
+    assert "entries 1-2" not in finding.why
     allow = repo.root / ps.ALLOW_LIST
     monkeypatch.chdir(repo.root)
     allow.parent.mkdir(parents=True, exist_ok=True)
@@ -368,7 +370,8 @@ def test_a_chain_is_spent_whole_by_its_landing(repo) -> None:
     findings = {f.landing: f for f in _check(repo, _two_step_chain(repo), chains=True)}
     assert findings[landing].chain == (1, 2)
     assert findings[replay].admitted_by is None
-    assert "admitted" in findings[replay].why and "already" in findings[replay].why
+    assert "admitted" in findings[replay].why
+    assert "already" in findings[replay].why
 
 
 def test_a_chain_whose_middle_blob_is_not_the_text_between_is_refused(repo) -> None:

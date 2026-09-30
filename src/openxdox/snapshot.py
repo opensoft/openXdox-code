@@ -199,6 +199,7 @@ def find_validator(start: Path | None = None) -> Path | None:
     snapshot's directory or a corpus, so an enclosing tree's validator is never
     adopted, whatever it carries. A caller that means another validator passes
     it explicitly: `validate_snapshot(..., validator=...)`."""
+    del start  # the declared signature is kept, and the start is ignored (7.3)
     root = product_root()
     if root is None:
         return _packaged_validator()

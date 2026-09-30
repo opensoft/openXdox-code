@@ -348,36 +348,55 @@ def chain_holds(repo: Path, landing: str, chain: list[dict]) -> str | None:
     `entry_holds`."""
     if len(chain) == 1:
         return entry_holds(repo, landing, chain[0])
+    why = _chain_ends_why(repo, landing, chain)
+    if why is not None:
+        return why
+    text = _blob_text(repo, chain[0]["before_blob"])
+    last = _blob_text(repo, chain[-1]["after_blob"])
+    for step, entry in enumerate(chain, 1):
+        following = text.replace(entry["old"], entry["new"], 1)
+        why = _step_why(repo, chain, step, text, following, last)
+        if why is not None:
+            return f"step {step}: {why}"
+        text = following
+    return None
+
+
+def _chain_ends_why(repo: Path, landing: str, chain: list[dict]) -> str | None:
+    """Why `chain` cannot admit `landing` whatever its steps say, or None: its
+    entries name more than one suite or landing, or its ends are not the
+    suite before the landing and at it."""
     suite = chain[0]["suite"]
     if any(entry["suite"] != suite for entry in chain):
         return "a chain's entries name more than one suite"
     if any(entry["landing"] != chain[0]["landing"] for entry in chain):
         return "a chain's entries name more than one landing"
     before = _blob(repo, f"{landing}^1", suite)
-    after = _blob(repo, landing, suite)
     if before != chain[0]["before_blob"]:
         return f"{suite} before the landing is {before}, not the chain's {chain[0]['before_blob']}"
+    after = _blob(repo, landing, suite)
     if after != chain[-1]["after_blob"]:
         return f"{suite} at the landing is {after}, not the chain's {chain[-1]['after_blob']}"
-    text, last = _blob_text(repo, before), _blob_text(repo, after)
-    for step, entry in enumerate(chain, 1):
-        if step > 1 and entry["before_blob"] != chain[step - 2]["after_blob"]:
-            return f"step {step}: its before_blob is not the step before it's after_blob"
-        if text.count(entry["old"]) != 1:
-            return (f"step {step}: its old text occurs {text.count(entry['old'])} times in "
-                    "the text the steps before it leave, not once")
-        following = text.replace(entry["old"], entry["new"], 1)
-        if step == len(chain):
-            if following != last:
-                return f"step {step}: the chain's texts do not give the suite at the landing"
-        elif _hash_text(repo, following) != entry["after_blob"]:
-            return (f"step {step}: its after_blob is not the blob of the text its edit "
-                    "leaves, so the chain does not record the text in between")
-        why = _edit_holds(text, following, entry)
-        if why is not None:
-            return f"step {step}: {why}"
-        text = following
     return None
+
+
+def _step_why(repo: Path, chain: list[dict], step: int, text: str, following: str,
+              last: str) -> str | None:
+    """Why step `step` (1-based) of `chain` does not hold on `text`, the text
+    the steps before it leave, or None. `following` is what its edit leaves,
+    and `last` the suite at the landing."""
+    entry = chain[step - 1]
+    if step > 1 and entry["before_blob"] != chain[step - 2]["after_blob"]:
+        return "its before_blob is not the step before it's after_blob"
+    if text.count(entry["old"]) != 1:
+        return (f"its old text occurs {text.count(entry['old'])} times in the text "
+                "the steps before it leave, not once")
+    if step == len(chain) and following != last:
+        return "the chain's texts do not give the suite at the landing"
+    if step < len(chain) and _hash_text(repo, following) != entry["after_blob"]:
+        return ("its after_blob is not the blob of the text its edit leaves, so the "
+                "chain does not record the text in between")
+    return _edit_holds(text, following, entry)
 
 
 def _edit_holds(before_text: str, after_text: str, entry: dict) -> str | None:
@@ -522,6 +541,11 @@ def main(argv: list[str] | None = None) -> int:
               f"({' '.join(map(str, exc.cmd[3:]))}: {detail[0] if detail else exc.returncode}), "
               "so nothing is checked", file=sys.stderr)
         return 2
+    return _report(findings)
+
+
+def _report(findings: list[Finding]) -> int:
+    """Print each finding, and answer the exit code: 1 when any is refused."""
     refused = []
     for f in findings:
         if f.admitted_by is not None:

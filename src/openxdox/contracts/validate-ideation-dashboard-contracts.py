@@ -187,11 +187,10 @@ EXAMPLES_DIR = CONTRACTS.parent / "examples" / "ideation-dashboard"
 # records beside it, wherever it is found (`openxdox.contracts` applies the
 # same rule), so a copy edited in place is refused, never read. A schema no
 # place supplies is refused BY NAME where an instance needs it (harness exit 2).
-OWN_KIND_SCHEMAS = frozenset({
-    "ideation-dashboard-snapshot.schema.yaml",
-    "ideation-dashboard-snapshot-index.schema.yaml",
-    "gate-action-record.schema.yaml",
-})
+SNAPSHOT_SCHEMA = "ideation-dashboard-snapshot.schema.yaml"
+SNAPSHOT_INDEX_SCHEMA = "ideation-dashboard-snapshot-index.schema.yaml"
+GATE_ACTION_RECORD_SCHEMA = "gate-action-record.schema.yaml"
+OWN_KIND_SCHEMAS = frozenset({SNAPSHOT_SCHEMA, SNAPSHOT_INDEX_SCHEMA, GATE_ACTION_RECORD_SCHEMA})
 COPIES_RECORD = "copies.yaml"
 
 
@@ -209,7 +208,7 @@ def distribution_contracts() -> Path | None:
         return None
     if spec is None or not spec.submodule_search_locations:
         return None
-    return Path(list(spec.submodule_search_locations)[0]).resolve()
+    return Path(next(iter(spec.submodule_search_locations))).resolve()
 
 
 def verified_copy(contracts: Path, name: str) -> Path:
@@ -278,25 +277,25 @@ def schema_sources() -> dict[str, tuple[Path | None, str]]:
     return {name: schema_source(name) for name in SCHEMA_FILENAMES}
 
 SCHEMA_FILENAMES = [
-    "ideation-dashboard-snapshot.schema.yaml",
-    "ideation-dashboard-snapshot-index.schema.yaml",
+    SNAPSHOT_SCHEMA,
+    SNAPSHOT_INDEX_SCHEMA,
     "ideation-workbench.schema.yaml",
     "ideation-possibles-register.schema.yaml",
     "xfactory-workbench-model-catalog.schema.yaml",
     "xfactory-workbench-chat-turn.schema.yaml",
     "project-register.schema.yaml",
-    "gate-action-record.schema.yaml",
+    GATE_ACTION_RECORD_SCHEMA,
     "demotion-execution-receipt.schema.yaml",
     "gate-intent.schema.yaml",
 ]
 
 # Whole-document schemas keyed by the hyphenated `kind` literal each declares.
 KIND_TO_SCHEMA = {
-    "ideation-dashboard-snapshot": "ideation-dashboard-snapshot.schema.yaml",
-    "ideation-dashboard-snapshot-index": "ideation-dashboard-snapshot-index.schema.yaml",
+    "ideation-dashboard-snapshot": SNAPSHOT_SCHEMA,
+    "ideation-dashboard-snapshot-index": SNAPSHOT_INDEX_SCHEMA,
     "ideation-workbench": "ideation-workbench.schema.yaml",
     "project-register": "project-register.schema.yaml",
-    "gate-action-record": "gate-action-record.schema.yaml",
+    "gate-action-record": GATE_ACTION_RECORD_SCHEMA,
     "demotion-execution-receipt": "demotion-execution-receipt.schema.yaml",
     "gate-intent": "gate-intent.schema.yaml",
     # doxBench wire family (add-workbench-integrated-editor-chat task 2.1):
