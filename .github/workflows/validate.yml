@@ -132,7 +132,7 @@ jobs:
       # imported carved session fixtures that reached `ideation_dashboard` and
       # `doc_health`, two packages neither leg carries. At the openDox this
       # leg pinned from plan 034 T040 (openDox-code `2d116415`), and at the one
-      # it pins since plan 034 T059 (`814516b7`), the chain loads in a lone
+      # it pins since plan 034 T059 (`047bb4fa`), the chain loads in a lone
       # checkout, and what still reaches openxFactory is what the declaration
       # and `LEFT_OUT` hold. Each of the sixteen files'
       # account of itself (why it joined the list, its counts, its review
