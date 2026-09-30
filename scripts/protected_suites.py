@@ -387,7 +387,7 @@ def _step_why(repo: Path, chain: list[dict], step: int, text: str, following: st
     and `last` the suite at the landing."""
     entry = chain[step - 1]
     if step > 1 and entry["before_blob"] != chain[step - 2]["after_blob"]:
-        return "its before_blob is not the step before it's after_blob"
+        return "its before_blob is not the after_blob of the step before it"
     if text.count(entry["old"]) != 1:
         return (f"its old text occurs {text.count(entry['old'])} times in the text "
                 "the steps before it leave, not once")

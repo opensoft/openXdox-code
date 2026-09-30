@@ -451,23 +451,28 @@ def load_yaml(path: Path) -> Any:
 # --------------------------- schema registry ---------------------------
 
 def build_registry() -> tuple[Registry, dict[str, dict]]:
-    """Offline registry over the family schemas SCHEMAS_DIR CARRIES, so the
+    """Offline registry over every family schema some channel SUPPLIES, so the
     register kernel's cross-file `$ref` into the snapshot's `evidence_pin`
     resolves (same approach as scripts/validate-document-catalog.py /
     validate-avatar-client.py).
 
-    A family schema SCHEMAS_DIR does not carry is left out here and refused BY
-    NAME where an instance needs it (`doc_validator`, harness exit 2). Since the
-    carve the ten are split across openXdox-spec, openDox-spec and openxFactory,
-    and this product's own spec leg carries three of them; a run that meets any
-    other kind has validated nothing and must say so, never pass (§ 8.9 residue
-    (i)).
+    Each schema comes from the one place `schema_source` names for it (plan 034
+    T061): this tree's own `contracts/schemas/`; for this validator's own three,
+    the installed openxdox distribution's packaged copies, digest-checked; for
+    the other seven, `CONTRACTS_DIR`. So the registry is merged from up to three
+    places, and one directory no longer decides it.
 
-    A SCHEMAS_DIR that carries NONE of the ten is refused HERE, before any mode
-    runs, as a harness failure (exit 2). An empty registry validates nothing. A
-    directory sweep that met no recognized instance, or a register transition,
-    would otherwise reach a verdict having loaded no schema, and the sweep would
-    exit 0 (Copilot review of openXdox-code#28)."""
+    A family schema no channel supplies is left out here and refused BY NAME
+    where an instance needs it (`doc_validator`, harness exit 2). Since the carve
+    the ten are split across openXdox-spec, openDox-spec and openxFactory; a run
+    that meets a kind nothing supplies has validated nothing and must say so,
+    never pass (§ 8.9 residue (i)).
+
+    A run that NO channel supplies with any of the ten is refused HERE, before
+    any mode runs, as a harness failure (exit 2). An empty registry validates
+    nothing. A directory sweep that met no recognized instance, or a register
+    transition, would otherwise reach a verdict having loaded no schema, and the
+    sweep would exit 0 (Copilot review of openXdox-code#28)."""
     sources = schema_sources()
     if not any(path is not None for path, _channel in sources.values()):
         raise FileNotFoundError(
