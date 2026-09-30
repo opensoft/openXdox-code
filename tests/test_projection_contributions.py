@@ -170,22 +170,34 @@ def test_a_refusal_takes_back_every_seam_this_call_wrote(isolated_seams) -> None
     assert projection_seams.validators.kinds() == ()
 
 
-def test_a_replaced_unread_default_is_taken_back_too(isolated_seams) -> None:
+def test_a_replaced_unread_default_is_given_back_as_a_default(isolated_seams) -> None:
     """The entry points registered their defaults, and something read the
     writer's. This call replaces the unread defaults before the writer
-    refuses, and empties them again, so no seam is left governed while the
-    writer stays neutral."""
-    from opendox import default_generator, default_projection
+    refuses. It gives each one back as the unread default it was (Copilot on
+    openXdox-code#35), so a caller that catches the refusal keeps its neutral
+    generator, registry and corpus root. No seam is left governed while the
+    writer stays neutral, and none is left empty either."""
+    from opendox import default_generator, default_projection, default_registry
 
     generator_seam.register_default(default_generator.GENERATOR)
     projection_seams.register_defaults()
+    registry_default = projection_seams.registry._registered
+    corpus_root_default = projection_seams.corpus_root._registered
     assert projection_seams.writer.current() is default_projection.WRITER  # read
     with pytest.raises(projection_seams.SeamAlreadyRegistered):
         pc.register()
-    assert not generator_seam.is_registered()
-    assert not projection_seams.registry.is_registered()
-    assert not projection_seams.corpus_root.is_registered()
+    # each is back, and still an unread default: the names are pinned here
+    assert generator_seam._registered is default_generator.GENERATOR
+    assert generator_seam._is_default
+    assert projection_seams.registry._registered is registry_default is default_registry
+    assert projection_seams.registry._is_default
+    assert projection_seams.corpus_root._registered is corpus_root_default
+    assert projection_seams.corpus_root._is_default
     assert projection_seams.writer.current() is default_projection.WRITER
+    # and replaceable still: once the writer's reader lets go, this call lands
+    projection_seams.writer.unregister()
+    pc.register()
+    assert pc.is_registered()
 
 
 def test_a_seam_already_holding_the_contribution_is_not_taken_back(isolated_seams) -> None:

@@ -328,24 +328,51 @@ def _take_back(seam: Any, kind: str | None) -> None:
         seam.unregister(kind)
 
 
+def _unread_default(seam: Any, kind: str | None) -> Any:
+    """The unread default `seam` holds (for `kind`), or None. It is the one
+    registration `register()` can replace: a host's refuses, and so does a
+    default that has been read. Read where the seam keeps it, like `_holds`,
+    because `current()` would close the default's window."""
+    if seam is generator_seam:
+        return generator_seam._registered if generator_seam._is_default else None
+    if kind is None:
+        return seam._registered if seam._is_default else None
+    held = seam._registered.get(kind)
+    return held[0] if held is not None and held[1] else None
+
+
+def _put_back(seam: Any, kind: str | None, displaced: Any) -> None:
+    """Empty what this call wrote, and give back the unread default it
+    replaced, as the default it was (Copilot on openXdox-code#35)."""
+    _take_back(seam, kind)
+    if displaced is None:
+        return
+    if kind is None:
+        seam.register_default(displaced)
+    else:
+        seam.register_default(kind, displaced)
+
+
 def register() -> tuple[str, ...]:
     """Register every contribution at its seam, all or none. Returns the
     seams' names.
 
     A refusal is openDox's own (`GeneratorAlreadyRegistered`,
     `SeamAlreadyRegistered`), raised unchanged once every seam this call wrote
-    has been emptied again."""
+    holds again what it held before: nothing, or the unread default this call
+    replaced, given back as a default."""
     with _lock:
-        written: list[tuple[Any, str | None]] = []
+        written: list[tuple[Any, str | None, Any]] = []
         try:
             for _name, seam, kind, contribution in _contributions():
                 if _holds(seam, kind, contribution):
                     continue
+                displaced = _unread_default(seam, kind)
                 _register_one(seam, kind, contribution)
-                written.append((seam, kind))
+                written.append((seam, kind, displaced))
         except BaseException:
-            for seam, kind in reversed(written):
-                _take_back(seam, kind)
+            for seam, kind, displaced in reversed(written):
+                _put_back(seam, kind, displaced)
             raise
         return tuple(name for name, *_ in _contributions())
 
