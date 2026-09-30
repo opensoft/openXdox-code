@@ -965,6 +965,271 @@ def test_the_replayed_shell_statements_are_the_pinned_bundles(bundle) -> None:
 
 
 # ---------------------------------------------------------------------------
+# THE GOVERNED SNAPSHOT'S VALUES, PLACED — plan 034 T060: 5.3a as T007's batch I
+# amends it, RULED R1Q26 (a) (`opensoft/openxFactory#656` comment `5851950767`,
+# kept at `5852513402`), on R1Q11 (a) (comment `5850003126`).
+#
+# `view_extensions.DISPLAY` carries a `values` block beside its one stage. A view
+# asks the shell's vocabulary about two snapshot enums, `documents[].stage` and
+# `possibles[].state`, both ways: for the VALUE a column filters its cards on
+# (`views/board.js` keeps a document in its captured column when
+# `d.stage === vocab.documentStage(CAPTURED)`), and for the ROLE a card's word
+# and style hook are read by (`views/canvas.js` keys a candidate on
+# `vocab.registerRole(state)`). Plan 034 T054 makes openDox's own defaults for
+# both enums its NEUTRAL snapshot's values, and this leg's governed generator
+# keeps writing the governed words, so the block is what keeps this leg's views
+# placing every governed card where they place it now. Four things, each a test:
+#   * the block is the governed profile's own word for every role openDox
+#     matches on, read off the vendored engineering profile the way the engine
+#     reads it, rather than typed a second time;
+#   * the host serves exactly those values whatever openDox's defaults are, and
+#     where the defaults ARE those values, the block changes nothing it serves;
+#   * the pinned bundle's `display.js`, handed that payload, answers both
+#     questions for every governed value as it answers them now, at either
+#     defaults;
+#   * without the block, at the neutral defaults, it answers neither for any of
+#     them, which is the regression the block exists to prevent.
+# The guard in front of them reads one name the DISPLAY section's guard does
+# not, and it is driven both ways, as that guard is.
+#
+# THE NEUTRAL DEFAULTS ARE STOOD UP BEFORE T054, AND REAL AFTER IT. At a pin
+# before T054, openDox's defaults are the governed words, so the neutral case
+# puts T054's in force for one test, in both of the places openDox keeps them:
+# the server's `display_profile.SNAPSHOT_VALUES`, which the served `values`
+# block is merged over (`_snapshot_values`), and the shell's own copy in
+# `views/display.js`, which a page reads when no payload reaches it. At a pin
+# past T054, the installed case IS the neutral one.
+# ---------------------------------------------------------------------------
+
+from test_gate_loop_views import (  # noqa: E402  (the DISPLAY section's pieces)
+    ENGINEERING_PROFILE,
+    _PIN_DECLARED,
+    _PIN_OTHER,
+    _guard_reads,
+)
+
+#: The neutral snapshot's values, which plan 034 T054 makes openDox's
+#: `SNAPSHOT_VALUES` defaults (openDox-code#57, on R1Q11 (a)): a document at the
+#: first two station role keys, and a candidate in `NEUTRAL_DISPLAY`'s own
+#: candidate words. The defaults an openDox past T054 serves, stood up here at
+#: a pin before it.
+NEUTRAL_SNAPSHOT_VALUES: dict[str, dict[str, str]] = {
+    "document_stage": {"captured": "source", "organized": "grouping"},
+    "register_state": {"captured": "unselected", "proposed": "selected",
+                       "retired": "declined", "superseded": "replaced"},
+}
+
+#: The two questions `views/display.js` answers for each enum, as its methods:
+#: role -> the value a column filters on, and value -> the role a card is read by.
+_ENUM_QUESTIONS = {"document_stage": ("documentStage", "documentStageRole"),
+                   "register_state": ("registerState", "registerRole")}
+
+
+def _snapshot_values_or_skip():
+    """The pinned reader and its `SNAPSHOT_VALUES`, or `_absent()`'s outcome.
+
+    `_display_profile_or_skip()` checks every name the DISPLAY section of
+    `test_gate_loop_views.py` reads, and its table is that protected suite's
+    own. This section reads one name more, the enum defaults the `values` block
+    is merged over, and holds it to the same rule: FAIL at the declared pin,
+    SKIP naming both commits for a different one.
+    """
+    display_profile, view_extension = _display_profile_or_skip()
+    if not hasattr(display_profile, "SNAPSHOT_VALUES"):
+        import opendox_bundle
+        opendox_bundle._absent(
+            "`opendox.display_profile.SNAPSHOT_VALUES`, the snapshot enums' "
+            "defaults a DISPLAY facet's `values` block overrides",
+            module_level=False)
+    return display_profile, view_extension
+
+
+def _governed_values(display_profile) -> dict[str, dict[str, str]]:
+    """The governed profile's word for every role openDox matches an enum on.
+
+    Read off the vendored engineering profile the way this leg's engine reads
+    it. The document spine is the kind `kind_declaring("demote")` names
+    (`generator._document_status_vocabulary`), and the register is the kind
+    `kind_declaring("promote-to-staging")` names
+    (`gate_console._promotable_register_state`). The ROLES are the pinned
+    openDox's own, so a role openDox starts matching on is asked for here too.
+    """
+    from openxdox import domain_profile as engine
+
+    profile = engine.load(ENGINEERING_PROFILE)
+    kinds = {"document_stage": profile.kind_declaring("demote"),
+             "register_state": profile.kind_declaring("promote-to-staging")}
+    return {name: {role: profile.status(role, kind=kinds[name]) for role in roles}
+            for name, roles in display_profile.SNAPSHOT_VALUES.items()}
+
+
+def _stand_up(display_profile, monkeypatch, which: str,
+              bundle: Path | None = None) -> dict[str, dict[str, str]]:
+    """Put one case's enum defaults in force, and return them.
+
+    `installed` leaves them as the assembled openDox ships them. `governed` and
+    `neutral` replace the server's copy for this test, and, given a composed
+    bundle, the shell's own copy in its `views/display.js`, lifted and replaced
+    whole, so the two halves read the same defaults, as they do in any one
+    openDox. The bundle is this test's own copy (the `bundle` fixture's), so
+    nothing outside the test changes.
+    """
+    if which == "installed":
+        return {name: dict(words)
+                for name, words in display_profile.SNAPSHOT_VALUES.items()}
+    values = (_governed_values(display_profile) if which == "governed" else
+              {name: dict(words) for name, words in NEUTRAL_SNAPSHOT_VALUES.items()})
+    monkeypatch.setattr(display_profile, "SNAPSHOT_VALUES", values)
+    if bundle is not None:
+        display = bundle / "views" / "display.js"
+        text = display.read_text(encoding="utf-8")
+        mirror = _lift(text, "export const SNAPSHOT_VALUES = {", through=";",
+                       name="views/display.js")
+        display.write_text(
+            text.replace(mirror,
+                         f"export const SNAPSHOT_VALUES = {json.dumps(values)};"),
+            encoding="utf-8")
+    return values
+
+
+def _asked(bundle: Path, capabilities: dict | None,
+           values: dict[str, dict[str, str]]) -> dict:
+    """Both of `views/display.js`'s answers, for each role and value in `values`.
+
+    `readDisplay` is `app.js`'s own reader of `/capabilities`. For each role it
+    records the value the shell filters that role's cards on, and for each
+    value the role the shell reads that card by (`null` where no role carries
+    the value).
+    """
+    return _run_node(f"""
+const {{ readDisplay }} = await import(VIEWS + "display.js");
+const display = readDisplay({json.dumps(capabilities)});
+const asked = {json.dumps(_ENUM_QUESTIONS)};
+const values = {json.dumps(values)};
+const out = {{}};
+for (const [name, words] of Object.entries(values)) {{
+  const [valueOf, roleOf] = asked[name];
+  out[name] = {{}};
+  for (const [role, word] of Object.entries(words)) {{
+    out[name][role] = {{ value: display[valueOf](role), role: display[roleOf](word) }};
+  }}
+}}
+console.log(JSON.stringify(out));
+""", bundle)
+
+
+def test_the_values_block_is_the_governed_profiles_word_for_every_role() -> None:
+    """The block, held to the profile the governed generator takes its words from."""
+    display_profile, _ = _snapshot_values_or_skip()
+    assert view_extensions.DISPLAY["values"] == _governed_values(display_profile)
+
+
+@pytest.mark.parametrize("defaults", ["installed", "governed", "neutral"])
+def test_the_host_serves_the_governed_values_at_any_defaults(
+        register_host, monkeypatch, defaults) -> None:
+    """With the facet, the governed values; without it, openDox's own defaults.
+
+    So where openDox's defaults ARE the governed values, the block changes no
+    served value, and where they are the neutral ones, the block is what keeps
+    the governed ones. Both payloads come through the same chain, the second
+    after an explicit `unregister()`, as the overlay test in
+    `test_gate_loop_views.py` registers its two.
+    """
+    from opendox import domain_profile as registry
+
+    display_profile, view_extension = _snapshot_values_or_skip()
+    governed = _governed_values(display_profile)
+    in_force = _stand_up(display_profile, monkeypatch, defaults)
+    register_host(_engineering_host("DISPLAY"))
+    declared = _served_display(display_profile, view_extension)["values"]
+    registry.unregister()
+    register_host(_engineering_host())
+    absent = _served_display(display_profile, view_extension)["values"]
+    assert declared == governed
+    assert absent == in_force
+    assert (declared == absent) == (in_force == governed)
+
+
+@pytest.mark.skipif(NODE is None, reason="node is not installed")
+@pytest.mark.parametrize("defaults", ["installed", "neutral"])
+def test_js_the_views_place_every_governed_value_where_they_place_it_now(
+        bundle, register_host, monkeypatch, defaults) -> None:
+    """Each governed word is the value its role filters on, and reads back as it."""
+    display_profile, _ = _snapshot_values_or_skip()
+    governed = _governed_values(display_profile)
+    _stand_up(display_profile, monkeypatch, defaults, bundle)
+    served = _served(register_host, "DISPLAY")
+    assert _asked(bundle, {"display": served}, governed) == {
+        name: {role: {"value": word, "role": role} for role, word in words.items()}
+        for name, words in governed.items()}
+
+
+@pytest.mark.skipif(NODE is None, reason="node is not installed")
+@pytest.mark.parametrize("without", ["host-forwards-no-facet",
+                                     "facet-without-the-block",
+                                     "no-capabilities-payload"])
+def test_js_without_the_block_the_neutral_defaults_place_no_governed_value(
+        bundle, register_host, monkeypatch, without) -> None:
+    """THE MUTATION: the block gone, at the defaults T054 makes openDox's.
+
+    Gone three ways: a host that forwards no facet at all; this leg's facet as
+    it was before T060, its one stage and no `values`; and no payload at all, a
+    static image whose `/capabilities` 404s, so the shell reads `null` and its
+    own copy of the defaults. Each way, each role filters on its neutral value
+    and no governed word reads back as any role, so the board's captured column
+    would hold none of the governed documents, and each governed candidate would
+    lose its `cstate-*` hook and show its raw state. That is what the positive
+    probe above must refuse. The third way is also a limit: no facet reaches a
+    page that fetches no `/capabilities`.
+    """
+    display_profile, _ = _snapshot_values_or_skip()
+    governed = _governed_values(display_profile)
+    _stand_up(display_profile, monkeypatch, "neutral", bundle)
+    if without == "host-forwards-no-facet":
+        capabilities = {"display": _served(register_host)}
+    elif without == "facet-without-the-block":
+        monkeypatch.setattr(view_extensions, "DISPLAY",
+                            {"stages": view_extensions.DISPLAY["stages"]})
+        capabilities = {"display": _served(register_host, "DISPLAY")}
+    else:
+        capabilities = None
+    assert _asked(bundle, capabilities, governed) == {
+        name: {role: {"value": NEUTRAL_SNAPSHOT_VALUES[name][role], "role": None}
+               for role in words}
+        for name, words in governed.items()}
+
+
+def _without_snapshot_values(monkeypatch) -> None:
+    """Leave the reader importable and take `SNAPSHOT_VALUES` off it."""
+    display_profile, _ = _display_profile_or_skip()
+    monkeypatch.delattr(display_profile, "SNAPSHOT_VALUES")
+
+
+def test_a_missing_snapshot_values_table_FAILS_at_the_declared_pin(
+        monkeypatch) -> None:
+    """The guard's refusal at the pin this leg declares, under CI: it fails."""
+    _without_snapshot_values(monkeypatch)
+    _guard_reads(monkeypatch, _PIN_DECLARED, _PIN_DECLARED)
+    with pytest.raises(pytest.fail.Exception) as raised:
+        _snapshot_values_or_skip()
+    message = str(raised.value)
+    assert "REGRESSION at the declared pin" in message
+    assert "SNAPSHOT_VALUES" in message
+
+
+def test_a_missing_snapshot_values_table_SKIPS_for_a_different_installed_commit(
+        monkeypatch) -> None:
+    """...and for a different assembly it skips, naming both commits."""
+    _without_snapshot_values(monkeypatch)
+    _guard_reads(monkeypatch, _PIN_DECLARED, _PIN_OTHER)
+    with pytest.raises(pytest.skip.Exception) as raised:
+        _snapshot_values_or_skip()
+    message = str(raised.value)
+    assert _PIN_DECLARED[:8] in message
+    assert _PIN_OTHER[:8] in message
+
+
+# ---------------------------------------------------------------------------
 # THE GUARD ITSELF, TESTED DIRECTLY — Copilot round-2 thread on #21
 # (`PRRT_kwDOUPv7_s6i_iiz`, "the new provenance decision is only exercised
 # indirectly on the normal bundle-present path; there are no tests"). Accurate:
