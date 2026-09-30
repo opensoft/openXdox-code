@@ -10,7 +10,8 @@ commit carrying the `Arc:` line. Each case holds one rule of the check:
   the test the entry names, is admitted;
 * an entry is refused as soon as its landing's diff differs from its recorded
   text in any way: another edit beside it, a text that occurs twice, an edit in
-  another test, or blobs that are not the entry's;
+  another test or reaching out of the named one, or blobs that are not the
+  entry's;
 * a commit without the `Arc:` line is not a landing, whatever it touches;
 * entries for one suite chain, and a file that breaks its own rules refuses
   the whole check rather than subtracting less.
@@ -159,6 +160,39 @@ def test_an_edit_outside_the_named_test_is_refused(repo) -> None:
     [finding] = _check(repo, [_entry(repo, test="test_first")])
     assert finding.admitted_by is None
     assert "not inside test_first" in finding.why
+
+
+@pytest.mark.parametrize("side", ["before_blob", "after_blob"])
+def test_an_entry_whose_recorded_blob_is_not_the_landings_is_refused(repo, side) -> None:
+    """The text would apply, but the entry names another blob on one side, so
+    it records some other edit than this landing's."""
+    repo.commit({SUITE: AFTER}, f"edit\n\n{ARC}")
+    [finding] = _check(repo, [_entry(repo, **{side: repo.blob("some other text\n")})])
+    assert finding.admitted_by is None
+    assert f"not the entry's {repo.blob('some other text' + chr(10))}" in finding.why
+
+
+def test_an_edit_that_turns_module_code_into_test_code_is_refused(repo) -> None:
+    """What the entry replaces lies outside the named test, although what it
+    leaves lies inside it: a module-level line becomes the test's last line."""
+    before = BEFORE + "X = 1\n"
+    after = BEFORE + "    assert 1\n"
+    repo.commit({SUITE: before}, "a module-level line after the test")
+    repo.commit({SUITE: after}, f"edit\n\n{ARC}")
+    [finding] = _check(repo, [_entry(repo, before=before, after=after,
+                                     old="X = 1\n", new="    assert 1\n")])
+    assert finding.admitted_by is None
+    assert "old text is not inside test_second" in finding.why
+
+
+def test_an_edit_that_moves_test_code_out_of_the_test_is_refused(repo) -> None:
+    """The reverse: what the entry replaces lies inside the named test, and
+    what it leaves lies outside it, so the test loses an assertion."""
+    after = BEFORE.replace(OLD, 'X = {"a": 1}\n')
+    repo.commit({SUITE: after}, f"edit\n\n{ARC}")
+    [finding] = _check(repo, [_entry(repo, after=after, new='X = {"a": 1}\n')])
+    assert finding.admitted_by is None
+    assert "new text is not inside test_second" in finding.why
 
 
 def test_a_commit_without_the_trailer_is_not_a_landing(repo) -> None:
