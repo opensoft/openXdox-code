@@ -253,8 +253,9 @@ def test_a_refused_contribution_leaves_no_profile_registered(isolated_seams) -> 
     domain_profile.unregister()
     projection_seams.writer.register(OtherWriter())
     try:
+        profile = domain_profile.load(PROFILE_FIXTURE)
         with pytest.raises(projection_seams.SeamAlreadyRegistered):
-            domain_profile.register(domain_profile.load(PROFILE_FIXTURE))
+            domain_profile.register(profile)
         assert not domain_profile.is_registered()
     finally:
         projection_seams.writer.unregister()
@@ -340,9 +341,12 @@ def test_the_scanned_roots_are_read_when_used(monkeypatch) -> None:
 
     monkeypatch.setattr(pc, "_governed", lambda name: CorpusRoot())
     roots = pc.CORPUS_ROOT.SCANNED_ROOTS
-    assert "read when used" in repr(roots) and reads == []
+    assert "read when used" in repr(roots)
+    assert reads == []
     assert tuple(roots) == ("docs", "openspec")
-    assert len(roots) == 2 and roots[1] == "openspec" and "docs" in roots
+    assert len(roots) == 2
+    assert roots[1] == "openspec"
+    assert "docs" in roots
 
 
 def test_the_change_rows_are_the_governed_enumeration_with_each_origin(monkeypatch) -> None:
@@ -393,6 +397,7 @@ def test_no_validator_from_any_root_is_unavailable_naming_the_script(monkeypatch
     result = pc.VALIDATOR.validate(tmp_path / "s.json",
                                    search_from=(tmp_path / "a", tmp_path / "b"))
     assert result.outcome == projection_seams.VALIDATOR_UNAVAILABLE
-    assert not result.available and result.validator is None
+    assert not result.available
+    assert result.validator is None
     assert str(snapshot_mod.VALIDATOR_RELPATH) in result.unavailable_reason
     assert pc.VALIDATOR.dependency_remedy == snapshot_mod.DEPENDENCY_REMEDY

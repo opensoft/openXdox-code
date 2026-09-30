@@ -19,13 +19,19 @@ HOW EACH FALSIFIER CALLS IT. The protected set and the landings are computed in
 the falsifier's own block, as #1144 writes them. The last step, the inline
 Python that intersected them, becomes this call, from the checkout's root:
 
-    python3 scripts/protected_suites.py "$W/x-arc.txt" "$W/gen-suites.txt"      # F5.2
-    python3 scripts/protected_suites.py "$W/x-arc.txt" "$W/governed.txt"        # 12.5
+    python3 scripts/protected_suites.py --landings="$(cat "$W/x-arc.txt")" \
+        --suites="$(cat "$W/gen-suites.txt")"                                   # F5.2
+    python3 scripts/protected_suites.py --landings="$(cat "$W/x-arc.txt")" \
+        --suites="$(cat "$W/governed.txt")"                                     # 12.5
 
-where `x-arc.txt` holds the landings, one commit per line, and the second file
-the protected suites, one path per line. It exits 0 when no landing touched a
-protected suite outside an entry that holds, 1 when one did (naming each
-landing and path), and 2 when the allow-list itself breaks its rules.
+Each option carries its LIST, one item per line, and never a path to one: the
+landings, each a full commit id as `git log --format=%H` prints it, and the
+protected suites, each `tests/test_<name>.py`. (The `=` keeps a value that
+begins with a dash a value.) So the check opens no file a caller names, and it
+refuses an item of neither shape (exit 2) rather than handing it to git. The one file it reads is the allow-list, at its fixed path
+under the checkout it runs in. It exits 0 when no landing touched a protected
+suite outside an entry that holds, 1 when one did (naming each landing and
+path), and 2 when its input or the allow-list itself breaks its rules.
 
 WHEN AN ENTRY HOLDS (the file's own header states the rule, and T060 wrote it).
 For a landing L that touches a protected `suite`, an entry for that suite holds
@@ -59,6 +65,7 @@ the falsifier runs at. A CREATED file: no row in openxFactory's
 
 from __future__ import annotations
 
+import argparse
 import ast
 import re
 import subprocess
@@ -79,10 +86,13 @@ COMMON_KEYS = frozenset({"suite", "test", "landing", "edit", "ruled", "review",
 EDIT_KEYS = {"respelling": frozenset({"respelled"}),
              "admitted": frozenset({"reason"})}
 
+#: A full object id: a blob in an entry, or a landing's commit in the input.
 _BLOB = re.compile(r"[0-9a-f]{40}")
-_SUITE = re.compile(r"tests/test_[A-Za-z0-9_]+\.py")
-_LANDING = re.compile(r"opensoft/openXdox-code#[1-9][0-9]*")
-_TEST = re.compile(r"test_[A-Za-z0-9_]+")
+_COMMIT = _BLOB
+#: ASCII only: a suite, a test or a landing is never spelled outside it.
+_SUITE = re.compile(r"tests/test_\w+\.py", re.ASCII)
+_LANDING = re.compile(r"opensoft/openXdox-code#[1-9]\d*", re.ASCII)
+_TEST = re.compile(r"test_\w+", re.ASCII)
 
 
 class AllowListInvalid(ValueError):
@@ -121,8 +131,8 @@ def _whole_lines(value: Any, where: str) -> str:
     return text
 
 
-def load_allow_list(path: Path) -> list[dict]:
-    """The allow-list's entries, in landing order, once every rule holds."""
+def _document(path: Path) -> dict:
+    """The allow-list as a mapping, read with no key given twice."""
     try:
         raw = yaml.load(path.read_text(encoding="utf-8"), Loader=_UniqueKeyLoader)
     except OSError as exc:
@@ -139,38 +149,58 @@ def load_allow_list(path: Path) -> list[dict]:
         raise AllowListInvalid(f"schema_version is {version!r}, not {SCHEMA_VERSION}")
     if raw["kind"] != KIND:
         raise AllowListInvalid(f"kind is {raw['kind']!r}, not {KIND!r}")
-    entries = raw["entries"]
-    if not isinstance(entries, list):
+    if not isinstance(raw["entries"], list):
         raise AllowListInvalid("entries is not a list")
+    return raw
+
+
+def _check_keys(entry: Any, where: str) -> None:
+    """An entry is a mapping carrying exactly its kind's keys, each a text."""
+    if not isinstance(entry, dict):
+        raise AllowListInvalid(f"{where} is not a mapping")
+    edit = entry.get("edit")
+    if edit not in EDIT_KEYS:
+        raise AllowListInvalid(f"{where}: edit is {edit!r}, not one of {sorted(EDIT_KEYS)}")
+    wanted = COMMON_KEYS | EDIT_KEYS[edit]
+    if set(entry) != wanted:
+        raise AllowListInvalid(
+            f"{where}: carries {sorted(map(str, entry))}, and a {edit} entry "
+            f"carries exactly {sorted(wanted)}")
+    for key in wanted - {"old", "new"}:
+        _text(entry[key], f"{where}: {key}")
+
+
+def _check_spellings(entry: dict, where: str) -> None:
+    """The suite, test, landing and blobs are each spelled as the rules say."""
+    if not _SUITE.fullmatch(entry["suite"]):
+        raise AllowListInvalid(f"{where}: suite {entry['suite']!r} is not tests/test_<name>.py")
+    if not _TEST.fullmatch(entry["test"]):
+        raise AllowListInvalid(f"{where}: test {entry['test']!r} is not a test's name")
+    if not _LANDING.fullmatch(entry["landing"]):
+        raise AllowListInvalid(
+            f"{where}: landing {entry['landing']!r} is not opensoft/openXdox-code#<n>")
+    for key in ("before_blob", "after_blob"):
+        if not _BLOB.fullmatch(entry[key]):
+            raise AllowListInvalid(f"{where}: {key} is not a full object id")
+
+
+def _check_texts(entry: dict, where: str) -> None:
+    """`old` and `new` are whole lines, and differ."""
+    old = _whole_lines(entry["old"], f"{where}: old")
+    new = _whole_lines(entry["new"], f"{where}: new")
+    if old == new:
+        raise AllowListInvalid(f"{where}: old and new are the same text")
+
+
+def load_allow_list(path: Path) -> list[dict]:
+    """The allow-list's entries, in landing order, once every rule holds."""
+    entries = _document(path)["entries"]
     last_after: dict[str, str] = {}
     for n, entry in enumerate(entries, 1):
         where = f"entry {n}"
-        if not isinstance(entry, dict):
-            raise AllowListInvalid(f"{where} is not a mapping")
-        edit = entry.get("edit")
-        if edit not in EDIT_KEYS:
-            raise AllowListInvalid(f"{where}: edit is {edit!r}, not one of {sorted(EDIT_KEYS)}")
-        wanted = COMMON_KEYS | EDIT_KEYS[edit]
-        if set(entry) != wanted:
-            raise AllowListInvalid(
-                f"{where}: carries {sorted(map(str, entry))}, and a {edit} entry "
-                f"carries exactly {sorted(wanted)}")
-        for key in wanted - {"old", "new"}:
-            _text(entry[key], f"{where}: {key}")
-        if not _SUITE.fullmatch(entry["suite"]):
-            raise AllowListInvalid(f"{where}: suite {entry['suite']!r} is not tests/test_<name>.py")
-        if not _TEST.fullmatch(entry["test"]):
-            raise AllowListInvalid(f"{where}: test {entry['test']!r} is not a test's name")
-        if not _LANDING.fullmatch(entry["landing"]):
-            raise AllowListInvalid(
-                f"{where}: landing {entry['landing']!r} is not opensoft/openXdox-code#<n>")
-        for key in ("before_blob", "after_blob"):
-            if not _BLOB.fullmatch(entry[key]):
-                raise AllowListInvalid(f"{where}: {key} is not a full object id")
-        old = _whole_lines(entry["old"], f"{where}: old")
-        new = _whole_lines(entry["new"], f"{where}: new")
-        if old == new:
-            raise AllowListInvalid(f"{where}: old and new are the same text")
+        _check_keys(entry, where)
+        _check_spellings(entry, where)
+        _check_texts(entry, where)
         suite = entry["suite"]
         if suite in last_after and entry["before_blob"] != last_after[suite]:
             raise AllowListInvalid(
@@ -251,6 +281,21 @@ class Finding:
     why: str
 
 
+def _admitting(repo: Path, landing: str, path: str,
+               entries: list[dict]) -> tuple[int | None, list[str]]:
+    """The entry (1-based) for `path` that holds at `landing`, or None and
+    every entry's reason for not holding."""
+    reasons = []
+    for n, entry in enumerate(entries, 1):
+        if entry["suite"] != path:
+            continue
+        why = entry_holds(repo, landing, entry)
+        if why is None:
+            return n, []
+        reasons.append(f"entry {n}: {why}")
+    return None, reasons
+
+
 def check(repo: Path, landings: list[str], protected: set[str],
           entries: list[dict]) -> list[Finding]:
     """One finding per protected path each landing touched: admitted by the
@@ -261,41 +306,51 @@ def check(repo: Path, landings: list[str], protected: set[str],
                    _git(repo, "diff", "--name-only", f"{landing}^1", landing).splitlines()
                    if line.strip()}
         for path in sorted(touched & protected):
-            reasons = []
-            admitted = None
-            for n, entry in enumerate(entries, 1):
-                if entry["suite"] != path:
-                    continue
-                why = entry_holds(repo, landing, entry)
-                if why is None:
-                    admitted = n
-                    break
-                reasons.append(f"entry {n}: {why}")
+            admitted, reasons = _admitting(repo, landing, path, entries)
             findings.append(Finding(
                 landing, path, admitted,
                 "" if admitted else ("; ".join(reasons) or "no entry names this suite")))
     return findings
 
 
-def _lines(path: str) -> list[str]:
-    return [line.strip() for line in Path(path).read_text(encoding="utf-8").splitlines()
-            if line.strip()]
+class InputInvalid(ValueError):
+    """An item of a list the caller passed is neither a landing nor a suite."""
+
+
+def _items(text: str, shape: re.Pattern[str], what: str) -> list[str]:
+    """The non-empty lines of `text`, each of `shape`, in order."""
+    items = [line.strip() for line in text.splitlines() if line.strip()]
+    for item in items:
+        if not shape.fullmatch(item):
+            raise InputInvalid(f"{item!r} is not {what}")
+    return items
 
 
 def main(argv: list[str] | None = None) -> int:
-    argv = sys.argv[1:] if argv is None else argv
-    if len(argv) != 2:
-        print("usage: protected_suites.py <landings file> <protected suites file>",
-              file=sys.stderr)
-        return 2
+    parser = argparse.ArgumentParser(
+        description="The unedited-by-the-arc check, with the reviewed allow-list subtracted.")
+    parser.add_argument("--landings", required=True,
+                        help="the arc's landings, one full commit id per line")
+    parser.add_argument("--suites", required=True,
+                        help="the protected suites, one tests/test_<name>.py per line")
+    try:
+        args = parser.parse_args(sys.argv[1:] if argv is None else argv)
+    except SystemExit as exc:
+        return 2 if exc.code else 0
     repo = Path.cwd()
+    try:
+        landings = _items(args.landings, _COMMIT, "a full commit id")
+        suites = set(_items(args.suites, _SUITE, "a tests/test_<name>.py path"))
+    except InputInvalid as exc:
+        print(f"FAIL: {exc}, so nothing is checked", file=sys.stderr)
+        return 2
     try:
         entries = load_allow_list(repo / ALLOW_LIST)
     except AllowListInvalid as exc:
         print(f"FAIL: {ALLOW_LIST} breaks its own rules, so nothing is subtracted: {exc}",
               file=sys.stderr)
         return 2
-    findings = check(repo, _lines(argv[0]), set(_lines(argv[1])), entries)
+    findings = check(repo, landings, suites, entries)
     refused = []
     for f in findings:
         if f.admitted_by is not None:

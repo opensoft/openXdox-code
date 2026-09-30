@@ -114,7 +114,8 @@ def _check(repo: Repo, entries: list[dict]) -> list[ps.Finding]:
 def test_an_unentered_edit_to_a_protected_suite_is_refused(repo) -> None:
     repo.commit({SUITE: AFTER}, f"edit\n\n{ARC}")
     [finding] = _check(repo, [])
-    assert finding.admitted_by is None and finding.path == SUITE
+    assert finding.admitted_by is None
+    assert finding.path == SUITE
     assert "no entry names this suite" in finding.why
 
 
@@ -181,24 +182,51 @@ def test_two_landings_admitted_by_two_chained_entries(repo) -> None:
     assert sorted(f.admitted_by for f in findings) == [1, 2]
 
 
-def test_the_command_exits_one_on_a_refusal_and_zero_when_every_edit_holds(repo, tmp_path,
+def _command(repo: Repo, *, landings: str | None = None, suites: str = SUITE + "\n") -> list[str]:
+    """The falsifier's call: each option carries its list, one item per line."""
+    if landings is None:
+        landings = repo.git("log", "--first-parent", "--format=%H", f"--grep=^{ARC}$",
+                            "HEAD") + "\n"
+    return [f"--landings={landings}", f"--suites={suites}"]
+
+
+def test_the_command_exits_one_on_a_refusal_and_zero_when_every_edit_holds(repo,
                                                                            monkeypatch) -> None:
     repo.commit({SUITE: AFTER}, f"edit\n\n{ARC}")
-    landings = tmp_path / "x-arc.txt"
-    landings.write_text(repo.git("log", "--first-parent", "--format=%H",
-                                 f"--grep=^{ARC}$", "HEAD") + "\n", encoding="utf-8")
-    suites = tmp_path / "suites.txt"
-    suites.write_text(SUITE + "\n", encoding="utf-8")
     allow = repo.root / ps.ALLOW_LIST
     monkeypatch.chdir(repo.root)
     allow.write_text(yaml.safe_dump({"schema_version": 1, "kind": ps.KIND, "entries": []}),
                      encoding="utf-8")
-    assert ps.main([str(landings), str(suites)]) == 1
+    assert ps.main(_command(repo)) == 1
     allow.write_text(yaml.safe_dump({"schema_version": 1, "kind": ps.KIND,
                                      "entries": [_entry(repo)]}), encoding="utf-8")
-    assert ps.main([str(landings), str(suites)]) == 0
+    assert ps.main(_command(repo)) == 0
     allow.write_text("schema_version: 1\nschema_version: 1\n", encoding="utf-8")
-    assert ps.main([str(landings), str(suites)]) == 2
+    assert ps.main(_command(repo)) == 2
+
+
+@pytest.mark.parametrize("landings, suites", [
+    ("HEAD\n", SUITE + "\n"),                        # a revision, not a commit id
+    ("--output=/tmp/x\n", SUITE + "\n"),             # an option git would take
+    (None, "../outside.py\n"),                       # not a tests/test_<name>.py
+    (None, "tests/test_é.py\n"),                     # outside ASCII
+], ids=["revision", "option", "outside-path", "non-ascii"])
+def test_an_item_of_neither_shape_is_refused_before_anything_is_checked(
+        repo, monkeypatch, capsys, landings, suites) -> None:
+    """The lists are values, never paths, and each item is held to its shape
+    before any of it reaches git."""
+    repo.commit({SUITE: AFTER}, f"edit\n\n{ARC}")
+    monkeypatch.chdir(repo.root)
+    (repo.root / ps.ALLOW_LIST).write_text(yaml.safe_dump(
+        {"schema_version": 1, "kind": ps.KIND, "entries": [_entry(repo)]}), encoding="utf-8")
+    command = _command(repo, landings=landings, suites=suites)
+    assert ps.main(command) == 2
+    assert "so nothing is checked" in capsys.readouterr().err
+
+
+def test_a_missing_option_is_a_usage_refusal(repo, monkeypatch) -> None:
+    monkeypatch.chdir(repo.root)
+    assert ps.main([f"--suites={SUITE}"]) == 2
 
 
 # --------------------------------------------------------------------------
@@ -240,8 +268,9 @@ def _valid_entry(**changes) -> dict:
     ("schema_version: 1\nschema_version: 1\n", "given twice"),
 ], ids=lambda value: value if isinstance(value, str) else None)
 def test_a_list_that_breaks_its_own_rules_subtracts_nothing(tmp_path, broken, why) -> None:
+    written = _write(tmp_path, broken)
     with pytest.raises(ps.AllowListInvalid, match=why):
-        ps.load_allow_list(_write(tmp_path, broken))
+        ps.load_allow_list(written)
 
 
 def test_a_respelling_names_what_it_respelled(tmp_path) -> None:

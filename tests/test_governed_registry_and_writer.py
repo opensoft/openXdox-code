@@ -99,7 +99,8 @@ def test_after_the_active_entry_is_dropped_the_next_one_becomes_active() -> None
     registry.register(_entry("alpha"))
     registry.drop("alpha")
     registry.register(_entry("beta"))
-    assert registry.active is not None and registry.active.repository == "beta"
+    assert registry.active is not None
+    assert registry.active.repository == "beta"
 
 
 def test_dropping_another_entry_keeps_the_active_one() -> None:
@@ -122,9 +123,9 @@ def _boundary(root: Path, name: str = "snapshot.json") -> OutputBoundary:
                          ids=["nan", "infinity", "minus-infinity"])
 def test_a_value_json_cannot_carry_is_refused_and_nothing_is_written(tmp_path, value) -> None:
     target = tmp_path / "snapshot.json"
+    boundary = _boundary(tmp_path)
     with pytest.raises(snapshot_mod.SnapshotNotWritable):
-        snapshot_mod.write_snapshot({"kind": "k", "score": value}, target,
-                                    _boundary(tmp_path))
+        snapshot_mod.write_snapshot({"kind": "k", "score": value}, target, boundary)
     assert list(tmp_path.iterdir()) == []
 
 
@@ -156,7 +157,8 @@ def test_the_write_replaces_the_target_in_one_move(tmp_path, monkeypatch) -> Non
     written = snapshot_mod.write_snapshot({"kind": "k"}, target, _boundary(tmp_path))
     assert written == target.resolve()
     assert json.loads(target.read_text(encoding="utf-8")) == {"kind": "k"}
-    assert len(moves) == 1 and moves[0].startswith(".snapshot.json.")
+    assert len(moves) == 1
+    assert moves[0].startswith(".snapshot.json.")
     assert sorted(p.name for p in tmp_path.iterdir()) == ["snapshot.json"]
 
 
@@ -168,8 +170,9 @@ def test_a_failed_move_leaves_the_old_snapshot_and_no_sibling(tmp_path, monkeypa
         raise OSError("the move failed")
 
     monkeypatch.setattr(os, "replace", refuse)
+    boundary = _boundary(tmp_path)
     with pytest.raises(OSError, match="the move failed"):
-        snapshot_mod.write_snapshot({"kind": "k"}, target, _boundary(tmp_path))
+        snapshot_mod.write_snapshot({"kind": "k"}, target, boundary)
     assert target.read_text(encoding="utf-8") == "old\n"
     assert sorted(p.name for p in tmp_path.iterdir()) == ["snapshot.json"]
 
@@ -185,9 +188,9 @@ def test_a_rewrite_keeps_the_snapshots_permissions(tmp_path) -> None:
 def test_the_boundary_still_decides_the_destination(tmp_path) -> None:
     from opendox.boundary import BoundaryViolation
 
+    boundary = _boundary(tmp_path)
     with pytest.raises(BoundaryViolation):
-        snapshot_mod.write_snapshot({"kind": "k"}, tmp_path / "elsewhere.json",
-                                    _boundary(tmp_path))
+        snapshot_mod.write_snapshot({"kind": "k"}, tmp_path / "elsewhere.json", boundary)
     assert list(tmp_path.iterdir()) == []
 
 
