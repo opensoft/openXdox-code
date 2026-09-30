@@ -367,3 +367,40 @@ def test_the_validators_reserved_sets_agree_with_the_runtimes(vidc):
     from opendox import doxbench_turns as turns
     assert set(vidc.V2_RESERVED_DOCUMENT_PATHS) == set(turns.RESERVED_BUFFER_KEYS)
     assert set(vidc.V1_RESERVED_DOCUMENT_PATHS) == set(turns.V1_RESERVED_BUFFER_KEYS)
+
+
+def test_every_schema_the_consumer_validates_is_on_disk():
+    """#1144 7.3's second named test, as T007's batch I reads it (plan 034 T061;
+    RULED R1Q27 (a), `opensoft/openxFactory#656` comment `5851950767`): every
+    schema THIS INSTALL validates is on disk, its own three always, and another
+    kind's only where the running tree supplies it.
+
+    THE VALIDATOR IS THE INSTALLED DISTRIBUTION'S, never this module's own
+    `SCRIPT`, whose `ROOT` is the carve's `parents[2]`, above the checkout
+    (V2-10): it is the one `openxdox.snapshot.find_validator` answers, and its
+    sources are the ones it reports (`schema_sources`). In a lone install its
+    tree carries no `contracts/`, so the three come from the distribution's
+    packaged copies, each held to `copies.yaml`'s digest. This module's
+    fixtures are not used: they read openxFactory's tree, which is why the file
+    is declared under `openxfactory-contracts`, and F7.1 runs this case by node
+    id."""
+    from openxdox import contracts, snapshot
+
+    validator = snapshot.find_validator()
+    assert validator is not None, "this install has no validator of its own"
+    spec = importlib.util.spec_from_file_location("_consumer_validator", validator)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    supplied = {name: path for name, (path, _channel) in module.schema_sources().items()
+                if path is not None}
+
+    own = {contracts.record().copy(copy_id).filename for copy_id in contracts.COPY_IDS}
+    assert own == set(module.OWN_KIND_SCHEMAS)
+    assert own <= set(supplied), f"its own three are not all supplied: {sorted(own - set(supplied))}"
+    for kind, name in module.KIND_TO_SCHEMA.items():
+        if name in supplied:
+            assert supplied[name].is_file(), (kind, supplied[name])
+    if not (module.ROOT / "contracts" / "schemas").is_dir():
+        for copy_id in contracts.COPY_IDS:
+            name = contracts.record().copy(copy_id).filename
+            assert supplied[name] == contracts.verified_path(copy_id), name

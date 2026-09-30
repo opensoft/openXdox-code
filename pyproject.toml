@@ -94,18 +94,38 @@ requires-python = ">=3.12"
 # reasoning; this slice is the owed fix — the allowlist entry comes back out
 # in the same act. `referencing` and `rfc3339-validator` (named alongside
 # jsonschema in this leg's own `DEPENDENCY_REMEDY` string, `src/openxdox/
-# snapshot.py:105`) are NOT added here: neither is imported anywhere under
+# snapshot.py:105`) were NOT added then: neither was imported anywhere under
 # `src/` — they are jsonschema's own optional format-checking companions, and
-# adding an undeclared dependency is not what any reach in this tree calls for.
+# adding an undeclared dependency was not what any reach in the tree called for.
+# Plan 034 T061 adds both, for the reason the paragraph below gives.
 #
 # LOWER BOUND: `>=4.18`, this leg's own already-stated floor
 # (`DEPENDENCY_REMEDY` at `src/openxdox/snapshot.py:105`, unchanged by this
 # PR) — and not an arbitrary choice: `Draft202012Validator`, the name
 # `gate_console.py:563` imports, was added in jsonschema 4.18.0.
+#
+# `referencing` and `rfc3339-validator`, plan 034 T061 (#1144 7.3; R1Q27 (a):
+# the consumer's validator validates its own three kinds "from its installed
+# distribution, wherever it runs"). The premise above changed: the validator
+# now ships INSIDE the package, as `openxdox/contracts/validate-ideation-
+# dashboard-contracts.py`, so an install runs it. It imports `referencing` at
+# module level (`Registry`, `Resource`, `referencing.jsonschema.DRAFT202012`),
+# and it refuses to run without `rfc3339-validator`: jsonschema registers its
+# `date-time` checker only when that package is importable, and the validator
+# will not validate with `date-time` unenforced. Left out, a plain install
+# would carry a validator it cannot run, and every snapshot it generated would
+# read validator-unavailable. `tests/test_dependency_direction.py` holds the
+# packaged validator's imports to this list.
+# LOWER BOUNDS: `referencing>=0.28.4` is the floor `jsonschema>=4.18` itself
+# requires, so declaring it adds nothing an install of jsonschema would not
+# already bring. `rfc3339-validator>=0.1.4` is the floor the `test` extra
+# stated for it until now (openxFactory's validator-input lock pins 0.1.4).
 dependencies = [
     "opendox @ git+https://github.com/opensoft/openDox-code@814516b778b04d4d5022e486c657774b61c86f15",
     "PyYAML>=6.0",
     "jsonschema>=4.18",
+    "referencing>=0.28.4",
+    "rfc3339-validator>=0.1.4",
 ]
 
 [project.optional-dependencies]
@@ -123,15 +143,16 @@ dependencies = [
 # over the whole suite at `e28930bf`, 23 red results asked for exactly this
 # package (21 in `tests/test_doxbench_blank_reason.py`, 2 in
 # `tests/test_snapshot.py`), and installing it cleared the 21.
-# It is a TEST dependency and stays out of `dependencies` for the reason the
-# jsonschema paragraph above gives: nothing under `src/` imports it, and the
-# validator script lands at the repository root, outside the package.
+# It was a TEST dependency while the validator script sat at the repository
+# root, outside the package. Since plan 034 T061 the package ships the
+# validator, so it is a runtime dependency (the paragraph above `dependencies`
+# gives the reason), and this extra no longer names it: `.[test]` installs it
+# all the same.
 # LOWER BOUND: `>=0.1.4`, derived the way PyYAML's was — what openxFactory
 # itself runs. Its validator-input lock pins `rfc3339-validator==0.1.4`
 # (`requirements/hermes-runtime-contracts.in`, which records the same reason).
 test = [
     "pytest>=8,<9",
-    "rfc3339-validator>=0.1.4",
 ]
 
 [build-system]
@@ -166,6 +187,20 @@ where = ["src"]
 # in an INSTALLED package rather than only in a source checkout.
 [tool.setuptools.package-data]
 openxdox = ["web/views/*.js", "web/views/*.css"]
+# THE CONSUMER VALIDATOR AND ITS OWN THREE SCHEMAS, SHIPPED AS PACKAGE DATA (plan
+# 034 T061; #1144 7.3, RULED R1Q14 (a): "openXdox's validator and its three
+# schemas (7.1's openXdox-spec three) are located through the INSTALLED openXdox
+# distribution, and no parent walk remains"). A wheel ships no `scripts/`, so an
+# install finds its validator here (`openxdox.snapshot.find_validator`), and that
+# validator finds its three schemas beside it, each held to the record's digest.
+# Without this line a wheel ships the package's two `.py` files and neither the
+# record nor a copy (measured: a wheel built from this tree with the line
+# removed), so the installed validator refuses each of its own three kinds by
+# name. The three patterns name the record, the copies and the validator and
+# nothing else; `build_py` would ship the validator as a `.py` file anyway, and
+# it is named here so this one line lists what an install needs to validate.
+# `tests/test_packaged_validator.py` holds this line to the files it ships.
+"openxdox.contracts" = ["copies.yaml", "schemas/*.schema.yaml", "validate-ideation-dashboard-contracts.py"]
 
 [tool.pytest.ini_options]
 # The ROOTDIR ANCHOR. With no pytest ini table anywhere, pytest infers a

@@ -160,15 +160,42 @@ def _modules(base: Path) -> list[Path]:
     return sorted(p for p in base.rglob("*.py") if ".git" not in p.parts)
 
 
-def _src_census() -> list[tuple[str, int, str, bool]]:
-    """`(relpath, lineno, root_module, runs_at_import_time)` for all of `src/`."""
+#: The `.py` files under `src/` that are NOT modules of the package, each with
+#: why it is there. An `import` statement cannot name a file whose stem is not an
+#: identifier, so importing the package never runs one, and the import-time
+#: census below leaves them out. They are held instead by
+#: `test_a_script_shipped_under_src_reaches_only_declared_dependencies`, and a
+#: new one fails `test_every_script_under_src_is_named` until it is named here.
+SCRIPTS_UNDER_SRC = {
+    # plan 034 T061 (#1144 7.3): the consumer validator, shipped as package data
+    # so an install runs its own. Run as a script, never imported by name.
+    "src/openxdox/contracts/validate-ideation-dashboard-contracts.py",
+}
+
+
+def _is_module(path: Path) -> bool:
+    return path.stem.isidentifier()
+
+
+def _census_rows(paths: list[Path]) -> list[tuple[str, int, str, bool]]:
     rows: list[tuple[str, int, str, bool]] = []
-    for path in _modules(SRC):
+    for path in paths:
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         rel = path.relative_to(ROOT).as_posix()
         for node, root, at_import_time in _census(tree):
             rows.append((rel, node.lineno, root, at_import_time))
     return rows
+
+
+def _src_census() -> list[tuple[str, int, str, bool]]:
+    """`(relpath, lineno, root_module, runs_at_import_time)` for every MODULE
+    under `src/`."""
+    return _census_rows([p for p in _modules(SRC) if _is_module(p)])
+
+
+def _script_census() -> list[tuple[str, int, str, bool]]:
+    """The same rows for the `.py` files under `src/` that are not modules."""
+    return _census_rows([p for p in _modules(SRC) if not _is_module(p)])
 
 
 # --------------------------------------------------------------------------
@@ -210,6 +237,34 @@ def test_no_module_under_src_reaches_its_consumer_at_import_time() -> None:
         "dependencies, and — under § 4.1's own second clause — `doc_health`. "
         "A new name here is a new dependency or a new direction defect; "
         "declare it in pyproject.toml and add it above, or reach it late")
+
+
+def test_every_script_under_src_is_named() -> None:
+    """A `.py` file the import-time census leaves out is one this file names,
+    so a module cannot leave the census by being given a hyphenated name."""
+    scripts = {p.relative_to(ROOT).as_posix() for p in _modules(SRC) if not _is_module(p)}
+    assert scripts == SCRIPTS_UNDER_SRC, (
+        f"non-module .py files under src/: {sorted(scripts)}; named: "
+        f"{sorted(SCRIPTS_UNDER_SRC)}. Name a new one in SCRIPTS_UNDER_SRC with "
+        "its reason, or give it an importable name so the census reads it")
+
+
+def test_a_script_shipped_under_src_reaches_only_declared_dependencies() -> None:
+    """A script the package SHIPS runs wherever the package is installed, so
+    every name it imports, at any depth, is the standard library, this leg's
+    own, or a declared runtime dependency (`pyproject.toml`). Nothing is
+    allowed on `IMPORT_TIME_ALLOWED`'s strength alone: `doc_health` does not
+    resolve in an install."""
+    rows = _script_census()
+    assert rows, "the census read no script, so this check would pass vacuously"
+    offenders = sorted({
+        f"{rel}:{line} -> {root}" for rel, line, root, _ in rows
+        if root not in OWN and root not in DEFERRED_ALLOWED and root not in _STDLIB
+    })
+    assert offenders == [], (
+        f"a script shipped under src/ reaches undeclared name(s): {offenders}. "
+        "Declare each in pyproject.toml's `dependencies`, since an install "
+        "runs the script")
 
 
 def test_every_deferred_cross_package_reach_out_of_src_is_known() -> None:
