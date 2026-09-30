@@ -105,9 +105,11 @@ def write_snapshot(snapshot: dict[str, Any], path: Path | str, boundary) -> Path
 
     THE BOUNDARY STILL DECIDES THE DESTINATION. `permit_output` is the check
     `write_output` makes, root and allowlist, with its refusal and its ledger,
-    and it runs first, so a refused target leaves nothing behind. The
-    rendering runs before it, so a snapshot JSON cannot carry is refused with
-    nothing written either. The sibling is created exclusively beside the
+    and it runs before anything is written, so a refused target leaves
+    nothing behind. THE RENDERING RUNS BEFORE IT: a snapshot JSON cannot carry
+    is refused first, as `SnapshotNotWritable`, with nothing written and
+    nothing asked of the boundary, so a write that is wrong on both counts is
+    refused for its content. The sibling is created exclusively beside the
     permitted target, with the mode an ordinary write would give it, or with
     the target's own permission bits where the target exists, so a refresh
     never widens a restricted snapshot. Its name is a dot-file with no
