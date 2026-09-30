@@ -185,7 +185,13 @@ def test_the_harness_exit_code_means_no_verdict_was_reached(tmp_path):
     assert "harness" in result.unavailable_reason
 
 
-def test_a_missing_validator_is_unavailable_not_a_verdict(tmp_path):
+def test_a_missing_validator_is_unavailable_not_a_verdict(tmp_path, monkeypatch):
+    # Since plan 034 T061 (#1144 7.3; T007's batch K, on Brett's ruling at
+    # openxFactory#656 comment 5916000030) the start never confines the lookup,
+    # so "missing" is made where the arc moved it: a distribution that carries no
+    # validator of its own, from no source tree and with no packaged copy.
+    monkeypatch.setattr(snapshot, "product_root", lambda: None)
+    monkeypatch.setattr(snapshot, "_packaged_validator", lambda: None)
     result = snapshot.validate_snapshot(_written(tmp_path),
                                         search_from=tmp_path / "out")
     assert result.outcome == snapshot.VALIDATOR_UNAVAILABLE
