@@ -14,7 +14,9 @@ commit carrying the `Arc:` line. Each case holds one rule of the check:
   entry's;
 * a commit without the `Arc:` line is not a landing, whatever it touches;
 * entries for one suite chain, and a file that breaks its own rules refuses
-  the whole check rather than subtracting less.
+  the whole check rather than subtracting less;
+* an ADDED test (plan 034 T061) is admitted only where the edit adds it and
+  nothing else.
 
 The last cases hold this repository's own allow-list to those rules. Which
 landing each entry holds at is the falsifier's to show, at the head it runs
@@ -248,6 +250,51 @@ def test_the_landings_are_taken_oldest_first_in_any_order(repo) -> None:
                     ps.check(repo.root, order, {SUITE}, [_entry(repo)])}
         assert findings[first].admitted_by == 1
         assert findings[replay].admitted_by is None
+
+
+THIRD = """
+
+def test_third() -> None:
+    \"\"\"The third, added.\"\"\"
+    assert 3 == 3
+"""
+
+
+def test_an_added_test_is_admitted_when_the_edit_adds_it_and_nothing_else(repo) -> None:
+    """Plan 034 T061 (batch F admits an added test): the named test has no body
+    before the landing, so `new` is `old` and then the test, and nothing else."""
+    after = BEFORE + THIRD
+    repo.commit({SUITE: after}, f"add\n\n{ARC}")
+    [finding] = _check(repo, [_entry(repo, after=after, test="test_third",
+                                     old=OLD, new=OLD + THIRD)])
+    assert finding.admitted_by == 1
+
+
+def test_an_added_test_whose_edit_also_changes_its_neighbour_is_refused(repo) -> None:
+    changed = NEW + THIRD
+    after = BEFORE.replace(OLD, changed)
+    repo.commit({SUITE: after}, f"add\n\n{ARC}")
+    [finding] = _check(repo, [_entry(repo, after=after, test="test_third",
+                                     old=OLD, new=changed)])
+    assert finding.admitted_by is None
+    assert "does not begin with its old text" in finding.why
+
+
+def test_an_added_test_beside_other_added_code_is_refused(repo) -> None:
+    helper = "\n\nHELPER = 1\n"
+    after = BEFORE + helper + THIRD
+    repo.commit({SUITE: after}, f"add\n\n{ARC}")
+    [finding] = _check(repo, [_entry(repo, after=after, test="test_third",
+                                     old=OLD, new=OLD + helper + THIRD)])
+    assert finding.admitted_by is None
+    assert "not test_third's own" in finding.why
+
+
+def test_an_entry_naming_a_test_that_exists_nowhere_is_refused(repo) -> None:
+    repo.commit({SUITE: AFTER}, f"edit\n\n{ARC}")
+    [finding] = _check(repo, [_entry(repo, test="test_nowhere")])
+    assert finding.admitted_by is None
+    assert "not one module-level test" in finding.why
 
 
 def test_a_commit_without_the_trailer_is_not_a_landing(repo) -> None:

@@ -46,6 +46,11 @@ at L when all of these are true:
 * the replaced text lies inside the one test the entry names, in the before
   text, and its replacement lies inside that test in the after text. So an
   entry cannot admit an edit to any other test of the suite.
+* AN ADDED TEST (plan 034 T061; T007's batch F admits one). Where the named
+  test does not exist before the landing, `new` is `old` followed by that test's
+  whole definition and blank lines, and nothing else, so the edit adds the one
+  test and changes no line it does not add. `old` is then the text the test is
+  added after, and may lie in a neighbouring test, which it leaves as it was.
 
 A landing that touches a protected suite is admitted for that suite only if one
 entry holds at it. Every other protected path it touches is refused.
@@ -264,6 +269,29 @@ def _inside_the_test(text: str, start: int, piece: str, test: str) -> bool:
     return span[0] <= first_line and last_line <= span[1]
 
 
+def _only_the_added_test(after_text: str, at: int, old: str, new: str, test: str) -> str | None:
+    """None when `new` is `old` followed by the named test's whole definition
+    and blank lines, and nothing else; else why not. The test is found in the
+    text at the landing, and must lie wholly inside what the edit appended."""
+    span = _test_lines(after_text, test)
+    if span is None:
+        return f"{test} is not one module-level test before the landing or at it"
+    if not new.startswith(old):
+        return (f"{test} is added by this landing, and the entry's new text does not "
+                "begin with its old text, so the edit changes more than it adds")
+    first = after_text.count("\n", 0, at + len(old)) + 1
+    tail = new[len(old):].splitlines()
+    last = first + len(tail) - 1
+    if not (first <= span[0] and span[1] <= last):
+        return f"{test} does not lie wholly inside the text the entry appends"
+    outside = [line for number, line in enumerate(tail, first)
+               if not span[0] <= number <= span[1] and line.strip()]
+    if outside:
+        return (f"the entry appends {len(outside)} line(s) that are not {test}'s own: "
+                f"{outside[0].strip()[:60]!r}")
+    return None
+
+
 def entry_holds(repo: Path, landing: str, entry: dict) -> str | None:
     """None when `entry` holds at `landing`, else why it does not."""
     suite = entry["suite"]
@@ -283,6 +311,10 @@ def entry_holds(repo: Path, landing: str, entry: dict) -> str | None:
         return "the entry's old text does not start a line before the landing, so it is not whole lines"
     if before_text.replace(old, new, 1) != after_text:
         return "replacing the entry's old text with its new text does not give the suite at the landing"
+    if _test_lines(before_text, entry["test"]) is None:
+        # An ADDED test (plan 034 T061; T007 batch F admits one): it has no body
+        # before the landing to lie inside, so the edit must add it and only it.
+        return _only_the_added_test(after_text, at, old, new, entry["test"])
     if not _inside_the_test(before_text, at, old, entry["test"]):
         return f"the entry's old text is not inside {entry['test']} before the landing"
     if not _inside_the_test(after_text, at, new, entry["test"]):

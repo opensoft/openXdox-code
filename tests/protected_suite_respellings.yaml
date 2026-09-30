@@ -68,6 +68,10 @@
 #     fourth, from `test`: `old` lies inside the named test in the
 #     `before_blob` text, and `new` inside it in the `after_blob` text, so an
 #     entry cannot admit an edit to another test of the suite.
+#   * AN ADDED TEST (plan 034 T061; batch F admits one). Where `test` does not
+#     exist in the `before_blob` text, the fourth condition reads instead: `new`
+#     is `old` followed by that test's whole definition and blank lines, and
+#     nothing else. `old` is then the text the test is added after.
 #   * Entries for one suite CHAIN: each one's `before_blob` is the previous
 #     one's `after_blob`, because each edit is made to the suite the last one
 #     left.
