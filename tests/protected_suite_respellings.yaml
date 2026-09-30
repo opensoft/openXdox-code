@@ -24,7 +24,11 @@
 #     `tests/test_snapshot.py` and `tests/test_snapshot_validator_home.py`.
 #   * The two edits 5.3a's `values` block requires (R1Q26 (a), `5851950767`,
 #     batch I), in `tests/test_gate_loop_views.py`.
-# The last two kinds are each entered with a reason, and neither is entered as
+#   * The ten cases 7.3's lookup rewords (Brett's ruling at `5916000030`, batch
+#     K), nine in `tests/test_snapshot_validation_launch.py` and one in
+#     `tests/test_snapshot.py`: each one's walk premise becomes 7.3's answer,
+#     and its assertions stay.
+# The last three kinds are each entered with a reason, and none is entered as
 # a respelling.
 #
 # WHO WRITES IT. The task that makes the first admitted edit creates it, in its
@@ -75,6 +79,14 @@
 #   * Entries for one suite CHAIN: each one's `before_blob` is the previous
 #     one's `after_blob`, because each edit is made to the suite the last one
 #     left.
+#   * SEVERAL EDITS IN ONE LANDING (plan 034 T061; batch K). A landing that
+#     edits one suite in several tests enters each edit as its own entry, in the
+#     order they apply, all naming that landing. The first one's `before_blob`
+#     is the suite before the landing and the last one's `after_blob` the suite
+#     at it. Each one between records, as its `after_blob`, the blob id of the
+#     text its edit leaves (`git hash-object`; no commit need hold it). Each
+#     holds on its own texts by the conditions above, so the landing's diff for
+#     the suite is exactly their texts, each inside its own test.
 #   * No entry weakens an assertion. The pull request that adds an entry is
 #     reviewed on exactly that basis (batch C).
 
