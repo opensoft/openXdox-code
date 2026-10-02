@@ -420,3 +420,73 @@ if _openxfactory_corpus is not None:
     from opendox import corpus_adapter as _corpus_adapter  # noqa: E402
 
     _corpus_adapter.register_home(_openxfactory_corpus.home_corpus)
+
+
+# ---------------------------------------------------------------------------
+# THE LAUNCH SUITE'S INSTALL (plan 034 T086; the holder's ruling on T086's
+# question Q4 (a), 2026-10-02).
+#
+# From openDox-code's T070 an install is HOSTED unless local is selected, and a
+# hosted install with no identity broker refuses. From T072 a local
+# `generate-and-open` starts its bundled PostgreSQL before it serves, even
+# with `--no-serve`, and the database arrives only with the `local` extra,
+# which this leg does not install. `tests/test_snapshot_validation_launch.py`
+# drives that verb to prove where the snapshot's validator comes from, which
+# neither the install mode nor the database decides. So for that suite alone
+# this selects the local install, scrubs every runtime setting the shell may
+# carry (a broker setting beside the local mode is refused by design), and
+# stands the bundled server in, as openDox-code's own entry-point suites do
+# (its `tests/test_doxbench_entrypoint.py`). The suite is one of F5.2's
+# protected suites, and its premise lives here so that none of its bytes
+# changes.
+#
+# TWO SHAPES OF PINNED openDox, and only two. Before T070 and T072 the leg has
+# no install mode and no bundle (`opendox.cli` carries no `bundle_mod`), and
+# this changes nothing. From them on it carries both. A leg carrying one and
+# not the other is between those landings, and is refused.
+# ---------------------------------------------------------------------------
+
+_LAUNCH_SUITE = "test_snapshot_validation_launch.py"
+
+
+@_pytest.fixture(autouse=True)
+def _the_launch_suite_runs_a_local_install(request, monkeypatch):
+    if request.node.path.name != _LAUNCH_SUITE:
+        yield
+        return
+    from opendox import cli as _cli
+    from opendox.runtime import config as _config
+
+    has_bundle = hasattr(_cli, "bundle_mod")
+    has_mode = hasattr(_config, "INSTALL_MODE_LOCAL")
+    assert has_bundle == has_mode, (
+        f"the pinned openDox carries {'a bundle' if has_bundle else 'no bundle'} "
+        f"and {'an install mode' if has_mode else 'no install mode'}: T070 and "
+        "T072 arrive together at every pin this leg takes, so this is neither "
+        "shape the launch suite's premise knows")
+    if not has_bundle:
+        yield
+        return
+    for name in _config.SETTING_NAMES:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv(_config.PREFIX + "INSTALL_MODE", _config.INSTALL_MODE_LOCAL)
+
+    class _StandInBundle:
+        """The bundled PostgreSQL, stood in: the launch reads nothing from it."""
+
+        applied: list = []
+
+        def __init__(self, settings):
+            assert settings.install_mode == _config.INSTALL_MODE_LOCAL
+
+        def start(self):
+            return self
+
+        def stop(self):
+            pass
+
+        def report(self):
+            return {"data_dir": None, "socket_dir": "(stood in)", "pid": None}
+
+    monkeypatch.setattr(_cli.bundle_mod, "BundledServer", _StandInBundle)
+    yield
