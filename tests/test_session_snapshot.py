@@ -862,7 +862,11 @@ def test_the_hosted_session_arrival_path_is_recorded_and_not_built():
     assert "apply_lane" not in src
     # every route that accepts a ref asks the one predicate
     assert src.count("hosted_ref_refused(") >= 4   # the definition + 3 call sites
-    for route in ("_serve_snapshot", "_serve_source", "_handle_refresh_action"):
+    # THIS LEG'S ROUTES (plan 034 T086; openxFactory#656 comment 5962785556,
+    # item 1). `_handle_refresh_action` is openxFactory's lane column, which
+    # never arrived here (`SERVE_SURFACE_NOT_AT_THIS_LEG`), so its check that
+    # it asks the predicate moves with it to openxFactory (plan 034 T094).
+    for route in ("_serve_snapshot", "_serve_source"):
         body = src.split(f"def {route}(", 1)[1].split("\n    def ", 1)[0]
         assert "hosted_ref_refused(" in body, f"{route} does not ask the predicate"
 
