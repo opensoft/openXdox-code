@@ -1148,7 +1148,12 @@ def test_serve_hands_the_route_its_registry_and_repository():
     rather than that it merely could."""
     import inspect
 
-    source = inspect.getsource(serve_mod.DashboardHandler._handle_gate_action)
+    # THE COLUMN'S OWN DOOR (plan 034 T086). From T084 the gate column is no
+    # base of openDox's core handler: openXdox contributes it through the
+    # handler-contribution facet (R1Q1 (a)), so its method is read where it lives.
+    from openxdox.serve_gate import GateRoutes
+
+    source = inspect.getsource(GateRoutes._handle_gate_action)
     assert "session_registry=self._session_registry()" in source
     assert "repository=self._session_repository()" in source
     assert "checkout_root=Path(self.checkout_root)" in source   # unchanged
