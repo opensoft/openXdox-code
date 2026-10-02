@@ -665,6 +665,11 @@ def test_a_session_key_is_validated_against_the_roster_before_url_composition(
     roster here is the real serving index, session row included."""
     registry, _ = _registry_with_main(scratch_repo, tmp_path)
     _create(scratch_repo, registry)
+    # THE MODEL'S SIBLING TRAVELS WITH IT (plan 034 T086; openxFactory#656
+    # comment 5962785556, item 1). Since openDox-code#21 the model imports
+    # `./display.js`, which imports nothing, so the probe's directory carries
+    # both files: the model's whole import closure.
+    shutil.copy(MODEL_JS.parent / "display.js", tmp_path / "display.js")
 
     r = _run_model(registry.index_document(), tmp_path)
 

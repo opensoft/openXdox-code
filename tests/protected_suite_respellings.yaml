@@ -892,3 +892,48 @@ entries:
           stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
           monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
           monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: stub)
+  - suite: tests/test_session_snapshot.py
+    test: test_a_session_key_is_validated_against_the_roster_before_url_composition
+    landing: opensoft/openXdox-code#37
+    edit: admitted
+    reason: >-
+      One of the three pre-arc carve-residue reds that plan 034 T086
+      repairs. After the carve, openDox-code#21 (section 3.4 S7,
+      `1e46971`) made the bundle's `views/repo-selector-model.js` import
+      its sibling `./display.js`, and this test's node probe copied the
+      model alone into its temporary directory, so the import failed
+      before any assertion ran. The test now copies the sibling beside the
+      model. `display.js` imports nothing, so the two files are the
+      model's whole import closure, at openDox-code `047bb4fa` and at plan
+      034 T084.
+    ruled: >-
+      Brett's ruling at opensoft/openxFactory#656 comment 5962785556, item
+      1 ("Fix in T086, close at phase 3 (Recommended)"), on R1Q7 (a),
+      comment 5817152735. #1144's text is unchanged, and plan 034 records
+      the move.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one
+      step of the chain this landing's entries for the suite make, in
+      order, under F5.2's `--chains`: the landing's diff for this suite is
+      exactly the chain's recorded texts, each inside its own named test,
+      and this step's is `old` to `new`, inside the test named. No
+      assertion changes: the probe gains the one file its model imports,
+      and every check of the roster, the three restores, the default and
+      the safe segments stays.
+    before_blob: f78c4452aebb9d2601f9043ceb8d9c552040e9b6
+    after_blob: 0788053372f4eeb3bf3bb677bc5d4d0731d02231
+    old: |2
+          registry, _ = _registry_with_main(scratch_repo, tmp_path)
+          _create(scratch_repo, registry)
+
+          r = _run_model(registry.index_document(), tmp_path)
+    new: |2
+          registry, _ = _registry_with_main(scratch_repo, tmp_path)
+          _create(scratch_repo, registry)
+          # THE MODEL'S SIBLING TRAVELS WITH IT (plan 034 T086; openxFactory#656
+          # comment 5962785556, item 1). Since openDox-code#21 the model imports
+          # `./display.js`, which imports nothing, so the probe's directory carries
+          # both files: the model's whole import closure.
+          shutil.copy(MODEL_JS.parent / "display.js", tmp_path / "display.js")
+
+          r = _run_model(registry.index_document(), tmp_path)
