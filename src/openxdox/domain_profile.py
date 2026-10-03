@@ -1106,6 +1106,18 @@ def register(profile: DomainProfile) -> DomainProfile:
     a profile never changes what a process serves. A host that registers its
     profile with openDox alone, as openxFactory does, calls
     `projection_contributions.register()` itself (plan 034 T064).
+
+    AND openXdox's GOVERNED COLUMNS AFTER IT (plan 034 T086). It then registers
+    openXdox's gate, doxBench scope, kickoff and cross-reference register at
+    openDox's four column seams (`openxdox.column_contributions`), where
+    openXdox's gate console imports, and otherwise none of them (the holder's
+    ruling on T086's question Q1 (a)). Each of the two calls is all or none
+    over its own seams, and both are idempotent. If the columns' call is
+    refused, the refusal reaches the caller with no column seam written and no
+    profile registered, and the projection registered just before it stays,
+    so registering again once the cause is fixed is a no-op for it. openxFactory
+    makes the columns' call itself too, after its projection call (plan 034
+    T094).
     """
     global _registered
     if not isinstance(profile, DomainProfile):
@@ -1128,9 +1140,10 @@ def register(profile: DomainProfile) -> DomainProfile:
             "already read the first. Call "
             "openxdox.domain_profile.unregister() first if the swap is "
             "deliberate.")
-    from . import projection_contributions
+    from . import column_contributions, projection_contributions
 
     projection_contributions.register()
+    column_contributions.register()
     _registered = profile
     return profile
 
@@ -1149,6 +1162,8 @@ def unregister() -> None:
     between, so a test that takes the profile away for one case could not put
     it back. A host that tears the governed projection down as well calls
     `projection_contributions.unregister()`, which empties only what it holds.
+    The governed columns stay for the same reason, and
+    `column_contributions.unregister()` takes them back (plan 034 T086).
     """
     global _registered
     _registered = None
