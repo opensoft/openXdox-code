@@ -124,9 +124,12 @@ def test_the_scope_seam_answers_the_governed_rule_not_the_default(tmp_path) -> N
     for rel in paths:
         (tmp_path / rel).parent.mkdir(parents=True, exist_ok=True)
         (tmp_path / rel).write_text("# a document\n", encoding="utf-8")
+    # A group's edges name its documents by ID, which the snapshot contract
+    # does not promise equals the path (openDox-code#77's fix round 3).
+    ids = [f"doc-{rel.rsplit('/', 1)[1][:-3]}" for rel in paths]
     snapshot = {
-        "documents": [{"id": rel, "path": rel} for rel in paths],
-        "clusters": [{"id": "c1", "document_edges": [{"document": rel} for rel in paths]}],
+        "documents": [{"id": doc_id, "path": rel} for doc_id, rel in zip(ids, paths)],
+        "clusters": [{"id": "c1", "document_edges": [{"document": doc_id} for doc_id in ids]}],
     }
     key = ScopeKey(repository="fixture-repo", ref="main", tile_kind="cluster", tile_id="c1")
     registered = column_seams.scope.proxy.resolve_scope(snapshot, key, source_root=tmp_path)

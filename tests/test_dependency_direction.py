@@ -481,7 +481,7 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 #: next (phase 2's openDox-code after T058, which T062 pins at the openDox
 #: root), both are unchanged, and `_back_import_census()` returned the same
 #: three rows the table held then, so the ratchet did not move. At
-#: `b333bf16` (openDox-code#77, plan 034 T084) `NEUTRAL_MODULES` holds
+#: `ebe0a35f` (openDox-code#77, plan 034 T084) `NEUTRAL_MODULES` holds
 #: fourteen: `consumer_reach` left it with the file T084 deleted, and T084's
 #: `column_seams` and `default_columns` joined it. `STILL_REACHING` is still
 #: empty.
@@ -500,7 +500,7 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 #:
 #: PLAN 034 T086 TOOK IT TO (0, 0). This table was a RATCHET whose numbers
 #: could only FALL, and it fell for the last time when the pin moved to
-#: openDox-code `b333bf16`, the head of openDox-code#77 (T084: the last
+#: openDox-code `ebe0a35f`, the head of openDox-code#77 (T084: the last
 #: deferred reaches through declared seams, `consumer_reach.py` retired). At
 #: that tree `_back_import_census()` returns no row at all: the eleven
 #: deferred reaches T059 left (`branch_session.py` (0, 2), `serve_project.py`
