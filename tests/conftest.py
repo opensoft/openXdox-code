@@ -470,6 +470,11 @@ def _the_launch_suite_runs_a_local_install(request, monkeypatch):
     for name in _config.SETTING_NAMES:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv(_config.PREFIX + "INSTALL_MODE", _config.INSTALL_MODE_LOCAL)
+    # A scratch state directory, never the operator's own: a local install
+    # keeps its bundle there (T072), and openDox's per-machine binding trust
+    # its record (T100), so no case may read or write the real one.
+    state_dir = request.getfixturevalue("tmp_path_factory").mktemp("opendox-state")
+    monkeypatch.setenv(_config.PREFIX + "STATE_DIR", str(state_dir))
 
     class _StandInBundle:
         """The bundled PostgreSQL, stood in: the launch reads nothing from it."""
@@ -478,6 +483,7 @@ def _the_launch_suite_runs_a_local_install(request, monkeypatch):
 
         def __init__(self, settings):
             assert settings.install_mode == _config.INSTALL_MODE_LOCAL
+            assert Path(settings.state_dir) == state_dir
 
         def start(self):
             return self
