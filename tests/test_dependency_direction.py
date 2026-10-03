@@ -479,8 +479,12 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 #: `projection_seams`, `default_registry`, `default_projection` and `rfc3339`.
 #: Its `STILL_REACHING` is empty at both. At `047bb4fa`, where the pin moved
 #: next (phase 2's openDox-code after T058, which T062 pins at the openDox
-#: root), both are unchanged, and `_back_import_census()` returns the same
-#: three rows the table below holds, so the ratchet does not move.
+#: root), both are unchanged, and `_back_import_census()` returned the same
+#: three rows the table held then, so the ratchet did not move. At
+#: `b333bf16` (openDox-code#77, plan 034 T084) `NEUTRAL_MODULES` holds
+#: fourteen: `consumer_reach` left it with the file T084 deleted, and T084's
+#: `column_seams` and `default_columns` joined it. `STILL_REACHING` is still
+#: empty.
 #:
 #: THE TWO MODULES THAT DID NOT IMPORT WITHOUT A CONSUMER NOW DO. This note
 #: said `opendox.serve` and `opendox.cli` were blocked by `ideation_dashboard`
@@ -494,15 +498,25 @@ def test_the_doc_health_implementation_surface_is_exactly_declared() -> None:
 #: invisible to THIS table by construction, and still is: the table counts
 #: `openxdox` and nothing else.
 #:
-#: A RATCHET, not a target: the numbers may only FALL. When a BUILD-arc slice
-#: lands, lower them here in the same act — the suite refuses a silent
-#: improvement as well as a regression, so the number in the tree stays true.
-OPENDOX_BACK_IMPORTS: dict[str, tuple[int, int]] = {
-    # module                        (import-time, deferred)
-    "opendox/branch_session.py":    (0, 2),
-    "opendox/serve_project.py":     (0, 2),
-    "opendox/serve_workbench.py":   (0, 7),
-}
+#: PLAN 034 T086 TOOK IT TO (0, 0). This table was a RATCHET whose numbers
+#: could only FALL, and it fell for the last time when the pin moved to
+#: openDox-code `b333bf16`, the head of openDox-code#77 (T084: the last
+#: deferred reaches through declared seams, `consumer_reach.py` retired). At
+#: that tree `_back_import_census()` returns no row at all: the eleven
+#: deferred reaches T059 left (`branch_session.py` (0, 2), `serve_project.py`
+#: (0, 2), `serve_workbench.py` (0, 7)) each ask one of openDox's four column
+#: seams now (`opendox.column_seams`: gate, scope, kickoff, register), and this
+#: leg contributes its governed mechanism there
+#: (`openxdox.column_contributions`). The two mixin bases, which no import
+#: node ever counted, are gone too: the columns arrive through openDox's
+#: handler-contribution facet, declared on this leg's route extensions. So the
+#: ratchet is retired, as its own reminder asked, in favour of the strict
+#: assertion below. It realizes #1144's 4.3 (the consumer half) and closes 9.2
+#: (T007's batch F addendum, R1Q25 (b)). The reminder named
+#: `split-opendox-two-layer-product` § 4.1's direction clause for its tick;
+#: that change is archived (2026-09-22), so 4.3 and 9.2 are where the record
+#: now lives. The table stays, empty, so the two totals keep their one source.
+OPENDOX_BACK_IMPORTS: dict[str, tuple[int, int]] = {}
 #: Derived from the table above, never typed twice — a second hand-kept copy
 #: is exactly how a compensating fall-and-rise slips past a total.
 OPENDOX_BACK_IMPORTS_AT_IMPORT_TIME = sum(v[0] for v in OPENDOX_BACK_IMPORTS.values())
@@ -676,57 +690,26 @@ def test_the_opendox_owned_defaults_match_this_leg(owned_name: str) -> None:
 
 
 def test_the_pinned_opendox_does_not_import_openxdox_back() -> None:
-    """The inversion, ratcheted PER MODULE.
+    """The direction, asserted STRICTLY (plan 034 T086; #1144 4.3 and 9.2).
 
-    The comparison is the whole table and not the two totals, because a fall
-    in one module paired with a rise in another leaves both totals untouched
-    and the landed census false.
+    No module of the pinned openDox names `openxdox` in an import, at import
+    time or deferred. openXdox is pinned BY openDox's consumer, never the
+    reverse (design.md:243, RULED OQ-2), so a back-import anywhere is the
+    regression § 2.4's extension points and 4.3's seams exist to remove. It
+    must not be answered by putting a row back in `OPENDOX_BACK_IMPORTS`.
     """
+    assert (OPENDOX_BACK_IMPORTS_AT_IMPORT_TIME,
+            OPENDOX_BACK_IMPORTS_DEFERRED) == (0, 0), (
+        "OPENDOX_BACK_IMPORTS records a back-import again "
+        f"({OPENDOX_BACK_IMPORTS}). The table was retired at (0, 0) by plan "
+        "034 T086; a reach into openxdox goes through one of openDox's seams")
     observed = {rel: tuple(v) for rel, v in _back_import_census().items()}
-    if observed == OPENDOX_BACK_IMPORTS:
-        return
-
-    stray = sorted(set(observed) - set(OPENDOX_BACK_IMPORTS))
-    assert stray == [], (
-        f"the pinned openDox imports `openxdox` from module(s) the census "
-        f"does not name: {stray}. openXdox is pinned BY openDox's consumer, "
-        "never the reverse (design.md:243, RULED OQ-2) — a NEW back-import is "
-        "a regression of the very thing § 2.4's extension points exist to "
-        "remove, and it must not be added to the table to make this pass")
-
-    risen = sorted(
-        f"{rel}: {OPENDOX_BACK_IMPORTS[rel]} -> {seen}"
-        for rel, seen in observed.items()
-        if seen[0] > OPENDOX_BACK_IMPORTS[rel][0]
-        or seen[1] > OPENDOX_BACK_IMPORTS[rel][1])
-    assert risen == [], (
-        "openDox→openXdox back-imports ROSE, per module (import-time, "
-        f"deferred): {risen}. The direction may only be removed, never added "
-        "to — § 2.4's extension points exist to carry these contributions the "
-        "other way round")
-
-    fallen = sorted(
-        f"{rel}: {OPENDOX_BACK_IMPORTS[rel]} -> {observed.get(rel, (0, 0))}"
-        for rel in OPENDOX_BACK_IMPORTS
-        if observed.get(rel, (0, 0)) != OPENDOX_BACK_IMPORTS[rel])
-    pytest.fail(
-        f"openDox→openXdox back-imports FELL, per module (import-time, "
-        f"deferred): {fallen} — good, and the census in this file is now "
-        "untrue. Update OPENDOX_BACK_IMPORTS to the observed values in the "
-        "same act (the two totals derive from it), citing the BUILD-arc "
-        "slice; drop a module from the table when it reaches (0, 0). When the "
-        "table is empty, delete the ratchet and assert the direction strictly")
-
-
-def test_the_ratchet_retires_itself_when_the_inversion_is_gone() -> None:
-    """A ratchet nobody retires becomes a lie. This is the reminder."""
-    if not OPENDOX_BACK_IMPORTS:
-        pytest.fail(
-            "the openDox→openXdox inversion is recorded as fully removed. "
-            "Replace the ratchet above with a strict assertion that the "
-            "census is empty, delete this test, and tick "
-            "split-opendox-two-layer-product § 4.1's direction clause")
-
+    assert observed == {}, (
+        "the pinned openDox imports `openxdox` again, per module "
+        f"(import-time, deferred): {observed}. openXdox is pinned BY openDox's "
+        "consumer, never the reverse (design.md:243, RULED OQ-2); route the "
+        "reach through a seam openDox declares (#1144 4.3), and contribute "
+        "openXdox's mechanism there")
 
 
 # --------------------------------------------------------------------------
