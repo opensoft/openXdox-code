@@ -588,10 +588,29 @@ def test_a_new_serve_process_re_registers_the_session_at_startup(scratch_repo,
                                                         name="a.json")[0])
     main_path = _main_snapshot_file(scratch_repo, tmp_path / "served.json")
 
-    with _serving(scratch_repo, main_path) as (host, port, _httpd):
+    # THE INDEX ROUTE IS A CONTRIBUTED BINDING (plan 034 T086; openxFactory#656
+    # comment 5962785556, item 1). `/snapshot-index.json` left `opendox.serve`
+    # for openXdox's projection column at the carve, so its name is
+    # `serve_projection.SNAPSHOT_INDEX_ROUTE`, and a server answers it only
+    # where `ProjectionRoutesExtension` is collected: the serve is built here
+    # with it. It still starts from an empty registry, the bootstrap under test.
+    from openxdox import serve_projection
+
+    httpd = serve_mod.build_server(
+        WEB, main_path, scratch_repo.root, repository=scratch_repo.repository,
+        actor="tester",
+        route_extensions=(serve_projection.ProjectionRoutesExtension(),))
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    host, port = httpd.server_address[:2]
+    try:
         status, headers, body = _get(host, port, f"{serve_mod.SNAPSHOT_ROUTE}"
                                                  f"?repository={REPO}&ref={DRAFT}")
-        _i, _ih, ibody = _get(host, port, serve_mod.SNAPSHOT_INDEX_ROUTE)
+        _i, _ih, ibody = _get(host, port, serve_projection.SNAPSHOT_INDEX_ROUTE)
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=2)
 
     assert status == 200
     assert headers["x-snapshot-ref"] == DRAFT

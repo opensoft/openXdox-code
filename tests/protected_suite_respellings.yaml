@@ -1016,3 +1016,70 @@ entries:
           from openxdox.serve_gate import GateRoutes
 
           source = inspect.getsource(GateRoutes._handle_gate_action)
+  - suite: tests/test_session_snapshot.py
+    test: test_a_new_serve_process_re_registers_the_session_at_startup
+    landing: opensoft/openXdox-code#37
+    edit: respelling
+    respelled: >-
+      The index route's name and the server that answers it. `/snapshot-
+      index.json` left `opendox.serve` for openXdox's projection column at
+      `split-opendox-two-layer-product` § 2.4 PR-3 (openxFactory #761) and
+      became a CONTRIBUTED binding,
+      `serve_projection.SNAPSHOT_INDEX_ROUTE`, served by
+      `ProjectionRoutesExtension`. openDox-code#10 (BUILD slice 2b)
+      removed the import that kept `serve_mod.SNAPSHOT_INDEX_ROUTE` alive,
+      so the test raised AttributeError. The constant alone is not enough:
+      in this leg's own process no host profile contributes the route, so
+      the serve is built inside the test with the projection extension, in
+      place of the shared `_serving` helper, which no entry can edit, and
+      torn down the same way. From T084 the extension's method arrives
+      through openDox's handler-contribution facet, which this landing
+      declares (`ProjectionRoutesExtension.HANDLER_CONTRIBUTIONS`).
+    ruled: >-
+      Brett's ruling at opensoft/openxFactory#656 comment 5962785556, item
+      1 ("Fix in T086, close at phase 3 (Recommended)"), on R1Q7 (a),
+      comment 5817152735. Entered as a respelling, as T086's prep proposed
+      and the holder ruled on T086's questions (all (a), 2026-10-02,
+      relayed on the lane's thread).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is the
+      third and last step of the chain this landing's entries for the
+      suite make, in order, under F5.2's `--chains`: the landing's diff
+      for this suite is exactly the chain's recorded texts, each inside
+      its own named test, and this step's is `old` to `new`, inside the
+      test named. Every assertion is kept and unchanged: the session ref
+      answers 200 with its own ref header and the created document, and
+      the index carries the session row with `main` active. The serve
+      still starts from an empty registry, which is the bootstrap under
+      test.
+    before_blob: 345b55e6a6e7017c0bacc5fbc1893e4a9babbe96
+    after_blob: b606be3db1baeff31f8811b7541e2da61e15403e
+    old: |2
+          with _serving(scratch_repo, main_path) as (host, port, _httpd):
+              status, headers, body = _get(host, port, f"{serve_mod.SNAPSHOT_ROUTE}"
+                                                       f"?repository={REPO}&ref={DRAFT}")
+              _i, _ih, ibody = _get(host, port, serve_mod.SNAPSHOT_INDEX_ROUTE)
+    new: |2
+          # THE INDEX ROUTE IS A CONTRIBUTED BINDING (plan 034 T086; openxFactory#656
+          # comment 5962785556, item 1). `/snapshot-index.json` left `opendox.serve`
+          # for openXdox's projection column at the carve, so its name is
+          # `serve_projection.SNAPSHOT_INDEX_ROUTE`, and a server answers it only
+          # where `ProjectionRoutesExtension` is collected: the serve is built here
+          # with it. It still starts from an empty registry, the bootstrap under test.
+          from openxdox import serve_projection
+
+          httpd = serve_mod.build_server(
+              WEB, main_path, scratch_repo.root, repository=scratch_repo.repository,
+              actor="tester",
+              route_extensions=(serve_projection.ProjectionRoutesExtension(),))
+          thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+          thread.start()
+          host, port = httpd.server_address[:2]
+          try:
+              status, headers, body = _get(host, port, f"{serve_mod.SNAPSHOT_ROUTE}"
+                                                       f"?repository={REPO}&ref={DRAFT}")
+              _i, _ih, ibody = _get(host, port, serve_projection.SNAPSHOT_INDEX_ROUTE)
+          finally:
+              httpd.shutdown()
+              httpd.server_close()
+              thread.join(timeout=2)
