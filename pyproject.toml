@@ -123,7 +123,7 @@ requires-python = ">=3.12"
 # already bring. `rfc3339-validator>=0.1.4` is the floor the `test` extra
 # stated for it until now (openxFactory's validator-input lock pins 0.1.4).
 dependencies = [
-    "opendox @ git+https://github.com/opensoft/openDox-code@047bb4fa394f3e1bf42466062a67ef18e99f8d6a",
+    "opendox @ git+https://github.com/opensoft/openDox-code@ebe0a35f2d2ae972d9653979f809a2d3b07e242d",
     "PyYAML>=6.0",
     "jsonschema>=4.18",
     "referencing>=0.28.4",

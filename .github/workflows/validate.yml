@@ -316,6 +316,20 @@ jobs:
       # `8d891652`, this branch with that `main` merged in, and read the same
       # triple: 1076, 1072 and 4. So the floors stand.
       #
+      # RAISED BY plan 034 T086, the same way. At openDox-code `ebe0a35f`
+      # (openDox-code#77, T084), this change's testing pin, its head read
+      # selected 1096, passed 1092, skipped 4, failures 0, errors 0, in this
+      # step's own command. The +20 on both floors, file by file against
+      # `main` `6a3b93b9`:
+      #   * +20, `tests/test_column_contributions.py` (new);
+      #   * +1, `tests/test_declared_exclusion.py`, which gains
+      #     `tests/test_column_contributions_governed.py`'s case: that file
+      #     (new, nine cases) needs `doc_health`, so it joins the declaration
+      #     under that reason, and its own cases are not in these numbers;
+      #   * -1, `tests/test_dependency_direction.py`, whose ratchet reminder
+      #     is deleted with the ratchet, as it asked (the table is at (0, 0)).
+      # Every selected test passes, and the four skips are the same four.
+      #
       # THE SKIPS ARE NAMED, which is why the exact pin is safe to take. All
       # FOUR are `tests/test_aggregation_register_instance.py`'s, which the
       # sixteen-file list never ran: each skips because the "aggregation
@@ -345,8 +359,8 @@ jobs:
           # on a ruling, which lowers them with its reason (above). Set to
           # the measured values, which this suite has actually met on CI
           # rather than an aspiration.
-          MIN_SELECTED: "1076"
-          MIN_PASSED: "1072"
+          MIN_SELECTED: "1096"
+          MIN_PASSED: "1092"
           # EXACT - the load-bearing number.
           EXPECT_SKIPPED: "4"
         run: |
