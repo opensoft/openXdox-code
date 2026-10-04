@@ -757,8 +757,11 @@ def stand_in_host_trust(tmp_path):
 
     openXdox's src registers NO trust policy (the holder's ruling: "T086
     registers no trust policy"). Only the cases that ask for this fixture
-    register it, for their own length, so they keep testing the intake flow
-    they were written for. With no host policy the same intake is refused by
+    register it, for their own length: every case that expects an intake to
+    complete (Copilot at openXdox-code#37 on the first two, r4178050937 on the
+    other four), so they keep testing the intake flow they were written for.
+    The request-validation cases do not ask for it, since their refusals come
+    before the trust check. With no host policy the same intake is refused by
     name, which `test_with_no_host_policy_the_intake_refuses_the_repositorys_broker_by_name`
     holds. At a pin before T100 this registers nothing."""
     trust = _trust_seam()
@@ -914,7 +917,7 @@ def test_a_completed_intake_keeps_only_the_reference_and_declares_it_pending(
 
 
 def test_the_supplied_value_is_found_nowhere_afterwards(scratch_repo, tmp_path,
-                                                        capfd):
+                                                        capfd, stand_in_host_trust):
     """TASK 2.4 — THE GREP TEST, and the test that makes the requirement real.
 
     After a completed intake the whole checkout, every response body, and every
@@ -1037,7 +1040,7 @@ def test_with_no_host_policy_the_intake_refuses_the_repositorys_broker_by_name(
 
 
 def test_the_approval_writes_a_gate_record_before_the_model_becomes_available(
-        scratch_repo, tmp_path):
+        scratch_repo, tmp_path, stand_in_host_trust):
     """Task 3.2. Approval is an explicit act by the resolved local human actor,
     recorded the way this dashboard records every other governed act: a gate
     action naming the model declaration it approved, carrying who issued, who
@@ -1076,7 +1079,7 @@ def test_the_approval_writes_a_gate_record_before_the_model_becomes_available(
 
 
 def test_a_second_approval_and_an_unknown_declaration_both_refuse(
-        scratch_repo, tmp_path):
+        scratch_repo, tmp_path, stand_in_host_trust):
     """Task 3.2's edges. A repeated approval would record an act with no effect,
     and an approval of something nobody declared would record an authority over
     nothing. Both refuse with a STATED reason and write nothing."""
@@ -1204,7 +1207,8 @@ def test_a_turn_naming_the_affordance_refuses_through_the_existing_refusal(
 # layer 3b — the records themselves
 # ===========================================================================
 
-def test_the_closed_catalog_entry_does_not_widen(scratch_repo, tmp_path):
+def test_the_closed_catalog_entry_does_not_widen(scratch_repo, tmp_path,
+                                               stand_in_host_trust):
     """Task 3.5, asserted rather than asserted-about. Proposed-versus-approved
     is a SERVER-SIDE distinction and a pending declaration is simply not in the
     catalog, so the public entry's shape is untouched — widening it is a
