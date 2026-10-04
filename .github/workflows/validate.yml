@@ -316,9 +316,9 @@ jobs:
       # `8d891652`, this branch with that `main` merged in, and read the same
       # triple: 1076, 1072 and 4. So the floors stand.
       #
-      # RAISED BY plan 034 T086, the same way. At openDox-code `ebe0a35f`
-      # (openDox-code#77, T084), this change's testing pin, its head read
-      # selected 1096, passed 1092, skipped 4, failures 0, errors 0, in this
+      # RAISED BY plan 034 T086, the same way. At openDox-code `c4b55cc4`
+      # (`main`, carrying T084 and T103), this change's testing pin, its head
+      # read selected 1096, passed 1092, skipped 4, failures 0, errors 0, in this
       # step's own command. The +20 on both floors, file by file against
       # `main` `6a3b93b9`:
       #   * +20, `tests/test_column_contributions.py` (new);
