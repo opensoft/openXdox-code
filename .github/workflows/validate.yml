@@ -332,6 +332,11 @@ jobs:
       #     under that reason, and its own cases are not in these numbers;
       #   * -1, `tests/test_dependency_direction.py`, whose ratchet reminder
       #     is deleted with the ratchet, as it asked (the table is at (0, 0)).
+      # And +3 on both, to 1099 and 1095, for `tests/test_host_plane.py`
+      # (new; T086's step (b), the console token on a host's plane). Read
+      # in this step's own command at the testing pin, and again at a local
+      # composition of `main` with openDox-code#76, #82 and #84, the shape of
+      # T087's pin: selected 1099, passed 1095, skipped 4 at both.
       # Every selected test passes, and the four skips are the same four.
       #
       # THE SKIPS ARE NAMED, which is why the exact pin is safe to take. All
@@ -363,8 +368,8 @@ jobs:
           # on a ruling, which lowers them with its reason (above). Set to
           # the measured values, which this suite has actually met on CI
           # rather than an aspiration.
-          MIN_SELECTED: "1096"
-          MIN_PASSED: "1092"
+          MIN_SELECTED: "1099"
+          MIN_PASSED: "1095"
           # EXACT - the load-bearing number.
           EXPECT_SKIPPED: "4"
         run: |
