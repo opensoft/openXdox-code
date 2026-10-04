@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import hashlib
 import http.client
+import importlib.util
 import json
 import os
 import shutil
@@ -729,6 +730,58 @@ def _request_without_content_length(host, port, method, path, *, headers=None):
     return resp.status, payload, raw
 
 
+def _trust_seam():
+    """`opendox.doxbench_trust`, the model-binding trust seam openDox-code's
+    T100 adds (openDox-code#82; #1144 16.3a), or None at a pin before it,
+    where the console intake asks no policy."""
+    if importlib.util.find_spec("opendox.doxbench_trust") is None:
+        return None
+    from opendox import doxbench_trust
+    return doxbench_trust
+
+
+@pytest.fixture
+def stand_in_host_trust(tmp_path):
+    """A TEST-ONLY stand-in for a host's trust policy, admitting the console
+    intake's broker (plan 034 T086; the holder's ruling of 2026-10-04).
+
+    From T100 the intake's hand-off runs the broker the served repository's
+    `model-declarations.yaml` names only if the registered trust policy admits
+    it (`doxbench_trust.intake_verdict_for`). openDox's strict default,
+    `MachineTrust`, never does; a host's own policy may. In the composed
+    product that host is openxFactory, whose `GovernedBindingTrust` (plan 034
+    T094; RULED openxFactory#656 comment 5970369724, "Governance approval")
+    answers the question. This is a TEST DOUBLE of that answer: it admits the
+    intake, and it is `MachineTrust` for every other question, with its store
+    in a scratch state directory.
+
+    openXdox's src registers NO trust policy (the holder's ruling: "T086
+    registers no trust policy"). Only the cases that ask for this fixture
+    register it, for their own length, so they keep testing the intake flow
+    they were written for. With no host policy the same intake is refused by
+    name, which `test_with_no_host_policy_the_intake_refuses_the_repositorys_broker_by_name`
+    holds. At a pin before T100 this registers nothing."""
+    trust = _trust_seam()
+    if trust is None:
+        yield None
+        return
+
+    class StandInHostTrust(trust.MachineTrust):
+        """The host's answer to the intake's question, stood in."""
+
+        def intake_verdict(self, binding, *, root):
+            return trust.TrustVerdict.trusted_for(binding, root=root,
+                                                  basis=trust.BASIS_HOST)
+
+    policy = StandInHostTrust(state_dir=tmp_path / "opendox-state")
+    trust.unregister()
+    trust.register(policy)
+    try:
+        yield policy
+    finally:
+        trust.unregister()
+
+
 def _console(host, port):
     status, payload, _raw = _request(host, port, "GET", "/capabilities")
     assert status == 200, payload
@@ -823,7 +876,7 @@ def test_an_agent_invocation_is_refused_and_reported_on_every_intake_route(
 
 
 def test_a_completed_intake_keeps_only_the_reference_and_declares_it_pending(
-        scratch_repo, tmp_path):
+        scratch_repo, tmp_path, stand_in_host_trust):
     """Tasks 2.2 and 3.1. The value goes to the broker and only the returned
     reference is retained, in the binding shape `credential-contracts` already
     owns — and completing the flow yields a PENDING declaration that contributes
@@ -907,7 +960,7 @@ def test_the_supplied_value_is_found_nowhere_afterwards(scratch_repo, tmp_path,
 
 
 def test_the_oauth_kind_surfaces_the_brokers_refusal_and_fakes_no_dance(
-        scratch_repo, tmp_path):
+        scratch_repo, tmp_path, stand_in_host_trust):
     """Task 2.3, HONESTLY. For the OAuth kind the dashboard must not be the
     party that receives the provider's tokens: it hands the human to the
     broker's OWN authorization flow (OQ-2, ruled 2026-08-21) and receives back
@@ -940,6 +993,47 @@ def test_the_oauth_kind_surfaces_the_brokers_refusal_and_fakes_no_dance(
     bindings = doxbench_binding.BindingStore(
         doxbench_binding.bindings_path(scratch_repo.root))
     assert bindings.list() == ()
+
+
+def test_with_no_host_policy_the_intake_refuses_the_repositorys_broker_by_name(
+        scratch_repo, tmp_path, monkeypatch):
+    """THE DESIGNED STANDALONE BEHAVIOUR (#1144 16.3a; openDox-code's T100).
+    With no host's trust policy registered, openDox's strict default answers
+    the intake's own question NO, so the intake
+    `test_a_completed_intake_keeps_only_the_reference_and_declares_it_pending`
+    completes under a host's policy is refused here by name,
+    `INTAKE_BROKER_UNTRUSTED`, which names the seam a host's policy registers
+    at (`opendox.doxbench_trust.register`). The broker never starts, and
+    nothing is stored. At a pin before T100 the intake asks no policy, and it
+    completes as that case's does."""
+    trust = _trust_seam()
+    monkeypatch.setenv("OPENDOX_STATE_DIR", str(tmp_path / "opendox-state"))
+    if trust is not None:
+        trust.unregister()
+    try:
+        program, record = _write_broker(tmp_path)
+        _declare_broker(scratch_repo.root, program)
+        with _serving(scratch_repo.root, tmp_path) as (host, port):
+            token = _console(host, port)
+            status, payload, _raw = _enrol(host, port, token, kind="api_key")
+        if trust is None:
+            assert status == 200, payload
+            return
+        assert status == serve_mod.doxbench_error_status(
+            serve_mod.DOXBENCH_ERR_INTAKE_REFUSED), payload
+        assert payload["reason"] == trust.INTAKE_BROKER_UNTRUSTED
+        assert "opendox.doxbench_trust.register" in payload["reason"]
+        assert not record.exists(), "the refused intake handed the broker a value"
+        assert not _broker_calls(tmp_path).exists(), "the refused intake ran the broker"
+        store = doxbench_intake.DeclarationStore(
+            doxbench_intake.declarations_path(scratch_repo.root))
+        assert store.list() == ()
+        bindings = doxbench_binding.BindingStore(
+            doxbench_binding.bindings_path(scratch_repo.root))
+        assert bindings.list() == ()
+    finally:
+        if trust is not None:
+            trust.unregister()
 
 
 def test_the_approval_writes_a_gate_record_before_the_model_becomes_available(
