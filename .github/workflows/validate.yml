@@ -99,7 +99,11 @@ jobs:
       # and T097 ticks 9.2 with that note.
       #
       # ONE TEST IS LEFT OUT BESIDE THEM, WITH ITS STATED REASON, UNTIL T008:
-      # `LEFT_OUT` below, the 31-entry assembled `--help` tree. RULED
+      # `LEFT_OUT` below, the assembled `--help` tree: 31 entries through
+      # phase 2, and 32 from phase 3's pin, where T100 adds `model-binding
+      # trust` (RULED 5970917267). Plan 034 T086 renamed the node to
+      # `..._is_the_32_entry_tree_...` and moved `LEFT_OUT` with it in the
+      # same change, so the `--deselect` never names a missing test. RULED
       # openxFactory#656 comment 5859927858 (Brett Heap, 2026-09-27, "(b)
       # Exclude it until T008's arc"): "The test leaves T042's integration
       # step, with its stated reason: cli_gate imports openxFactory's
@@ -154,7 +158,7 @@ jobs:
       # a comment, so none does.
       - name: pytest
         env:
-          LEFT_OUT: tests/integration/test_assembled_surface.py::test_the_assembled_help_tree_is_the_31_entry_tree_the_manifest_records
+          LEFT_OUT: tests/integration/test_assembled_surface.py::test_the_assembled_help_tree_is_the_32_entry_tree_the_manifest_records
         run: |
           echo "::notice::open extraction, left out of this run until the doc_health direction arc (plan 034 T008): $LEFT_OUT. Its stated reason: cli_gate imports openxFactory's doc_health at load time, which is R1Q6 (d)'s kind of exclusion (RULED openxFactory#656 comment 5859927858). F9.2 still runs it."
           python -m pytest -q --junitxml=pytest-report.xml --deselect "$LEFT_OUT"
