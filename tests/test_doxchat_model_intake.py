@@ -740,6 +740,31 @@ def _trust_seam():
     return doxbench_trust
 
 
+#: The trust seam's whole state, as `opendox.doxbench_trust` keeps it: the
+#: registration, whether it is openDox's default, and whether a consumer has
+#: read that default (which closes its window to a host's registration).
+_TRUST_SEAM_STATE = ("_registered", "_is_default", "_default_read")
+
+
+@contextmanager
+def _trust_seam_restored(trust):
+    """Run the body, then put the trust seam back EXACTLY as it was, all
+    three fields, as this leg's column and profile isolation fixtures do
+    (Copilot at openXdox-code#37, r4178080465). `unregister()` alone would
+    drop a host policy registered before, or a read default, for every later
+    test of the process."""
+    if trust is None:
+        yield
+        return
+    saved = tuple(getattr(trust, name) for name in _TRUST_SEAM_STATE)
+    try:
+        yield
+    finally:
+        with trust._lock:
+            for name, value in zip(_TRUST_SEAM_STATE, saved):
+                setattr(trust, name, value)
+
+
 @pytest.fixture
 def stand_in_host_trust(tmp_path):
     """A TEST-ONLY stand-in for a host's trust policy, admitting the console
@@ -777,12 +802,10 @@ def stand_in_host_trust(tmp_path):
                                                   basis=trust.BASIS_HOST)
 
     policy = StandInHostTrust(state_dir=tmp_path / "opendox-state")
-    trust.unregister()
-    trust.register(policy)
-    try:
-        yield policy
-    finally:
+    with _trust_seam_restored(trust):
         trust.unregister()
+        trust.register(policy)
+        yield policy
 
 
 def _console(host, port):
@@ -1011,9 +1034,9 @@ def test_with_no_host_policy_the_intake_refuses_the_repositorys_broker_by_name(
     completes as that case's does."""
     trust = _trust_seam()
     monkeypatch.setenv("OPENDOX_STATE_DIR", str(tmp_path / "opendox-state"))
-    if trust is not None:
-        trust.unregister()
-    try:
+    with _trust_seam_restored(trust):
+        if trust is not None:
+            trust.unregister()
         program, record = _write_broker(tmp_path)
         _declare_broker(scratch_repo.root, program)
         with _serving(scratch_repo.root, tmp_path) as (host, port):
@@ -1034,9 +1057,47 @@ def test_with_no_host_policy_the_intake_refuses_the_repositorys_broker_by_name(
         bindings = doxbench_binding.BindingStore(
             doxbench_binding.bindings_path(scratch_repo.root))
         assert bindings.list() == ()
-    finally:
-        if trust is not None:
+
+
+def test_the_trust_seam_is_left_exactly_as_each_case_found_it():
+    """The stand-in policy, and the standalone case's unregistering, change the
+    trust seam only for their own case (Copilot at openXdox-code#37,
+    r4178080465): a host's policy registered before is put back, and so is a
+    default some consumer had already read, flags and all. At a pin before
+    T100 there is no seam, and the guard does nothing."""
+    trust = _trust_seam()
+    if trust is None:
+        with _trust_seam_restored(trust):
+            pass
+        return
+
+    class HostPolicy:
+        def verdict(self, binding, *, root):
+            raise AssertionError("not asked")
+
+        def record(self, binding, *, root):
+            raise AssertionError("not asked")
+
+    def state():
+        return tuple(getattr(trust, name) for name in _TRUST_SEAM_STATE)
+
+    with _trust_seam_restored(trust):
+        trust.unregister()
+        host = trust.register(HostPolicy())
+        before = state()
+        with _trust_seam_restored(trust):
             trust.unregister()
+            trust.register(trust.MachineTrust())
+        assert state() == before and trust.current() is host
+
+        trust.unregister()
+        trust.register_default()
+        trust.current()  # a consumer reads the default
+        before = state()
+        assert before[1:] == (True, True)
+        with _trust_seam_restored(trust):
+            trust.unregister()
+        assert state() == before
 
 
 def test_the_approval_writes_a_gate_record_before_the_model_becomes_available(
