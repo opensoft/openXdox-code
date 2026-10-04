@@ -496,3 +496,83 @@ def _the_launch_suite_runs_a_local_install(request, monkeypatch):
 
     monkeypatch.setattr(_cli.bundle_mod, "BundledServer", _StandInBundle)
     yield
+
+
+# ---------------------------------------------------------------------------
+# A HOST'S PLANE FOR THE SUITES THAT READ THE CONSOLE TOKEN (plan 034 T086,
+# step (b); openDox-code's T104, RULED openxFactory#656 comment 5963851934).
+#
+# From T104 openDox delivers the human console's per-serve token by WHOSE plane
+# it serves. On a host's plane it is published on `/capabilities`, as it always
+# was. On a standalone plane, built from openDox's own default profile, it is
+# not: the entry point writes it to a private copy and opens the page with it
+# in the URL's fragment (`opendox.console_access.delivery_for`). No module of
+# this leg registers an openDox profile, so every server these suites build
+# would be a standalone plane, and each of them reads the token from
+# `/capabilities`, as the served page of a HOST's plane does: through
+# `tests/doxbench_routes_harness.py` and `tests/gate_routes_harness.py`, or
+# directly. Measured composed at openDox-code main `c4b55cc4` merged with
+# openDox-code#76, #82 and #84: 99 cases fail `KeyError: 'console_token'`, or
+# miss the token in an asserted capability document.
+#
+# openXdox's governed columns are served only under a host (openxFactory
+# registers its profile at process start), so these suites run on a host's
+# plane, as the plan's step allows ("or register openXdox's profile as a
+# host"). For the length of each of their tests this registers a stand-in host
+# that contributes nothing (the default profile contributes no route either),
+# and puts the registry back afterwards, as `tests/test_gate_loop_views.py`'s
+# `register_host` does. Before T104 the delivery does not depend on the
+# profile, so this changes no token there.
+#
+# THE LIST IS THE SCAN'S. `tests/test_host_plane.py` holds it equal to the
+# test modules that read `console_token` from a capability document or import
+# one of the two harnesses, so a suite that starts reading the token joins it
+# or fails there.
+# ---------------------------------------------------------------------------
+
+HOST_PLANE_SUITES = frozenset({
+    "test_create_project.py",
+    "test_doxbench_abstract_route.py",
+    "test_doxbench_blank_reason.py",
+    "test_doxbench_knowledge_service.py",
+    "test_doxbench_request_handling.py",
+    "test_doxbench_thread_wiring.py",
+    "test_doxchat_model_intake.py",
+    "test_edit_action.py",
+    "test_edit_project.py",
+    "test_gate_failure_diagnostics.py",
+    "test_gateway_provenance.py",
+    "test_notebook_action.py",
+    "test_register_edit_lane.py",
+    "test_session_confinement.py",
+    "test_session_gates.py",
+    "test_session_verbs.py",
+})
+
+
+class StandInHost:
+    """A host's profile that contributes nothing: no route and no subcommand."""
+
+    ROUTE_EXTENSIONS: tuple = ()
+    SUBCOMMAND_EXTENSIONS: tuple = ()
+
+
+@_pytest.fixture(autouse=True)
+def _a_hosts_plane_for_the_token_reading_suites(request):
+    if request.node.path.name not in HOST_PLANE_SUITES:
+        yield
+        return
+    from opendox import default_profile as _default_profile
+    from opendox import domain_profile as _registry
+
+    previous = _registry.current() if _registry.is_registered() else None
+    _registry.unregister()
+    _registry.register(StandInHost())
+    try:
+        yield
+    finally:
+        _registry.unregister()
+        # The entry point's default is not put back as a registration: the
+        # next entry point registers it again, as it does in any process.
+        if previous is not None and previous is not _default_profile:
+            _registry.register(previous)
