@@ -167,7 +167,13 @@ def test_rebinding_host_cannot_obtain_token_or_launch_an_editor(tmp_path):
     assert status == 403
     assert hostile_caps["error"] == "invalid_host"
     assert "console_token" not in hostile_caps
-    assert (launched, payload["error"]) == (403, "agent_invocation")
+    # THE HOST IS CHECKED FIRST (plan 034 T086). Since openDox-code's T103
+    # (openDox-code#80, on `main` as `390e2c27`) every loopback route checks the
+    # request's Host before anything else, so the edit route refuses a
+    # rebinding host as `/capabilities` does, with `invalid_host`. Before T103
+    # the console check answered first, with `agent_invocation`. It is a 403
+    # before the body is read either way, and the editor never launches.
+    assert (launched, payload["error"]) == (403, "invalid_host")
     assert calls == []
 
 

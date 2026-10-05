@@ -1,4 +1,4 @@
-"""The ASSEMBLED command line: the 31-entry `--help` tree neither leg makes alone.
+"""The ASSEMBLED command line: the 32-entry `--help` tree neither leg makes alone.
 
 Plan 034 task T042, box 9.3 of the ratified
 `add-neutral-product-standalone-operability`: behaviours needing both legs
@@ -20,14 +20,27 @@ builds to that golden twice:
     `tests/ideation-dashboard/test_extension_point_parity.py::test_the_help_text_of_every_entry_point_is_unchanged`.
     R1Q5 (a) says the 31-entry goldens stand, and this is where that is
     checked at the declared composition.
-Both were read at openxFactory `d90df42d`.
+Both were read at openxFactory `d90df42d`, where the tree had 31 entries.
 
-WHY IT IS 31 AND NOT MORE. The default profile, which openDox registers when no
+32 FROM PHASE 3'S PIN (RULED openxFactory#656 comment 5970917267, Brett Heap,
+2026-10-03, "Amend to 32 (Recommended)"; plan 034 T086, step (a); T007's batch
+O records it in #1144). T100 adds `model-binding trust`, so the tree has 32
+entries, and the test below is renamed `..._is_the_32_entry_tree_...`, as the
+holder accepted. The carve manifest's "31-entry" stays as it quotes it (9.3).
+The 32 headers and the digest below were measured from this test's own child,
+run where `doc_health` imports, at the local composition openDox-code `main`
+`c4b55cc4` plus openDox-code#76, #82 (T100) and #84 merged. openxFactory's
+phase-3 golden, which lands in the non-arc PR ahead of T094 (E1 (a), comment
+5970369724), must hash to the same digest, and both are read again at T087's
+pin.
+
+WHY IT IS 32 AND NOT MORE. The default profile, which openDox registers when no
 host has registered one, contributes the runtime verbs (`RuntimeSubcommand`,
 R1Q5 (a)). A host that registers its own profile does not get them, so the
-assembled tree stays at 31 entries: the root, six top-level subcommands,
-`gate`'s nineteen verbs and `model-binding`'s five. Eleven are openDox's own
-(research R8), and the other twenty are this column's `gate` tree.
+assembled tree stays at 32 entries: the root, six top-level subcommands,
+`gate`'s nineteen verbs and `model-binding`'s six (T100's `trust` the sixth).
+Twelve are openDox's own (research R8, with T100's), and the other twenty are
+this column's `gate` tree.
 
 THE HOST, STOOD IN, IN A FRESH INTERPRETER. No module in this leg registers an
 openDox profile. openxFactory's `profile_openxfactory.SUBCOMMAND_EXTENSIONS` is
@@ -91,9 +104,11 @@ GOLDEN_COLUMNS = "100"
 #: (`opendox.cli.build_parser`). The golden's sections are named with it.
 ROOT_LABEL = "ideation-dashboard"
 
-#: THE TREE THE MANIFEST RECORDS: the golden's 31 section headers, in its order
-#: (depth-first, each level's subcommands sorted), as read at openxFactory
-#: `d90df42d` from `tests/ideation-dashboard/fixtures/cli-help-tree.golden.txt`.
+#: THE TREE THE MANIFEST RECORDS, AT PHASE 3'S PIN: the 32 section headers, in
+#: the golden's order (depth-first, each level's subcommands sorted). The first
+#: 31 are the headers read at openxFactory `d90df42d` from
+#: `tests/ideation-dashboard/fixtures/cli-help-tree.golden.txt`; the 32nd is
+#: T100's `model-binding trust` (RULED `5970917267`).
 MANIFEST_RECORDED_ENTRY_POINTS = (
     "ideation-dashboard",
     "ideation-dashboard create",
@@ -126,12 +141,14 @@ MANIFEST_RECORDED_ENTRY_POINTS = (
     "ideation-dashboard model-binding list",
     "ideation-dashboard model-binding remove",
     "ideation-dashboard model-binding set-credential",
+    "ideation-dashboard model-binding trust",
 )
 
-#: The sha256 of that golden's bytes at openxFactory `d90df42d`. The tree's
-#: text, joined the way the golden joins it, must hash to it.
+#: The sha256 of the 32-entry tree's text, joined the way the golden joins it,
+#: measured as the module docstring says. The 31-entry golden at openxFactory
+#: `d90df42d` hashed to `9cbeca997f38b5c3...`.
 MANIFEST_RECORDED_GOLDEN_SHA256 = (
-    "9cbeca997f38b5c3f1b5e95ed83b1e62ac9cacb131852914c1e462adfc3ef875")
+    "9cc6e383da1bb27e450ef7d2108668c4cfefb039b7854d564798257b119666a6")
 
 #: The variables a lone checkout does not have, dropped from the child.
 SCRUBBED_ENVIRONMENT = ("PYTHONPATH",)
@@ -197,11 +214,11 @@ def _assemble(where: Path) -> subprocess.CompletedProcess:
         capture_output=True, text=True, timeout=300)
 
 
-def test_the_assembled_help_tree_is_the_31_entry_tree_the_manifest_records(
+def test_the_assembled_help_tree_is_the_32_entry_tree_the_manifest_records(
         composition: Composition, tmp_path: Path) -> None:
     """openDox's parser at the pin, with this column's `gate` tree contributed
-    by a host's own profile, is the 31-entry tree the carve manifest records:
-    the same entry points, and the golden's text byte for byte."""
+    by a host's own profile, is the 32-entry tree recorded above: the same
+    entry points, and the recorded text byte for byte."""
     done = _assemble(tmp_path)
     last = (done.stderr.strip().splitlines() or [""])[-1]
     assert done.returncode == 0, (
@@ -228,7 +245,7 @@ def test_the_assembled_help_tree_is_the_31_entry_tree_the_manifest_records(
                      for name, help_text in built["entries"])
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
     assert digest == MANIFEST_RECORDED_GOLDEN_SHA256, (
-        f"at {composition}: the assembled tree has the 31 recorded entry "
+        f"at {composition}: the assembled tree has the 32 recorded entry "
         f"points, but its text hashes to {digest}, not to the golden's "
         f"{MANIFEST_RECORDED_GOLDEN_SHA256}. The help text of an entry point "
         "changed. openxFactory's "

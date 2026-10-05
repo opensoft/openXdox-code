@@ -420,3 +420,159 @@ if _openxfactory_corpus is not None:
     from opendox import corpus_adapter as _corpus_adapter  # noqa: E402
 
     _corpus_adapter.register_home(_openxfactory_corpus.home_corpus)
+
+
+# ---------------------------------------------------------------------------
+# THE LAUNCH SUITE'S INSTALL (plan 034 T086; the holder's ruling on T086's
+# question Q4 (a), 2026-10-02).
+#
+# From openDox-code's T070 an install is HOSTED unless local is selected, and a
+# hosted install with no identity broker refuses. From T072 a local
+# `generate-and-open` starts its bundled PostgreSQL before it serves, even
+# with `--no-serve`, and the database arrives only with the `local` extra,
+# which this leg does not install. `tests/test_snapshot_validation_launch.py`
+# drives that verb to prove where the snapshot's validator comes from, which
+# neither the install mode nor the database decides. So for that suite alone
+# this selects the local install, scrubs every runtime setting the shell may
+# carry (a broker setting beside the local mode is refused by design), and
+# stands the bundled server in, as openDox-code's own entry-point suites do
+# (its `tests/test_doxbench_entrypoint.py`). The suite is one of F5.2's
+# protected suites, and its premise lives here so that none of its bytes
+# changes.
+#
+# TWO SHAPES OF PINNED openDox, and only two. Before T070 and T072 the leg has
+# no install mode and no bundle (`opendox.cli` carries no `bundle_mod`), and
+# this changes nothing. From them on it carries both. A leg carrying one and
+# not the other is between those landings, and is refused.
+# ---------------------------------------------------------------------------
+
+_LAUNCH_SUITE = "test_snapshot_validation_launch.py"
+
+
+@_pytest.fixture(autouse=True)
+def _the_launch_suite_runs_a_local_install(request, monkeypatch):
+    if request.node.path.name != _LAUNCH_SUITE:
+        yield
+        return
+    from opendox import cli as _cli
+    from opendox.runtime import config as _config
+
+    has_bundle = hasattr(_cli, "bundle_mod")
+    has_mode = hasattr(_config, "INSTALL_MODE_LOCAL")
+    assert has_bundle == has_mode, (
+        f"the pinned openDox carries {'a bundle' if has_bundle else 'no bundle'} "
+        f"and {'an install mode' if has_mode else 'no install mode'}: T070 and "
+        "T072 arrive together at every pin this leg takes, so this is neither "
+        "shape the launch suite's premise knows")
+    if not has_bundle:
+        yield
+        return
+    for name in _config.SETTING_NAMES:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv(_config.PREFIX + "INSTALL_MODE", _config.INSTALL_MODE_LOCAL)
+    # A scratch state directory, never the operator's own: a local install
+    # keeps its bundle there (T072), and openDox's per-machine binding trust
+    # its record (T100), so no case may read or write the real one.
+    state_dir = request.getfixturevalue("tmp_path_factory").mktemp("opendox-state")
+    monkeypatch.setenv(_config.PREFIX + "STATE_DIR", str(state_dir))
+
+    class _StandInBundle:
+        """The bundled PostgreSQL, stood in: the launch reads nothing from it."""
+
+        applied: list = []
+
+        def __init__(self, settings):
+            assert settings.install_mode == _config.INSTALL_MODE_LOCAL
+            assert Path(settings.state_dir) == state_dir
+
+        def start(self):
+            return self
+
+        def stop(self):
+            pass
+
+        def report(self):
+            return {"data_dir": None, "socket_dir": "(stood in)", "pid": None}
+
+    monkeypatch.setattr(_cli.bundle_mod, "BundledServer", _StandInBundle)
+    yield
+
+
+# ---------------------------------------------------------------------------
+# A HOST'S PLANE FOR THE SUITES THAT READ THE CONSOLE TOKEN (plan 034 T086,
+# step (b); openDox-code's T104, RULED openxFactory#656 comment 5963851934).
+#
+# From T104 openDox delivers the human console's per-serve token by WHOSE plane
+# it serves. On a host's plane it is published on `/capabilities`, as it always
+# was. On a standalone plane, built from openDox's own default profile, it is
+# not: the entry point writes it to a private copy and opens the page with it
+# in the URL's fragment (`opendox.console_access.delivery_for`). No module of
+# this leg registers an openDox profile, so every server these suites build
+# would be a standalone plane, and each of them reads the token from
+# `/capabilities`, as the served page of a HOST's plane does: through
+# `tests/doxbench_routes_harness.py` and `tests/gate_routes_harness.py`, or
+# directly. Measured composed at openDox-code main `c4b55cc4` merged with
+# openDox-code#76, #82 and #84: 99 cases fail `KeyError: 'console_token'`, or
+# miss the token in an asserted capability document.
+#
+# openXdox's governed columns are served only under a host (openxFactory
+# registers its profile at process start), so these suites run on a host's
+# plane, as the plan's step allows ("or register openXdox's profile as a
+# host"). For the length of each of their tests this registers a stand-in host
+# that contributes nothing (the default profile contributes no route either),
+# and puts the registry back afterwards, as `tests/test_gate_loop_views.py`'s
+# `register_host` does. Before T104 the delivery does not depend on the
+# profile, so this changes no token there.
+#
+# THE LIST IS THE SCAN'S. `tests/test_host_plane.py` holds it equal to the
+# test modules that read `console_token` from a capability document or import
+# one of the two harnesses, so a suite that starts reading the token joins it
+# or fails there.
+# ---------------------------------------------------------------------------
+
+HOST_PLANE_SUITES = frozenset({
+    "test_create_project.py",
+    "test_doxbench_abstract_route.py",
+    "test_doxbench_blank_reason.py",
+    "test_doxbench_knowledge_service.py",
+    "test_doxbench_request_handling.py",
+    "test_doxbench_thread_wiring.py",
+    "test_doxchat_model_intake.py",
+    "test_edit_action.py",
+    "test_edit_project.py",
+    "test_gate_failure_diagnostics.py",
+    "test_gateway_provenance.py",
+    "test_notebook_action.py",
+    "test_register_edit_lane.py",
+    "test_session_confinement.py",
+    "test_session_gates.py",
+    "test_session_verbs.py",
+})
+
+
+class StandInHost:
+    """A host's profile that contributes nothing: no route and no subcommand."""
+
+    ROUTE_EXTENSIONS: tuple = ()
+    SUBCOMMAND_EXTENSIONS: tuple = ()
+
+
+@_pytest.fixture(autouse=True)
+def _a_hosts_plane_for_the_token_reading_suites(request):
+    if request.node.path.name not in HOST_PLANE_SUITES:
+        yield
+        return
+    from opendox import default_profile as _default_profile
+    from opendox import domain_profile as _registry
+
+    previous = _registry.current() if _registry.is_registered() else None
+    _registry.unregister()
+    _registry.register(StandInHost())
+    try:
+        yield
+    finally:
+        _registry.unregister()
+        # The entry point's default is not put back as a registration: the
+        # next entry point registers it again, as it does in any process.
+        if previous is not None and previous is not _default_profile:
+            _registry.register(previous)

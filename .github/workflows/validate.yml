@@ -99,7 +99,11 @@ jobs:
       # and T097 ticks 9.2 with that note.
       #
       # ONE TEST IS LEFT OUT BESIDE THEM, WITH ITS STATED REASON, UNTIL T008:
-      # `LEFT_OUT` below, the 31-entry assembled `--help` tree. RULED
+      # `LEFT_OUT` below, the assembled `--help` tree: 31 entries through
+      # phase 2, and 32 from phase 3's pin, where T100 adds `model-binding
+      # trust` (RULED 5970917267). Plan 034 T086 renamed the node to
+      # `..._is_the_32_entry_tree_...` and moved `LEFT_OUT` with it in the
+      # same change, so the `--deselect` never names a missing test. RULED
       # openxFactory#656 comment 5859927858 (Brett Heap, 2026-09-27, "(b)
       # Exclude it until T008's arc"): "The test leaves T042's integration
       # step, with its stated reason: cli_gate imports openxFactory's
@@ -154,7 +158,7 @@ jobs:
       # a comment, so none does.
       - name: pytest
         env:
-          LEFT_OUT: tests/integration/test_assembled_surface.py::test_the_assembled_help_tree_is_the_31_entry_tree_the_manifest_records
+          LEFT_OUT: tests/integration/test_assembled_surface.py::test_the_assembled_help_tree_is_the_32_entry_tree_the_manifest_records
         run: |
           echo "::notice::open extraction, left out of this run until the doc_health direction arc (plan 034 T008): $LEFT_OUT. Its stated reason: cli_gate imports openxFactory's doc_health at load time, which is R1Q6 (d)'s kind of exclusion (RULED openxFactory#656 comment 5859927858). F9.2 still runs it."
           python -m pytest -q --junitxml=pytest-report.xml --deselect "$LEFT_OUT"
@@ -316,6 +320,25 @@ jobs:
       # `8d891652`, this branch with that `main` merged in, and read the same
       # triple: 1076, 1072 and 4. So the floors stand.
       #
+      # RAISED BY plan 034 T086, the same way. At openDox-code `c4b55cc4`
+      # (`main`, carrying T084 and T103), the pin it was built at, its head
+      # read selected 1096, passed 1092, skipped 4, failures 0, errors 0, in this
+      # step's own command. The +20 on both floors, file by file against
+      # `main` `6a3b93b9`:
+      #   * +20, `tests/test_column_contributions.py` (new);
+      #   * +1, `tests/test_declared_exclusion.py`, which gains
+      #     `tests/test_column_contributions_governed.py`'s case: that file
+      #     (new, nine cases) needs `doc_health`, so it joins the declaration
+      #     under that reason, and its own cases are not in these numbers;
+      #   * -1, `tests/test_dependency_direction.py`, whose ratchet reminder
+      #     is deleted with the ratchet, as it asked (the table is at (0, 0)).
+      # And +3 on both, to 1099 and 1095, for `tests/test_host_plane.py`
+      # (new; T086's step (b), the console token on a host's plane). Read
+      # in this step's own command at openDox-code `dede32b4` (#79, release
+      # 0.1.0), the commit T087 pins the openDox root at, which this change
+      # pins in the same landing: selected 1099, passed 1095, skipped 4.
+      # Every selected test passes, and the four skips are the same four.
+      #
       # THE SKIPS ARE NAMED, which is why the exact pin is safe to take. All
       # FOUR are `tests/test_aggregation_register_instance.py`'s, which the
       # sixteen-file list never ran: each skips because the "aggregation
@@ -345,8 +368,8 @@ jobs:
           # on a ruling, which lowers them with its reason (above). Set to
           # the measured values, which this suite has actually met on CI
           # rather than an aspiration.
-          MIN_SELECTED: "1076"
-          MIN_PASSED: "1072"
+          MIN_SELECTED: "1099"
+          MIN_PASSED: "1095"
           # EXACT - the load-bearing number.
           EXPECT_SKIPPED: "4"
         run: |

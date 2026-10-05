@@ -892,3 +892,194 @@ entries:
           stub = repo_root.parent / snapshot_mod.VALIDATOR_RELPATH   # the stub the helper wrote
           monkeypatch.setattr(snapshot_mod, "product_root", lambda: None)
           monkeypatch.setattr(snapshot_mod, "_packaged_validator", lambda: stub)
+  - suite: tests/test_session_snapshot.py
+    test: test_a_session_key_is_validated_against_the_roster_before_url_composition
+    landing: opensoft/openXdox-code#37
+    edit: admitted
+    reason: >-
+      One of the three pre-arc carve-residue reds that plan 034 T086
+      repairs. After the carve, openDox-code#21 (section 3.4 S7,
+      `1e46971`) made the bundle's `views/repo-selector-model.js` import
+      its sibling `./display.js`, and this test's node probe copied the
+      model alone into its temporary directory, so the import failed
+      before any assertion ran. The test now copies the sibling beside the
+      model. `display.js` imports nothing, so the two files are the
+      model's whole import closure, at openDox-code `047bb4fa` and at plan
+      034 T084.
+    ruled: >-
+      Brett's ruling at opensoft/openxFactory#656 comment 5962785556, item
+      1 ("Fix in T086, close at phase 3 (Recommended)"), on R1Q7 (a),
+      comment 5817152735. #1144's text is unchanged, and plan 034 records
+      the move.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one
+      step of the chain this landing's entries for the suite make, in
+      order, under F5.2's `--chains`: the landing's diff for this suite is
+      exactly the chain's recorded texts, each inside its own named test,
+      and this step's is `old` to `new`, inside the test named. No
+      assertion changes: the probe gains the one file its model imports,
+      and every check of the roster, the three restores, the default and
+      the safe segments stays.
+    before_blob: f78c4452aebb9d2601f9043ceb8d9c552040e9b6
+    after_blob: 0788053372f4eeb3bf3bb677bc5d4d0731d02231
+    old: |2
+          registry, _ = _registry_with_main(scratch_repo, tmp_path)
+          _create(scratch_repo, registry)
+
+          r = _run_model(registry.index_document(), tmp_path)
+    new: |2
+          registry, _ = _registry_with_main(scratch_repo, tmp_path)
+          _create(scratch_repo, registry)
+          # THE MODEL'S SIBLING TRAVELS WITH IT (plan 034 T086; openxFactory#656
+          # comment 5962785556, item 1). Since openDox-code#21 the model imports
+          # `./display.js`, which imports nothing, so the probe's directory carries
+          # both files: the model's whole import closure.
+          shutil.copy(MODEL_JS.parent / "display.js", tmp_path / "display.js")
+
+          r = _run_model(registry.index_document(), tmp_path)
+  - suite: tests/test_session_snapshot.py
+    test: test_the_hosted_session_arrival_path_is_recorded_and_not_built
+    landing: opensoft/openXdox-code#37
+    edit: admitted
+    reason: >-
+      One of the three pre-arc carve-residue reds that plan 034 T086
+      repairs. The per-route loop split the serve surface on `def
+      _handle_refresh_action(`, which is openxFactory's lane column
+      (`serve_openxfactory_lanes.py`, a `stays_openxfactory_adapter` row
+      under RULING DQ-1). It never arrived at this leg, and
+      `tests/conftest.py` lists it in `SERVE_SURFACE_NOT_AT_THIS_LEG`, so
+      the split found nothing and raised IndexError. The loop now names
+      this leg's two routes. The lane route's check that it asks
+      `hosted_ref_refused(` moves with its owner to an openxFactory host
+      test (plan 034 T094).
+    ruled: >-
+      Brett's ruling at opensoft/openxFactory#656 comment 5962785556, item
+      1 ("Fix in T086, close at phase 3 (Recommended)"), on R1Q7 (a),
+      comment 5817152735. The lane route's new home is the holder's ruling
+      on T086's question Q8 (a) (2026-10-02, relayed on the lane's
+      thread), recorded in the next plan 034 bookkeeping round.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one
+      step of the chain this landing's entries for the suite make, in
+      order, under F5.2's `--chains`: the landing's diff for this suite is
+      exactly the chain's recorded texts, each inside its own named test,
+      and this step's is `old` to `new`, inside the test named. No
+      assertion this leg can make is dropped: the definition and its three
+      named anchors, the absence of `apply_lane`, the call-site floor, and
+      each of this leg's two routes asking the predicate all stay, and the
+      third route's check moves to the repository that owns it.
+    before_blob: 0788053372f4eeb3bf3bb677bc5d4d0731d02231
+    after_blob: 345b55e6a6e7017c0bacc5fbc1893e4a9babbe96
+    old: |2
+          for route in ("_serve_snapshot", "_serve_source", "_handle_refresh_action"):
+    new: |2
+          # THIS LEG'S ROUTES (plan 034 T086; openxFactory#656 comment 5962785556,
+          # item 1). `_handle_refresh_action` is openxFactory's lane column, which
+          # never arrived here (`SERVE_SURFACE_NOT_AT_THIS_LEG`), so its check that
+          # it asks the predicate moves with it to openxFactory (plan 034 T094).
+          for route in ("_serve_snapshot", "_serve_source"):
+  - suite: tests/test_branch_session.py
+    test: test_serve_hands_the_route_its_registry_and_repository
+    landing: opensoft/openXdox-code#37
+    edit: respelling
+    respelled: >-
+      Where the gate route is read from:
+      `serve_mod.DashboardHandler._handle_gate_action` to
+      `GateRoutes._handle_gate_action`, imported inside the test from
+      `openxdox.serve_gate`, where the method has lived since the carve.
+      From openDox-code#77 (T084) the gate column is no base of openDox's
+      core `DashboardHandler`: openXdox contributes it through the
+      handler-contribution facet (R1Q1 (a)), so the core class no longer
+      carries the name and the old spelling raised AttributeError.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735, recorded in
+      #1144's F5.2 and 12.5 falsifiers by T007's batch C. The holder's
+      ruling on T086's question Q5 (a) (2026-10-02, relayed on the lane's
+      thread) accepted this entry as a respelling in T086, recorded in the
+      next plan 034 bookkeeping round.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. Its diff
+      for this suite is exactly `old` to `new`, inside the one test named.
+      The three assertions are unchanged: the route still hands the gate
+      engine the session registry and the repository, and the served
+      `checkout_root` is still unchanged. They now read the method the
+      request actually reaches, the contributed column's own, so no
+      assertion is weakened.
+    before_blob: 038d72c4619c171d2dcfc15b3f408220c334e70a
+    after_blob: bd5116edb49d5273876506df9e4fbfd2b023d264
+    old: |2
+          source = inspect.getsource(serve_mod.DashboardHandler._handle_gate_action)
+    new: |2
+          # THE COLUMN'S OWN DOOR (plan 034 T086). From T084 the gate column is no
+          # base of openDox's core handler: openXdox contributes it through the
+          # handler-contribution facet (R1Q1 (a)), so its method is read where it lives.
+          from openxdox.serve_gate import GateRoutes
+
+          source = inspect.getsource(GateRoutes._handle_gate_action)
+  - suite: tests/test_session_snapshot.py
+    test: test_a_new_serve_process_re_registers_the_session_at_startup
+    landing: opensoft/openXdox-code#37
+    edit: respelling
+    respelled: >-
+      The index route's name and the server that answers it. `/snapshot-
+      index.json` left `opendox.serve` for openXdox's projection column at
+      `split-opendox-two-layer-product` § 2.4 PR-3 (openxFactory #761) and
+      became a CONTRIBUTED binding,
+      `serve_projection.SNAPSHOT_INDEX_ROUTE`, served by
+      `ProjectionRoutesExtension`. openDox-code#10 (BUILD slice 2b)
+      removed the import that kept `serve_mod.SNAPSHOT_INDEX_ROUTE` alive,
+      so the test raised AttributeError. The constant alone is not enough:
+      in this leg's own process no host profile contributes the route, so
+      the serve is built inside the test with the projection extension, in
+      place of the shared `_serving` helper, which no entry can edit, and
+      torn down the same way. From T084 the extension's method arrives
+      through openDox's handler-contribution facet, which this landing
+      declares (`ProjectionRoutesExtension.HANDLER_CONTRIBUTIONS`).
+    ruled: >-
+      Brett's ruling at opensoft/openxFactory#656 comment 5962785556, item
+      1 ("Fix in T086, close at phase 3 (Recommended)"), on R1Q7 (a),
+      comment 5817152735. Entered as a respelling, as T086's prep proposed
+      and the holder ruled on T086's questions (all (a), 2026-10-02,
+      relayed on the lane's thread).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is the
+      third and last step of the chain this landing's entries for the
+      suite make, in order, under F5.2's `--chains`: the landing's diff
+      for this suite is exactly the chain's recorded texts, each inside
+      its own named test, and this step's is `old` to `new`, inside the
+      test named. Every assertion is kept and unchanged: the session ref
+      answers 200 with its own ref header and the created document, and
+      the index carries the session row with `main` active. The serve
+      still starts from an empty registry, which is the bootstrap under
+      test.
+    before_blob: 345b55e6a6e7017c0bacc5fbc1893e4a9babbe96
+    after_blob: b606be3db1baeff31f8811b7541e2da61e15403e
+    old: |2
+          with _serving(scratch_repo, main_path) as (host, port, _httpd):
+              status, headers, body = _get(host, port, f"{serve_mod.SNAPSHOT_ROUTE}"
+                                                       f"?repository={REPO}&ref={DRAFT}")
+              _i, _ih, ibody = _get(host, port, serve_mod.SNAPSHOT_INDEX_ROUTE)
+    new: |2
+          # THE INDEX ROUTE IS A CONTRIBUTED BINDING (plan 034 T086; openxFactory#656
+          # comment 5962785556, item 1). `/snapshot-index.json` left `opendox.serve`
+          # for openXdox's projection column at the carve, so its name is
+          # `serve_projection.SNAPSHOT_INDEX_ROUTE`, and a server answers it only
+          # where `ProjectionRoutesExtension` is collected: the serve is built here
+          # with it. It still starts from an empty registry, the bootstrap under test.
+          from openxdox import serve_projection
+
+          httpd = serve_mod.build_server(
+              WEB, main_path, scratch_repo.root, repository=scratch_repo.repository,
+              actor="tester",
+              route_extensions=(serve_projection.ProjectionRoutesExtension(),))
+          thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+          thread.start()
+          host, port = httpd.server_address[:2]
+          try:
+              status, headers, body = _get(host, port, f"{serve_mod.SNAPSHOT_ROUTE}"
+                                                       f"?repository={REPO}&ref={DRAFT}")
+              _i, _ih, ibody = _get(host, port, serve_projection.SNAPSHOT_INDEX_ROUTE)
+          finally:
+              httpd.shutdown()
+              httpd.server_close()
+              thread.join(timeout=2)

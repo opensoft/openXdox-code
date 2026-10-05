@@ -588,10 +588,29 @@ def test_a_new_serve_process_re_registers_the_session_at_startup(scratch_repo,
                                                         name="a.json")[0])
     main_path = _main_snapshot_file(scratch_repo, tmp_path / "served.json")
 
-    with _serving(scratch_repo, main_path) as (host, port, _httpd):
+    # THE INDEX ROUTE IS A CONTRIBUTED BINDING (plan 034 T086; openxFactory#656
+    # comment 5962785556, item 1). `/snapshot-index.json` left `opendox.serve`
+    # for openXdox's projection column at the carve, so its name is
+    # `serve_projection.SNAPSHOT_INDEX_ROUTE`, and a server answers it only
+    # where `ProjectionRoutesExtension` is collected: the serve is built here
+    # with it. It still starts from an empty registry, the bootstrap under test.
+    from openxdox import serve_projection
+
+    httpd = serve_mod.build_server(
+        WEB, main_path, scratch_repo.root, repository=scratch_repo.repository,
+        actor="tester",
+        route_extensions=(serve_projection.ProjectionRoutesExtension(),))
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    host, port = httpd.server_address[:2]
+    try:
         status, headers, body = _get(host, port, f"{serve_mod.SNAPSHOT_ROUTE}"
                                                  f"?repository={REPO}&ref={DRAFT}")
-        _i, _ih, ibody = _get(host, port, serve_mod.SNAPSHOT_INDEX_ROUTE)
+        _i, _ih, ibody = _get(host, port, serve_projection.SNAPSHOT_INDEX_ROUTE)
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=2)
 
     assert status == 200
     assert headers["x-snapshot-ref"] == DRAFT
@@ -665,6 +684,11 @@ def test_a_session_key_is_validated_against_the_roster_before_url_composition(
     roster here is the real serving index, session row included."""
     registry, _ = _registry_with_main(scratch_repo, tmp_path)
     _create(scratch_repo, registry)
+    # THE MODEL'S SIBLING TRAVELS WITH IT (plan 034 T086; openxFactory#656
+    # comment 5962785556, item 1). Since openDox-code#21 the model imports
+    # `./display.js`, which imports nothing, so the probe's directory carries
+    # both files: the model's whole import closure.
+    shutil.copy(MODEL_JS.parent / "display.js", tmp_path / "display.js")
 
     r = _run_model(registry.index_document(), tmp_path)
 
@@ -857,7 +881,11 @@ def test_the_hosted_session_arrival_path_is_recorded_and_not_built():
     assert "apply_lane" not in src
     # every route that accepts a ref asks the one predicate
     assert src.count("hosted_ref_refused(") >= 4   # the definition + 3 call sites
-    for route in ("_serve_snapshot", "_serve_source", "_handle_refresh_action"):
+    # THIS LEG'S ROUTES (plan 034 T086; openxFactory#656 comment 5962785556,
+    # item 1). `_handle_refresh_action` is openxFactory's lane column, which
+    # never arrived here (`SERVE_SURFACE_NOT_AT_THIS_LEG`), so its check that
+    # it asks the predicate moves with it to openxFactory (plan 034 T094).
+    for route in ("_serve_snapshot", "_serve_source"):
         body = src.split(f"def {route}(", 1)[1].split("\n    def ", 1)[0]
         assert "hosted_ref_refused(" in body, f"{route} does not ask the predicate"
 

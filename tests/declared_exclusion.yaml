@@ -59,7 +59,7 @@
 schema_version: 1
 kind: declared-test-exclusion
 
-count: 65
+count: 66
 
 reasons:
   - id: doc_health
@@ -79,6 +79,7 @@ entries:
   - {path: tests/test_authoring_agent.py, reasons: [doc_health]}
   - {path: tests/test_branch_session.py, reasons: [doc_health]}
   - {path: tests/test_canvas.py, reasons: [doc_health]}
+  - {path: tests/test_column_contributions_governed.py, reasons: [doc_health], note: "plan 034 T086: the governed columns register only where gate_console imports (Q1 (a)); their mechanism runs lone in tests/test_column_contributions.py"}
   - {path: tests/test_completeness.py, reasons: [doc_health]}
   - {path: tests/test_create_document_cli.py, reasons: [doc_health]}
   - {path: tests/test_create_project.py, reasons: [doc_health]}

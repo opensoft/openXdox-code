@@ -8,6 +8,11 @@ lifted out of `serve.py` UNCHANGED, byte for byte, as a mixin
 `_divergence_headers`, `loopback`, `source`, `snapshot_path`)
 resolves through the MRO to `serve.py`'s own core implementation.
 
+SINCE PLAN 034 T086 THE MIXIN HOLDS THE INDEX ROSTER ONLY. The snapshot read
+became the core handler's own at T055, and openDox's handler-contribution
+facet, through which the column arrives since T084, refuses a mixin that
+shadows the core (see `ProjectionRoutes`).
+
 WHAT ARRIVES THROUGH THE SEAM AND WHAT STAYS A CORE ARM. `/snapshot-index.json`
 is CONTRIBUTED here (`ProjectionRoutesExtension` below, assembled in
 `profile_openxfactory.py`), so `_route` no longer branches on it.
@@ -53,16 +58,11 @@ import the same way `serve.py` and `snapshot_registry.py` do.
 from __future__ import annotations
 
 import json
-import sys
-import urllib.parse
-from pathlib import Path
-
 
 import route_extension  # noqa: E402
 
 from openxdox import snapshot_registry as registry_mod  # noqa: E402
 from opendox.serve_wire import (  # noqa: E402
-    HOSTED_SESSION_REFUSAL,
     JSON_CTYPE,
 )
 
@@ -190,86 +190,23 @@ def hosted_ref_refused(loopback: bool, ref: str | None) -> bool:
 
 
 class ProjectionRoutes:
-    """The projection column, mixed into `DashboardHandler`."""
+    """The projection column, mixed into `DashboardHandler` by openDox's
+    handler-contribution facet: the index roster, `_serve_index`, and nothing
+    else.
 
-    def _query_key(self) -> tuple[str | None, str | None]:
-        """The optional `?repository=&ref=` of a read route. Absent repository
-        means the ACTIVE entry — which is what every pre-existing caller sends,
-        so today's behaviour is unchanged."""
-        query = urllib.parse.urlsplit(self.path).query
-        params = urllib.parse.parse_qs(query)
-        repository = (params.get("repository") or [None])[0]
-        ref = (params.get("ref") or [None])[0]
-        return repository, ref
-
-    # ---- snapshot ----
-    def _read_snapshot(self) -> bytes | None:
-        """The ACTIVE snapshot's bytes, through the registry when one is bound
-        (the in-process derived cache included) and from the configured path
-        otherwise."""
-        entry = self._active_entry()
-        if entry is not None:
-            return entry.read_bytes()
-        try:
-            return Path(self.snapshot_path).read_bytes()
-        except OSError:
-            return None
-
-    def _serve_snapshot(self, head_only: bool) -> None:
-        """`/snapshot.json` — the active snapshot, or any registered
-        (repository, ref) named by the query. An unknown pair is a 404; the
-        active view the client already has stays untouched.
-
-        On the HOSTED plane a non-`main` ref refuses before resolution (FR-048):
-        the serving index legitimately advertises a live session row (FR-014), so
-        without this a hosted request could name one."""
-        repository, ref = self._query_key()
-        if hosted_ref_refused(self.loopback, ref):
-            self._send_json(403, {"ok": False, "error": "session_unavailable",
-                                  "message": HOSTED_SESSION_REFUSAL})
-            return
-        if repository and self.source is not None:
-            entry = self.source.registry.resolve(repository, ref)
-            if entry is None:
-                # An AGGREGATE id (declared, or register-derived per project —
-                # add-project-merged-projection D11) composes at the default
-                # ref only. Off-loopback, members at unpublishable refs are
-                # dropped before composition (the hosted_index projection,
-                # applied to content).
-                composed = None
-                if registry_mod.is_publishable_ref(ref):
-                    composed = self.source.compose_view(
-                        repository, publishable_only=not self.loopback)
-                if composed is not None:
-                    self._serve_bytes(json.dumps(composed).encode("utf-8"),
-                                      JSON_CTYPE, head_only)
-                    return
-                self.send_error(404, "no such snapshot")
-                return
-            if self._hosted_entry_refused(entry):
-                return
-            self._serve_bytes(entry.read_bytes(), JSON_CTYPE, head_only, entry=entry)
-            return
-        if repository and self.source is None:
-            self.send_error(404, "no such snapshot")
-            return
-        # THE REF-LESS HOLE (PR #49 review finding 14, composing with finding
-        # 10b): a request that NAMES no ref resolves to the ACTIVE entry, and
-        # `hosted_ref_refused` only ever inspected the ref a request named. A
-        # non-`main` active entry would therefore have been served off-loopback
-        # with no key in sight. The refusal now follows the RESOLVED entry.
-        if self._hosted_entry_refused(self._active_entry()):
-            return
-        self._serve_bytes(self._read_snapshot(), JSON_CTYPE, head_only)
-
-    def _hosted_entry_refused(self, entry) -> bool:
-        """Refuse (and answer) when the entry a request RESOLVED to is
-        session-local and this is the hosted plane. Returns whether it answered."""
-        if entry is None or not hosted_ref_refused(self.loopback, getattr(entry, "ref", None)):
-            return False
-        self._send_json(403, {"ok": False, "error": "session_unavailable",
-                              "message": HOSTED_SESSION_REFUSAL})
-        return True
+    THE SNAPSHOT READ IS openDox's (plan 034 T086). This class used to carry
+    `_query_key`, `_read_snapshot`, `_serve_snapshot` and
+    `_hosted_entry_refused` as well. Plan 034's T055 made those four the core
+    handler's own (`opendox.serve.DashboardHandler`), which answers
+    `/snapshot.json` as a fixed core arm, so the copies here were dead: the
+    core's came first in the MRO. Since T084 the column arrives through the
+    facet (R1Q1 (a)), which composes a mixin only where it ADDS names and
+    refuses one that shadows the core's, so it holds only `_serve_index`
+    (the holder's ruling on T086's questions Q2 (a) and Q3 (a)).
+    `_serve_index` calls the core's `_serve_bytes`, `_send_json` and
+    `send_error` and this module's `hosted_index`, none of the four, so no
+    route's behaviour changes. `hosted_ref_refused` and `hosted_index` stay
+    module functions here: openxFactory's lane column imports the first."""
 
     def _serve_index(self, head_only: bool) -> None:
         """`/snapshot-index.json` — the roster the selector reads, composed from
@@ -300,7 +237,17 @@ class ProjectionRoutesExtension:
     here: each travels with the surface that answers it
     (`evidence_provenance_surface.py`, `model_scenario_workbench.py`,
     `role_authority_projection.py`), and the ruling leaves all three untouched.
+
+    THE MIXIN ITS BINDING'S METHOD LIVES ON (plan 034 T086). Since T084 the
+    core handler carries no stand-in for `_serve_index`, so the binding below
+    would name a method the server lacks. openDox's handler-contribution facet
+    (R1Q1 (a), `route_extension.HANDLER_FACET`) reads `HANDLER_CONTRIBUTIONS`
+    off every collected route extension and composes the mixins after the
+    core, so any host that collects this extension gets the column with it
+    (the holder's ruling on T086's question Q2 (a)).
     """
+
+    HANDLER_CONTRIBUTIONS = (ProjectionRoutes,)
 
     def routes(self) -> tuple[route_extension.RouteBinding, ...]:
         return (

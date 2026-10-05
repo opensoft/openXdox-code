@@ -233,7 +233,17 @@ class GateRoutesExtension:
     Conforms to `route_extension.RouteExtension` STRUCTURALLY (the protocol is
     `runtime_checkable`), so nothing about this class is imported by the core it
     contributes to — the direction that lets the § 3 carve take this file whole.
+
+    THE MIXIN ITS BINDING'S METHOD LIVES ON (plan 034 T086). Since T084 the
+    core handler carries no stand-in for `_handle_gate_action`, so the binding
+    below would name a method the server lacks. openDox's handler-contribution
+    facet (R1Q1 (a), `route_extension.HANDLER_FACET`) reads
+    `HANDLER_CONTRIBUTIONS` off every collected route extension and composes
+    the mixins after the core, so any host that collects this extension gets
+    the gate door with it (the holder's ruling on T086's question Q2 (a)).
     """
+
+    HANDLER_CONTRIBUTIONS = (GateRoutes,)
 
     def routes(self) -> tuple[route_extension.RouteBinding, ...]:
         return (

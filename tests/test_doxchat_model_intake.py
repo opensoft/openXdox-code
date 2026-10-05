@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import hashlib
 import http.client
+import importlib.util
 import json
 import os
 import shutil
@@ -729,6 +730,90 @@ def _request_without_content_length(host, port, method, path, *, headers=None):
     return resp.status, payload, raw
 
 
+def _trust_seam():
+    """`opendox.doxbench_trust`, the model-binding trust seam openDox-code's
+    T100 adds (openDox-code#82; #1144 16.3a), or None at a pin before it,
+    where the console intake asks no policy."""
+    if importlib.util.find_spec("opendox.doxbench_trust") is None:
+        return None
+    from opendox import doxbench_trust
+    return doxbench_trust
+
+
+#: The trust seam's whole state, as `opendox.doxbench_trust` keeps it: the
+#: registration, whether it is openDox's default, and whether a consumer has
+#: read that default (which closes its window to a host's registration).
+_TRUST_SEAM_STATE = ("_registered", "_is_default", "_default_read")
+
+
+@contextmanager
+def _trust_seam_restored(trust):
+    """Run the body, then put the trust seam back EXACTLY as it was, all
+    three fields, as this leg's column and profile isolation fixtures do
+    (Copilot at openXdox-code#37, r4178080465). `unregister()` alone would
+    drop a host policy registered before, or a read default, for every later
+    test of the process."""
+    if trust is None:
+        yield
+        return
+    saved = tuple(getattr(trust, name) for name in _TRUST_SEAM_STATE)
+    try:
+        yield
+    finally:
+        with trust._lock:
+            for name, value in zip(_TRUST_SEAM_STATE, saved):
+                setattr(trust, name, value)
+
+
+@pytest.fixture
+def stand_in_host_trust(tmp_path):
+    """A TEST-ONLY stand-in for a host's trust policy, admitting the console
+    intake's broker (plan 034 T086; the holder's ruling of 2026-10-04).
+
+    From T100 the intake's hand-off runs the broker the served repository's
+    `model-declarations.yaml` names only if the registered trust policy admits
+    it (`doxbench_trust.intake_verdict_for`). openDox's strict default,
+    `MachineTrust`, never does; a host's own policy may. In the composed
+    product that host is openxFactory, whose `GovernedBindingTrust` (plan 034
+    T094; RULED openxFactory#656 comment 5970369724, "Governance approval")
+    answers the question. This is a TEST DOUBLE of that answer: it admits the
+    intake, and it is `MachineTrust` for every other question, with its store
+    in a scratch state directory.
+    Its `record()` is `MachineTrust`'s, and these cases never call it.
+
+    openXdox's src registers NO trust policy (the holder's ruling: "T086
+    registers no trust policy"). Only the cases that ask for this fixture
+    register it, for their own length. They are every case that expects an
+    intake to complete (Copilot at openXdox-code#37 on the first two,
+    r4178050937 on the other four), and the case that expects the intake
+    OFFERED. From openDox-code#86 (T100's follow-on, A5) the surface offers
+    the intake only where the registered policy answers `intake_verdict`
+    itself (`doxbench_trust.intake_admissible`), which this stand-in does and
+    openDox's default does not. So they keep testing the intake flow they
+    were written for. The request-validation cases do not ask for it, since
+    their refusals come before the trust check. With no host policy the
+    intake is neither offered nor admitted, and its refusal is named, which
+    `test_with_no_host_policy_the_intake_refuses_the_repositorys_broker_by_name`
+    holds. At a pin before T100 this registers nothing."""
+    trust = _trust_seam()
+    if trust is None:
+        yield None
+        return
+
+    class StandInHostTrust(trust.MachineTrust):
+        """The host's answer to the intake's question, stood in."""
+
+        def intake_verdict(self, binding, *, root):
+            return trust.TrustVerdict.trusted_for(binding, root=root,
+                                                  basis=trust.BASIS_HOST)
+
+    policy = StandInHostTrust(state_dir=tmp_path / "opendox-state")
+    with _trust_seam_restored(trust):
+        trust.unregister()
+        trust.register(policy)
+        yield policy
+
+
 def _console(host, port):
     status, payload, _raw = _request(host, port, "GET", "/capabilities")
     assert status == 200, payload
@@ -774,7 +859,7 @@ def test_the_surface_refuses_when_no_broker_is_declared(scratch_repo, tmp_path):
 
 
 def test_a_declared_broker_offers_both_kinds_and_the_dialect_vocabulary(
-        scratch_repo, tmp_path):
+        scratch_repo, tmp_path, stand_in_host_trust):
     """Task 2.1. Both authentication kinds a human may hold are offered, and
     only one of them declares that it accepts a supplied value — which is the
     fact a renderer actually needs, stated on the server beside the vocabulary
@@ -823,7 +908,7 @@ def test_an_agent_invocation_is_refused_and_reported_on_every_intake_route(
 
 
 def test_a_completed_intake_keeps_only_the_reference_and_declares_it_pending(
-        scratch_repo, tmp_path):
+        scratch_repo, tmp_path, stand_in_host_trust):
     """Tasks 2.2 and 3.1. The value goes to the broker and only the returned
     reference is retained, in the binding shape `credential-contracts` already
     owns — and completing the flow yields a PENDING declaration that contributes
@@ -861,7 +946,7 @@ def test_a_completed_intake_keeps_only_the_reference_and_declares_it_pending(
 
 
 def test_the_supplied_value_is_found_nowhere_afterwards(scratch_repo, tmp_path,
-                                                        capfd):
+                                                        capfd, stand_in_host_trust):
     """TASK 2.4 — THE GREP TEST, and the test that makes the requirement real.
 
     After a completed intake the whole checkout, every response body, and every
@@ -907,7 +992,7 @@ def test_the_supplied_value_is_found_nowhere_afterwards(scratch_repo, tmp_path,
 
 
 def test_the_oauth_kind_surfaces_the_brokers_refusal_and_fakes_no_dance(
-        scratch_repo, tmp_path):
+        scratch_repo, tmp_path, stand_in_host_trust):
     """Task 2.3, HONESTLY. For the OAuth kind the dashboard must not be the
     party that receives the provider's tokens: it hands the human to the
     broker's OWN authorization flow (OQ-2, ruled 2026-08-21) and receives back
@@ -942,8 +1027,103 @@ def test_the_oauth_kind_surfaces_the_brokers_refusal_and_fakes_no_dance(
     assert bindings.list() == ()
 
 
+def test_with_no_host_policy_the_intake_refuses_the_repositorys_broker_by_name(
+        scratch_repo, tmp_path, monkeypatch):
+    """THE DESIGNED STANDALONE BEHAVIOUR (#1144 16.3a; openDox-code's T100).
+    With no host's trust policy registered, openDox's strict default answers
+    the intake's own question NO, so the intake
+    `test_a_completed_intake_keeps_only_the_reference_and_declares_it_pending`
+    completes under a host's policy is refused here by name,
+    `INTAKE_BROKER_UNTRUSTED`, which names the seam a host's policy registers
+    at (`opendox.doxbench_trust.register`). That is the sentence for a
+    refusal on openDox's own basis; a HOST's policy that declines is named
+    `INTAKE_HOST_NOT_ADMITTED` instead (openDox-code#86; the holder's ruling,
+    openxFactory#656 comment 5985490378, D3), and no host is registered
+    here. The broker never starts, and nothing is stored. From
+    openDox-code#86 (A5) the surface does not even offer the intake, naming
+    the same seam (`INTAKE_NOT_ADMISSIBLE`). At a pin before T100 the intake
+    asks no policy, and it completes as that case's does."""
+    trust = _trust_seam()
+    monkeypatch.setenv("OPENDOX_STATE_DIR", str(tmp_path / "opendox-state"))
+    with _trust_seam_restored(trust):
+        if trust is not None:
+            trust.unregister()
+        program, record = _write_broker(tmp_path)
+        _declare_broker(scratch_repo.root, program)
+        with _serving(scratch_repo.root, tmp_path) as (host, port):
+            token = _console(host, port)
+            surface = _request(host, port, "GET", SURFACE_ROUTE,
+                               headers={"X-XF-Console-Token": token})
+            status, payload, _raw = _enrol(host, port, token, kind="api_key")
+        if trust is None:
+            assert status == 200, payload
+            return
+        if hasattr(trust, "intake_admissible"):
+            # openDox-code#86 (A5): no registered policy admits a hand-off,
+            # so the intake is not offered, and no field takes a secret
+            surface_status, offer, _surface_raw = surface
+            assert surface_status == 200, offer
+            assert offer["offered"] is False, offer
+            assert offer["auth_kinds"] == []
+            assert offer["reason"] == trust.INTAKE_NOT_ADMISSIBLE
+            assert "opendox.doxbench_trust.register" in offer["reason"]
+        assert status == serve_mod.doxbench_error_status(
+            serve_mod.DOXBENCH_ERR_INTAKE_REFUSED), payload
+        assert payload["reason"] == trust.INTAKE_BROKER_UNTRUSTED
+        assert "opendox.doxbench_trust.register" in payload["reason"]
+        assert not record.exists(), "the refused intake handed the broker a value"
+        assert not _broker_calls(tmp_path).exists(), "the refused intake ran the broker"
+        store = doxbench_intake.DeclarationStore(
+            doxbench_intake.declarations_path(scratch_repo.root))
+        assert store.list() == ()
+        bindings = doxbench_binding.BindingStore(
+            doxbench_binding.bindings_path(scratch_repo.root))
+        assert bindings.list() == ()
+
+
+def test_the_trust_seam_is_left_exactly_as_each_case_found_it():
+    """The stand-in policy, and the standalone case's unregistering, change the
+    trust seam only for their own case (Copilot at openXdox-code#37,
+    r4178080465): a host's policy registered before is put back, and so is a
+    default some consumer had already read, flags and all. At a pin before
+    T100 there is no seam, and the guard does nothing."""
+    trust = _trust_seam()
+    if trust is None:
+        with _trust_seam_restored(trust):
+            pass
+        return
+
+    class HostPolicy:
+        def verdict(self, binding, *, root):
+            raise AssertionError("not asked")
+
+        def record(self, binding, *, root):
+            raise AssertionError("not asked")
+
+    def state():
+        return tuple(getattr(trust, name) for name in _TRUST_SEAM_STATE)
+
+    with _trust_seam_restored(trust):
+        trust.unregister()
+        host = trust.register(HostPolicy())
+        before = state()
+        with _trust_seam_restored(trust):
+            trust.unregister()
+            trust.register(trust.MachineTrust())
+        assert state() == before and trust.current() is host
+
+        trust.unregister()
+        trust.register_default()
+        trust.current()  # a consumer reads the default
+        before = state()
+        assert before[1:] == (True, True)
+        with _trust_seam_restored(trust):
+            trust.unregister()
+        assert state() == before
+
+
 def test_the_approval_writes_a_gate_record_before_the_model_becomes_available(
-        scratch_repo, tmp_path):
+        scratch_repo, tmp_path, stand_in_host_trust):
     """Task 3.2. Approval is an explicit act by the resolved local human actor,
     recorded the way this dashboard records every other governed act: a gate
     action naming the model declaration it approved, carrying who issued, who
@@ -982,7 +1162,7 @@ def test_the_approval_writes_a_gate_record_before_the_model_becomes_available(
 
 
 def test_a_second_approval_and_an_unknown_declaration_both_refuse(
-        scratch_repo, tmp_path):
+        scratch_repo, tmp_path, stand_in_host_trust):
     """Task 3.2's edges. A repeated approval would record an act with no effect,
     and an approval of something nobody declared would record an authority over
     nothing. Both refuse with a STATED reason and write nothing."""
@@ -1110,7 +1290,8 @@ def test_a_turn_naming_the_affordance_refuses_through_the_existing_refusal(
 # layer 3b — the records themselves
 # ===========================================================================
 
-def test_the_closed_catalog_entry_does_not_widen(scratch_repo, tmp_path):
+def test_the_closed_catalog_entry_does_not_widen(scratch_repo, tmp_path,
+                                               stand_in_host_trust):
     """Task 3.5, asserted rather than asserted-about. Proposed-versus-approved
     is a SERVER-SIDE distinction and a pending declaration is simply not in the
     catalog, so the public entry's shape is untouched — widening it is a
