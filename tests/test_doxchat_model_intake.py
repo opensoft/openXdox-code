@@ -779,15 +779,21 @@ def stand_in_host_trust(tmp_path):
     answers the question. This is a TEST DOUBLE of that answer: it admits the
     intake, and it is `MachineTrust` for every other question, with its store
     in a scratch state directory.
+    Its `record()` is `MachineTrust`'s, and these cases never call it.
 
     openXdox's src registers NO trust policy (the holder's ruling: "T086
     registers no trust policy"). Only the cases that ask for this fixture
-    register it, for their own length: every case that expects an intake to
-    complete (Copilot at openXdox-code#37 on the first two, r4178050937 on the
-    other four), so they keep testing the intake flow they were written for.
-    The request-validation cases do not ask for it, since their refusals come
-    before the trust check. With no host policy the same intake is refused by
-    name, which `test_with_no_host_policy_the_intake_refuses_the_repositorys_broker_by_name`
+    register it, for their own length. They are every case that expects an
+    intake to complete (Copilot at openXdox-code#37 on the first two,
+    r4178050937 on the other four), and the case that expects the intake
+    OFFERED. From openDox-code#86 (T100's follow-on, A5) the surface offers
+    the intake only where the registered policy answers `intake_verdict`
+    itself (`doxbench_trust.intake_admissible`), which this stand-in does and
+    openDox's default does not. So they keep testing the intake flow they
+    were written for. The request-validation cases do not ask for it, since
+    their refusals come before the trust check. With no host policy the
+    intake is neither offered nor admitted, and its refusal is named, which
+    `test_with_no_host_policy_the_intake_refuses_the_repositorys_broker_by_name`
     holds. At a pin before T100 this registers nothing."""
     trust = _trust_seam()
     if trust is None:
@@ -853,7 +859,7 @@ def test_the_surface_refuses_when_no_broker_is_declared(scratch_repo, tmp_path):
 
 
 def test_a_declared_broker_offers_both_kinds_and_the_dialect_vocabulary(
-        scratch_repo, tmp_path):
+        scratch_repo, tmp_path, stand_in_host_trust):
     """Task 2.1. Both authentication kinds a human may hold are offered, and
     only one of them declares that it accepts a supplied value — which is the
     fact a renderer actually needs, stated on the server beside the vocabulary
@@ -1029,9 +1035,14 @@ def test_with_no_host_policy_the_intake_refuses_the_repositorys_broker_by_name(
     `test_a_completed_intake_keeps_only_the_reference_and_declares_it_pending`
     completes under a host's policy is refused here by name,
     `INTAKE_BROKER_UNTRUSTED`, which names the seam a host's policy registers
-    at (`opendox.doxbench_trust.register`). The broker never starts, and
-    nothing is stored. At a pin before T100 the intake asks no policy, and it
-    completes as that case's does."""
+    at (`opendox.doxbench_trust.register`). That is the sentence for a
+    refusal on openDox's own basis; a HOST's policy that declines is named
+    `INTAKE_HOST_NOT_ADMITTED` instead (openDox-code#86; the holder's ruling,
+    openxFactory#656 comment 5985490378, D3), and no host is registered
+    here. The broker never starts, and nothing is stored. From
+    openDox-code#86 (A5) the surface does not even offer the intake, naming
+    the same seam (`INTAKE_NOT_ADMISSIBLE`). At a pin before T100 the intake
+    asks no policy, and it completes as that case's does."""
     trust = _trust_seam()
     monkeypatch.setenv("OPENDOX_STATE_DIR", str(tmp_path / "opendox-state"))
     with _trust_seam_restored(trust):
@@ -1041,10 +1052,21 @@ def test_with_no_host_policy_the_intake_refuses_the_repositorys_broker_by_name(
         _declare_broker(scratch_repo.root, program)
         with _serving(scratch_repo.root, tmp_path) as (host, port):
             token = _console(host, port)
+            surface = _request(host, port, "GET", SURFACE_ROUTE,
+                               headers={"X-XF-Console-Token": token})
             status, payload, _raw = _enrol(host, port, token, kind="api_key")
         if trust is None:
             assert status == 200, payload
             return
+        if hasattr(trust, "intake_admissible"):
+            # openDox-code#86 (A5): no registered policy admits a hand-off,
+            # so the intake is not offered, and no field takes a secret
+            surface_status, offer, _surface_raw = surface
+            assert surface_status == 200, offer
+            assert offer["offered"] is False, offer
+            assert offer["auth_kinds"] == []
+            assert offer["reason"] == trust.INTAKE_NOT_ADMISSIBLE
+            assert "opendox.doxbench_trust.register" in offer["reason"]
         assert status == serve_mod.doxbench_error_status(
             serve_mod.DOXBENCH_ERR_INTAKE_REFUSED), payload
         assert payload["reason"] == trust.INTAKE_BROKER_UNTRUSTED
