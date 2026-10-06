@@ -44,7 +44,8 @@ import pytest
 import yaml
 
 from conftest import (  # noqa: F401
-    PINNED_REVISION, REPO_ROOT, FakeGit, serve_surface_source,
+    CONTRACTS_DIR, PINNED_REVISION, FakeGit, openxfactory_root,
+    serve_surface_source,
 )
 from session_fixtures import scratch_repo  # noqa: F401
 
@@ -546,6 +547,13 @@ def test_the_intake_transport_stays_out_of_the_fetch_bearing_set():
     assert "/actions/workbench/model-approval" not in view
 
 
+#: The authentication kinds the intake flow offers: the record's vocabulary,
+#: in its order, less `none`, which a broker never enrols (T080,
+#: openDox-code `1130e99`; #1144 box 16.3).
+_BROKER_ENROLLED_KINDS = [kind for kind in doxbench_binding.AUTH_KINDS
+                          if kind != doxbench_binding.AUTH_KIND_NONE]
+
+
 def test_no_browser_module_names_the_authentication_kinds():
     """The absolute views clause, applied where it bites hardest. The intake
     flow offers two authentication kinds and NO browser module spells either
@@ -558,8 +566,12 @@ def test_no_browser_module_names_the_authentication_kinds():
         source = path.read_text(encoding="utf-8")
         assert doxbench_binding.AUTH_KIND_API_KEY not in source, path.name
     # …and the server IS where they live, read from the record that owns them.
+    # The flow offers every kind a broker enrols, which is every member but
+    # `none` (T080, openDox-code `1130e99`; #1144 box 16.3): a `none` binding
+    # holds no credential, so there is nothing for this flow to hand a broker
+    # (plan 038 T101, R2-INV-R9's CP).
     kinds = [entry["kind"] for entry in doxbench_intake.auth_kind_disclosure()]
-    assert kinds == list(doxbench_binding.AUTH_KINDS)
+    assert kinds == _BROKER_ENROLLED_KINDS
     assert [entry["accepts_secret"]
             for entry in doxbench_intake.auth_kind_disclosure()] == [True, False]
 
@@ -779,7 +791,9 @@ def stand_in_host_trust(tmp_path):
     answers the question. This is a TEST DOUBLE of that answer: it admits the
     intake, and it is `MachineTrust` for every other question, with its store
     in a scratch state directory.
-    Its `record()` is `MachineTrust`'s, and these cases never call it.
+    Its `record()` is `MachineTrust`'s. Only the approval case asks it, through
+    `doxbench_trust.recording_for` as `model-binding trust` does, and it
+    records into that scratch state directory.
 
     openXdox's src registers NO trust policy (the holder's ruling: "T086
     registers no trust policy"). Only the cases that ask for this fixture
@@ -873,8 +887,7 @@ def test_a_declared_broker_offers_both_kinds_and_the_dialect_vocabulary(
             headers={"X-XF-Console-Token": token})
     assert status == 200, payload
     assert payload["offered"] is True
-    assert [k["kind"] for k in payload["auth_kinds"]] == list(
-        doxbench_binding.AUTH_KINDS)
+    assert [k["kind"] for k in payload["auth_kinds"]] == _BROKER_ENROLLED_KINDS
     assert payload["dialects"] == list(doxbench_binding.DIALECTS)
     assert "reason" not in payload
 
@@ -1153,10 +1166,31 @@ def test_the_approval_writes_a_gate_record_before_the_model_becomes_available(
     assert approval["audit_ref"]
     # the RELEASED schema accepts it — the same validator the console ran
     gate_console.validate_gate_action_record(record)
-    # …and only NOW does the model become available.
-    factory = doxbench_install.declared_model_port_factory(
-        tmp_path / "sessions", checkout_root=scratch_repo.root)
-    entries = factory().catalog().entries
+    # …and only NOW does the model become available, once THIS MACHINE trusts
+    # it as well. SINCE T100 (openDox-code `38d3350`; #1144 16.3a) a binding
+    # read from a repository serves only once the operator has trusted that
+    # exact binding here: the approval is the human's recorded act, and
+    # `opendox model-binding trust <id>` is the machine's. So the approved
+    # model is listed and not yet available. The trust is then recorded as
+    # that verb records it, by asking the registered policy
+    # (`doxbench_trust.recording_for`; here this case's stand-in, whose store
+    # is a scratch state directory), and the model is available (plan 038
+    # T101, R2-INV-R9's CP). Each catalog is read off a factory built at that
+    # moment, as an install builds one: the factory takes the policy's verdict
+    # when it is built (`trust_gated_model_port_factory`).
+    def catalog_entries():
+        factory = doxbench_install.declared_model_port_factory(
+            tmp_path / "sessions", checkout_root=scratch_repo.root)
+        return factory().catalog().entries
+
+    entries = catalog_entries()
+    assert [entry.model_id for entry in entries] == ["authoring-model"]
+    assert entries[0].available is False
+    from opendox import doxbench_trust
+    binding = doxbench_binding.BindingStore(
+        doxbench_binding.bindings_path(scratch_repo.root)).get("authoring-model")
+    doxbench_trust.recording_for(binding, root=Path(scratch_repo.root).resolve())
+    entries = catalog_entries()
     assert [entry.model_id for entry in entries] == ["authoring-model"]
     assert entries[0].available is True
 
@@ -1442,7 +1476,11 @@ def test_an_unreadable_declarations_document_suppresses_nothing(tmp_path):
 # layer 4 — the contract
 # ===========================================================================
 
-CONTRACTS = REPO_ROOT / "contracts"
+# The contract family's composed source: the farm plan 038 T095 builds for a
+# composed run, laid out openxFactory-style, whose `schemas/` resolve to the
+# owners' spec legs (CONTRACTS_DIR; T101's CS). This leg carries no
+# `contracts/` of its own, so its old spelling here read nothing.
+CONTRACTS = CONTRACTS_DIR
 
 
 def test_the_gate_action_enum_gained_exactly_one_additive_member():
@@ -1503,32 +1541,74 @@ def test_the_turn_record_gained_the_remint_fact_additively():
     assert schema["contract_schema_version"] == 1
 
 
+#: The release's two schemas, each with the root that OWNS its manifest row
+#: since contract-v4.0 (split-opendox-two-layer-product § 5.7): the openXdox
+#: root and the openDox root, each publishing its spec leg's contracts and
+#: consumed by openxFactory at a commit.
+_RELEASED_SCHEMA_OWNERS = (("gate-action-record", "openXdox"),
+                           ("xfactory-workbench-chat-turn", "openDox"))
+
+
 def test_the_bundle_release_names_both_schemas_and_recomputes_both_digests():
     """The additive-release recipe, followed exactly: the manifest's bundle
     version moves, both changed rows' `sha256` are recomputed from the bytes on
     disk, both `consumption_rule`s name what arrived, and the CHANGELOG carries
-    one entry per release."""
-    manifest = yaml.safe_load(
-        (CONTRACTS / "manifest.yaml").read_text(encoding="utf-8"))
+    one entry per release.
+
+    OVER BOTH OWNERS, IN THE COMPOSED TREE (plan 038 T101; RULED W6,
+    openxFactory#656 `6021830531`). contract-v1.45 was cut in openxFactory's
+    one manifest. At contract-v4.0 the two rows left it, byte-unchanged, for
+    the roots that own the family now: `gate-action-record` for the openXdox
+    root's manifest and `xfactory-workbench-chat-turn` for the openDox root's,
+    each row naming its spec leg, the commit it is consumed at, and the digest.
+    So the LIVE half is asked of each owner: the row is in its owner's manifest
+    and in no other of the three, and its recorded digest is recomputed from
+    the bytes its spec leg carries in the composed tree. The immutable half,
+    the release's own entry, is in openxFactory's CHANGELOG still, where
+    contract-v1.45 was cut, with its digest inventory. The two
+    `consumption_rule`s left with openxFactory's rows: an owner's row carries
+    none, so the entry is where this release still names what arrived."""
     # `contract_bundle_version` is a MOVING POINTER at whatever bundle was cut
     # last, not a fact about THIS release: pinning it to contract-v1.45 asserted
     # that no later bundle exists, which contract-v1.46 falsified and every
     # future cut would falsify again. This release's own facts are immutable and
     # are the ones asserted — its CHANGELOG entry and its digest inventory,
-    # both of which name the two schemas — plus the LIVE half that actually
-    # matters here: both schemas are still manifest members whose recorded
+    # both of which name the two schemas, and both openxFactory's, where the
+    # release was cut — plus the LIVE half that actually matters here: both
+    # schemas are still manifest members, each of its owner's, whose recorded
     # digests match their bytes on disk.
-    rows = {row["id"]: row for row in manifest["contracts"]}
-    for contract_id in ("gate-action-record", "xfactory-workbench-chat-turn"):
-        row = rows[contract_id]
+    openxfactory = openxfactory_root()
+    assert openxfactory is not None, (
+        "the release record is read from the composed tree, so this runs "
+        "composed (R1Q23 (a)), with openxFactory's scripts/ on the path")
+    roots = {"openxFactory": openxfactory,
+             "openXdox": openxfactory / "openXdox",
+             "openDox": openxfactory / "openDox"}
+    manifests = {name: yaml.safe_load((root / "contracts" / "manifest.yaml")
+                                      .read_text(encoding="utf-8"))
+                 for name, root in roots.items()}
+
+    def rows_of(manifest):
+        # openxFactory's manifest lists `contracts`, an owner root's `entries`
+        return [*(manifest.get("contracts") or ()),
+                *(manifest.get("entries") or ())]
+
+    for contract_id, owner in _RELEASED_SCHEMA_OWNERS:
+        holders = [name for name, manifest in manifests.items()
+                   if any(row.get("id") == contract_id
+                          for row in rows_of(manifest))]
+        assert holders == [owner], (contract_id, holders)
+        rows = [row for row in rows_of(manifests[owner])
+                if row.get("id") == contract_id]
+        assert len(rows) == 1, (contract_id, rows)
+        row = rows[0]
+        assert row["release_member"] is True, contract_id
+        assert row["contract_schema_version"] == 1, contract_id
         digest = hashlib.sha256(
-            (REPO_ROOT / row["path"]).read_bytes()).hexdigest()
+            (roots[owner] / row["leg"] / row["path"]).read_bytes()).hexdigest()
         assert row["sha256"] == digest, contract_id
-        assert row["schema_version"] == 1
-    assert "contract-v1.45" in rows["gate-action-record"]["consumption_rule"]
-    assert "contract-v1.45" in rows[
-        "xfactory-workbench-chat-turn"]["consumption_rule"]
-    changelog = (CONTRACTS / "CHANGELOG.md").read_text(encoding="utf-8")
+    changelog = (openxfactory / "contracts" / "CHANGELOG.md").read_text(
+        encoding="utf-8")
     assert changelog.count("## contract-v1.45 —") == 1
     # Scoped to THIS entry's own section. Reading everything above the v1.44
     # heading was the same moving-pointer mistake in a second dress: once a
@@ -1539,8 +1619,8 @@ def test_the_bundle_release_names_both_schemas_and_recomputes_both_digests():
     assert "gate-action-record" in entry
     assert "xfactory-workbench-chat-turn" in entry
     inventory = yaml.safe_load(
-        (CONTRACTS / "releases" / "contract-v1.45.digests.yaml").read_text(
-            encoding="utf-8"))
+        (openxfactory / "contracts" / "releases"
+         / "contract-v1.45.digests.yaml").read_text(encoding="utf-8"))
     assert inventory["bundle_tag"] == "contract-v1.45"
     named = {e["path"] for e in inventory["entries"]}
     for schema in ("contracts/schemas/gate-action-record.schema.yaml",
