@@ -723,12 +723,12 @@ _RULED_DYNAMIC_IMPORTS = {
 # `import`, then any JavaScript whitespace (U+FEFF too, which Python's `\s`
 # does not cover), then `(`. A member call (`a.import(`) is not a dynamic
 # import and is skipped where it is found; a spread (`...import(`) is one.
-_DYNAMIC_IMPORT_RE = re.compile(r"(?<![\w$])import[\s﻿]*\(")
+_DYNAMIC_IMPORT_RE = re.compile(r"(?<![\w$])import[\s\ufeff]*\(")
 
 # JavaScript's four line terminators: each ends a `//` comment and a regular-
 # expression literal, and CR and LF end an unterminated quoted string (U+2028
 # and U+2029 are legal inside one).
-_LINE_END_RE = re.compile("[\n\r  ]")
+_LINE_END_RE = re.compile("[\n\r\u2028\u2029]")
 
 # A `/` that is not a comment opens a regular-expression literal, not a
 # division, at the start of the source, after one of these characters, or
@@ -768,14 +768,12 @@ def _without_comments(src: str) -> str:
         c = src[i]
         if c in "'\"`":
             # a quoted string ends at its quote, or, unterminated, at CR or LF;
-            # a template may span lines; an escape (a line continuation over
-            # CR LF included) is skipped whole
+            # a template may span lines; an escape is skipped whole (a line
+            # continuation included: the file is read with universal newlines,
+            # so a CR LF arrives as one LF)
             j = i + 1
             while j < n and src[j] != c and (c == "`" or src[j] not in "\r\n"):
-                if src[j] == "\\":
-                    j += 3 if src.startswith("\r\n", j + 1) else 2
-                else:
-                    j += 1
+                j += 2 if src[j] == "\\" else 1
             out.extend(src[i:j + 1])
             i = j + 1
         elif src.startswith("//", i):
@@ -788,7 +786,7 @@ def _without_comments(src: str) -> str:
             i = n if j < 0 else j + 2
         elif c == "/" and regex_may_start():
             j, in_class = i + 1, False
-            while j < n and src[j] not in "\n\r  ":
+            while j < n and src[j] not in "\n\r\u2028\u2029":
                 if src[j] == "\\":
                     j += 2
                     continue
@@ -861,6 +859,62 @@ def test_dynamic_import_is_absent():
     assert 'const bundleRoot = new URL("../", import.meta.url);' in loader, (
         "the registry's loader no longer resolves a binding against the "
         "bundle's own root")
+
+
+# The scan's own regression cases (Copilot's third finding on #47): each is a
+# probe file's source and the site map the scan must read from it. A call
+# the scan must FIND sits beside text that could hide it, and a spelling that
+# is not a dynamic import must read as none. The written bytes are exactly
+# these, so CR, U+2028, U+2029 and U+FEFF reach the scan.
+_SCAN_CASES = [
+    ("plain", 'const m = await import("./a.js");', ['"./a.js"']),
+    ("line-comment", '// import("./a.js")\nconst x = 1;', []),
+    ("block-comment", '/* import("./a.js") */ const x = 1;', []),
+    ("code-after-block-comment", '/* a note */ const m = import("./a.js");', ['"./a.js"']),
+    ("line-break-before-paren", 'const m = import\n("./a.js");', ['"./a.js"']),
+    ("comment-before-paren", 'const m = import /* why */ ("./a.js");', ['"./a.js"']),
+    ("generator-method-line", 'const o = {\n  *load() {\n    yield import("./a.js");\n  },\n};',
+     ['"./a.js"']),
+    ("cr-ends-line-comment", '// c\rconst m = import("./a.js");', ['"./a.js"']),
+    ("u2028-ends-line-comment", '// c\u2028const m = import("./a.js");', ['"./a.js"']),
+    ("u2029-ends-line-comment", '// c\u2029const m = import("./a.js");', ['"./a.js"']),
+    ("spread", 'const m = [...import("./a.js")];', ['"./a.js"']),
+    ("ufeff-before-paren", 'const m = import\ufeff("./a.js");', ['"./a.js"']),
+    ("member-call-is-not-one", 'const m = loader.import("./a.js");', []),
+    ("optional-member-call-is-not-one", 'const m = loader?.import("./a.js");', []),
+    ("slashes-in-string", 'const u = "http://x/"; const m = import("./a.js");', ['"./a.js"']),
+    ("slashes-in-template", 'const u = `http://x/`; const m = import("./a.js");', ['"./a.js"']),
+    ("quote-and-slashes-in-regex", 'const r = /["\\/\\/]/; const m = import("./a.js");',
+     ['"./a.js"']),
+    ("escaped-slash-then-slash-in-regex", 'const r = /a\\//; const m = import("./a.js");',
+     ['"./a.js"']),
+    ("crlf-continuation-in-string",
+     'const s = "a\\\r\nb"; const u = "http://x/"; const m = import("./a.js");', ['"./a.js"']),
+    ("spelled-in-a-string-over-counts", 'const s = "import(\'./a.js\')";', ["'./a.js'"]),
+    ("argument-whitespace-collapsed", 'import(\n  new URL(m,\n    root).href)', ["new URL(m, root).href"]),
+]
+
+
+@pytest.mark.parametrize(("source", "expected"), [c[1:] for c in _SCAN_CASES],
+                         ids=[c[0] for c in _SCAN_CASES])
+def test_the_dynamic_import_scan_reads_code_as_a_lexer_does(tmp_path, source, expected):
+    """`_dynamic_import_sites` over one probe module: the calls it must find
+    and the spellings it must not count, so a weaker scan cannot pass
+    `test_dynamic_import_is_absent` on today's bundle alone."""
+    (tmp_path / "views").mkdir()
+    (tmp_path / "views" / "probe.js").write_bytes(source.encode("utf-8"))
+    assert _dynamic_import_sites(tmp_path) == (
+        {"views/probe.js": expected} if expected else {})
+
+
+def test_the_dynamic_import_scan_reads_every_script_suffix(tmp_path):
+    """A module the bundle can serve under any script or page suffix is read;
+    a file of another kind is not."""
+    call = 'const m = import("./a.js");'
+    for name in ("a.js", "b.mjs", "c.cjs", "d.html", "e.htm", "f.css", "g.txt", "h.json"):
+        (tmp_path / name).write_text(call, encoding="utf-8")
+    assert sorted(_dynamic_import_sites(tmp_path)) == [
+        "a.js", "b.mjs", "c.cjs", "d.html", "e.htm", "f.css"]
 
 
 # ----------------------------------------------------------------------------
