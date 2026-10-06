@@ -104,6 +104,11 @@ SOURCE = TESTS.parent / "src"
 #: A `gate` verb, as a test module spells it: the string `gate` and, after the
 #: comma, the verb, the way an argument vector names a subcommand.
 _GATE_VERB = re.compile(r"""["']gate["']\s*,\s*["']([a-z][a-z-]*)["']""")
+#: Or as a command line spells it: a string that opens with `gate` and the verb,
+#: the way a CLI descriptor does that a test parses with the real parser
+#: (`test_staging_workbench.py`; plan 038 T026, RULED at openxFactory#656
+#: comment 6016648451).
+_GATE_COMMAND = re.compile(r"""["']gate ([a-z][a-z-]*)""")
 
 
 def _gate_verbs() -> frozenset[str]:
@@ -121,8 +126,10 @@ def _gate_verbs() -> frozenset[str]:
 
 
 def _drives_a_gate_verb(path: Path, verbs: frozenset[str]) -> bool:
+    text = path.read_text(encoding="utf-8")
     return any(verb in verbs
-               for verb in _GATE_VERB.findall(path.read_text(encoding="utf-8")))
+               for spelling in (_GATE_VERB, _GATE_COMMAND)
+               for verb in spelling.findall(text))
 
 
 def test_the_governed_list_is_every_governed_suite_that_drives_a_gate_verb() -> None:
