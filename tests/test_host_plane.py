@@ -406,7 +406,8 @@ def test_this_process_has_a_farm_exactly_where_it_is_composed() -> None:
         assert tests_conftest.CONTRACTS_DIR is None
         return
     farm = tests_conftest.CONTRACTS_DIR
-    assert farm is not None and farm.name == "contracts"
+    assert farm is not None
+    assert farm.name == "contracts"
     assert (farm / "schemas").is_dir()
     assert (farm.parent / "examples" / "ideation-dashboard").is_dir()
     assert os.environ["CONTRACTS_DIR"] == str(farm)
@@ -448,7 +449,8 @@ def test_composed_a_declared_host_suite_runs_under_the_governed_host(
 def _fixture_definition(request, name: str):
     manager = request.config.pluginmanager.get_plugin("funcmanage")
     definitions = manager.getfixturedefs(name, request.node)
-    assert definitions and len(definitions) == 1, name
+    assert definitions, name
+    assert len(definitions) == 1, name
     return definitions[0]
 
 
@@ -543,6 +545,11 @@ def test_composed_the_seam_table_is_read_with_the_reach_put_back(monkeypatch, tm
     assert sys.path == before
 
 
+def _raise_inside(module, call, what) -> None:
+    with tests_conftest.a_hosts_seam(module, call, what):
+        raise RuntimeError("raised in the block")
+
+
 def test_a_hosts_health_check_is_registered_for_the_block_and_put_back(monkeypatch) -> None:
     with _the_seams_kept(monkeypatch):
         workbench.unregister_health_check()
@@ -554,9 +561,7 @@ def test_a_hosts_health_check_is_registered_for_the_block_and_put_back(monkeypat
             assert workbench._health_check is _health_check
         assert workbench._health_check is _another_check
         with pytest.raises(RuntimeError, match="raised in the block"):
-            with tests_conftest.a_hosts_seam(workbench, "register_health_check",
-                                             _health_check):
-                raise RuntimeError("raised in the block")
+            _raise_inside(workbench, "register_health_check", _health_check)
         assert workbench._health_check is _another_check
 
 
@@ -657,8 +662,9 @@ def test_the_farm_refuses_an_example_two_owners_keep(tmp_path) -> None:
         "examples/ideation-dashboard/negative/same.negative.yaml": "",
         "openXdox/spec/examples/ideation-dashboard/negative/same.negative.yaml": "",
     })
+    reach, farm = _a_reach(root, {}), tmp_path / "farm"
     with pytest.raises(RuntimeError, match=r"two owners keep the example negative/same"):
-        tests_conftest.build_contracts_farm(_a_reach(root, {}), tmp_path / "farm")
+        tests_conftest.build_contracts_farm(reach, farm)
 
 
 def test_composed_the_farm_is_built_outside_the_checkout_and_named_in_the_environment(
@@ -673,7 +679,8 @@ def test_composed_the_farm_is_built_outside_the_checkout_and_named_in_the_enviro
     (tmp_path / "t").mkdir()
     environ = {"CONTRACTS_DIR": "a directory the environment named before"}
     contracts = tests_conftest.compose_the_contracts_farm(environ, under=str(tmp_path / "t"))
-    assert contracts is not None and contracts.parent.parent == tmp_path / "t"
+    assert contracts is not None
+    assert contracts.parent.parent == tmp_path / "t"
     assert contracts.parent.name.startswith("openxdox-contracts-farm-")
     assert environ == {"CONTRACTS_DIR": str(contracts)}
     assert _links(contracts / "schemas") == {
