@@ -1021,7 +1021,9 @@ def _the_hosts_seams_for_the_seam_suites(request):
 #     kind the family's validator does not serve. Two owners naming one path
 #     is refused, never resolved.
 # It is OUTSIDE the checkout, in a temporary directory removed at exit: the
-# validator refuses a `contracts/` that links out of its tree (`:157-163`).
+# validator refuses a `contracts/` that links out of its tree (`:157-163`). A
+# temporary root inside the checkout (a TMPDIR, or `under`, beneath it) is
+# refused before anything is created.
 # The reach is read with `sys.path` saved and put back, and it must be the
 # composed tree's own.
 CONTRACT_EXAMPLE_LEFT_OUT = "opendox-snapshot-"
@@ -1068,6 +1070,12 @@ def compose_the_contracts_farm(environ, *, under: str | None = None) -> Path | N
     root = openxfactory_root()
     if root is None:
         return None
+    parent = Path(under if under is not None else _tempfile.gettempdir()).resolve()
+    if parent.is_relative_to(REPO_ROOT):
+        raise RuntimeError(
+            f"the contracts farm would be built under {parent}, inside this "
+            f"checkout ({REPO_ROOT}), and it must sit outside it. Point TMPDIR "
+            "outside the checkout")
     saved = list(sys.path)
     try:
         reach = importlib.import_module("carved_reach")

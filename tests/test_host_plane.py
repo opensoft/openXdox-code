@@ -689,6 +689,24 @@ def test_composed_the_farm_is_built_outside_the_checkout_and_named_in_the_enviro
                         {"ignore_errors": True})]
 
 
+def test_composed_a_temporary_root_inside_the_checkout_is_refused(monkeypatch, tmp_path) -> None:
+    """The farm sits outside the checkout. A temporary root beneath it, from
+    TMPDIR or `under`, is refused before anything is created or set."""
+    root = tmp_path / "openxFactory"
+    _a_tree(root, {"contracts/schemas/gate-intent.schema.yaml": ""})
+    _a_host_module(monkeypatch, root)
+    monkeypatch.setitem(sys.modules, "carved_reach", _a_reach(root, {}))
+    inside = tests_conftest.REPO_ROOT / ".a-temporary-root-never-created"
+    environ: dict[str, str] = {}
+    with pytest.raises(RuntimeError, match="inside this checkout"):
+        tests_conftest.compose_the_contracts_farm(environ, under=str(inside))
+    monkeypatch.setattr(tests_conftest._tempfile, "gettempdir", lambda: str(inside))
+    with pytest.raises(RuntimeError, match="inside this checkout"):
+        tests_conftest.compose_the_contracts_farm(environ)
+    assert environ == {}
+    assert not inside.exists()
+
+
 def test_composed_a_reach_from_another_tree_is_refused(monkeypatch, tmp_path) -> None:
     root = tmp_path / "openxFactory"
     _a_tree(root, {"contracts/schemas/gate-intent.schema.yaml": ""})
