@@ -791,3 +791,102 @@ if _OPENXFACTORY_HOST is not None:
 
     _gate_console.register_contract_schema_source(
         Path(_OPENXFACTORY_HOST.__file__).resolve().parents[1] / "contracts" / "schemas")
+
+
+# ---------------------------------------------------------------------------
+# THE HOST'S STATUS-EXEMPTION RAIL FOR THE DECLARED RAIL SUITES (plan 038
+# T073; ARC-Q2 (a), openxFactory#656 comment 6003918488; R1Q24 (a), comment
+# 5850003126).
+#
+# R1Q24 (a) declared the files that need openxFactory's status-exemption rail,
+# which only openxFactory's host registers at openDox's status-exemption seam
+# (`opendox.doxbench_packet.register_status_exemption`). In a lone checkout
+# nothing registers it, so their cases refuse with
+# `StatusExemptionNotRegistered`, which is the declaration's evidence for their
+# reason. ARC-Q2 (a) makes them declared integration tests, which the composed
+# workflow runs. So, as U-1 registers the governed host above, for the length
+# of each test of a file `tests/declared_exclusion.yaml` names under the reason
+# `status-exemption-rail`, this registers THE HOST'S RAIL where the run is
+# composed, and puts the seam back afterwards. Where the run is not composed it
+# registers nothing, and the lone checkout's evidence is unchanged.
+#
+# THE RAIL IS THE ONE openxFactory'S HOST REGISTERS: the
+# `register_status_exemption` row of `opendox_host.seams()`, the table the
+# host's process start registers from. It is read off that table rather than
+# named here, so a later host pin is followed.
+#
+# THE LIST IS THE DECLARATION'S, as the root `conftest.py` has already held it
+# to its rules: a file gets the rail, or stops getting it, only with its entry.
+#
+# THE SEAM IS PUT BACK. A rail held before the test is dropped for it. After
+# it, a host's rail is registered again, and openDox's own default, an entry
+# point's, is not, since the next entry point registers it again, as
+# `a_hosts_plane` treats the default profile.
+# ---------------------------------------------------------------------------
+
+STATUS_EXEMPTION_RAIL_REASON = "status-exemption-rail"
+
+
+@functools.cache
+def status_exemption_rail_suites() -> frozenset[str]:
+    """The test modules the declaration names under the rail's reason."""
+    import yaml
+
+    declaration = yaml.safe_load(
+        (HERE / "declared_exclusion.yaml").read_text(encoding="utf-8"))
+    return frozenset(Path(entry["path"]).name
+                     for entry in declaration["entries"]
+                     if STATUS_EXEMPTION_RAIL_REASON in entry["reasons"])
+
+
+@functools.cache
+def openxfactory_status_exemption_rail():
+    """openxFactory's status-exemption rail where the run is composed, and
+    None where it is not: what its host registers at openDox's seam, read off
+    the host's own seam table."""
+    host_module = openxfactory_host()
+    if host_module is None:
+        return None
+    saved = list(sys.path)
+    try:
+        rails = [what for _, call, what in host_module.seams()
+                 if call == "register_status_exemption"]
+    finally:
+        sys.path[:] = saved
+    _refuse_an_openxdox_from_elsewhere()
+    if len(rails) != 1:
+        raise RuntimeError(
+            f"openxFactory's host seam table names {len(rails)} "
+            "status-exemption rails, so the rail it registers is not one "
+            "this harness can register for it")
+    return rails[0]
+
+
+@contextlib.contextmanager
+def a_hosts_rail(rail):
+    """Register `rail` at openDox's status-exemption seam for the length of
+    the block, then put the seam back as it was, less openDox's default."""
+    from opendox import doxbench_packet as _packet
+
+    previous = getattr(_packet, "_status_exemption_rail", None)
+    a_hosts = previous is not None and not getattr(
+        _packet, "_status_exemption_is_default", False)
+    _packet.unregister_status_exemption()
+    try:
+        yield _packet.register_status_exemption(rail)
+    finally:
+        _packet.unregister_status_exemption()
+        if a_hosts:
+            _packet.register_status_exemption(previous)
+
+
+@_pytest.fixture(autouse=True)
+def _the_hosts_rail_for_the_declared_rail_suites(request):
+    rail = (openxfactory_status_exemption_rail()
+            if request.node.path.name in status_exemption_rail_suites()
+            else None)
+    if rail is None:
+        yield
+        return
+    with a_hosts_rail(rail):
+        yield

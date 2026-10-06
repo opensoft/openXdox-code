@@ -28,6 +28,14 @@ name: composed
 #   5. 12.5's governed suites, computed the way its falsifier computes them
 #      (16 is the floor). Each suite runs alone, with
 #      `PYTHONPATH="$OPENXFACTORY/scripts"` (R1Q23 (a)'s form).
+#   5a. The declaration's other entries (plan 038 T073; ARC-Q2 (a),
+#      openxFactory#656 comment 6003918488). Every file of
+#      `tests/declared_exclusion.yaml` is a declared integration test that
+#      this workflow runs. The governed suites among them ran in step 5, and
+#      this step runs every other entry in the same form, each alone. It
+#      refuses an entry with no report from either step, so none is dropped
+#      from both suites. The rail the R1Q24 rail files need is registered by
+#      `tests/conftest.py` where the run is composed.
 #   6. The oracle, `scripts/protected_suites.py`, in 12.5's call: no landing
 #      of the arc touched a governed suite outside an allow-list entry that
 #      holds.
@@ -35,7 +43,7 @@ name: composed
 #      the hosts' help goldens are unchanged). `validate.yml` leaves that test
 #      out (`LEFT_OUT`), because building the tree needs `doc_health`. Composed,
 #      it can run.
-# Steps 6 and 7 run even when step 5 is red, so one run reports every red.
+# Steps 5a, 6 and 7 run even when step 5 is red, so one run reports every red.
 #
 # WHAT IS NOT HERE. Making `composed` a REQUIRED check is the holder's act,
 # after this workflow's first green run on `main` (N-7b (a), ruled
@@ -278,6 +286,95 @@ jobs:
           if os.environ.get("GITHUB_STEP_SUMMARY"):
               with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
                   handle.write("## 12.5's governed suites, composed\n\n```\n" + "\n".join(lines) + "\n```\n")
+          PY
+          exit "$red"
+
+      # Step 5a (T073): the declaration's other entries, each alone, in step
+      # 5's form. The list is the declaration's own `entries`, read here, so an
+      # entry runs from the landing that lists it; the governed suites among
+      # them ran in step 5. Every entry must then have a report from one of the
+      # two steps, or it is refused as dropped from both suites.
+      - name: the declared integration tests, composed, each alone
+        id: declared
+        if: ${{ !cancelled() && steps.governed.outcome == 'success' }}
+        run: |
+          export PYTHONPATH="$OPENXFACTORY/scripts"
+          echo "the declaration's composed home: opensoft/openxFactory@$COMPOSED_HOST_COMMIT, the commit tests/composed_host_pin.yaml names"
+          python - "$COMPOSED" <<'PY'
+          import pathlib, sys
+          import yaml
+
+          out = pathlib.Path(sys.argv[1])
+          declaration = yaml.safe_load(pathlib.Path("tests/declared_exclusion.yaml").read_text(encoding="utf-8"))
+          entries = [entry["path"] for entry in declaration["entries"]]
+          governed = {line.strip() for line in (out / "governed.txt").read_text().splitlines() if line.strip()}
+          here = [path for path in entries if path not in governed]
+          (out / "declared.txt").write_text("".join(f"{path}\n" for path in here))
+          print(f"declared integration tests: {len(entries)} (count {declaration['count']}); "
+                f"{len(entries) - len(here)} ran in step 5, {len(here)} run here")
+          PY
+          mkdir -p "$COMPOSED/declared-reports"
+          red=0
+          while read -r test_file <&3; do
+            echo "::group::$test_file"
+            rc=0
+            python -m pytest -q -p no:cacheprovider -rfE \
+              --junitxml="$COMPOSED/declared-reports/$(basename "$test_file" .py).xml" "$test_file" < /dev/null || rc=$?
+            echo "::endgroup::"
+            echo "$test_file: pytest exit $rc"
+            if [ "$rc" -ne 0 ]; then red=1; fi
+          done 3< "$COMPOSED/declared.txt"
+          python - "$COMPOSED" <<'PY' || red=1
+          import os, pathlib, sys
+          import xml.etree.ElementTree as ET
+          import yaml
+
+          out = pathlib.Path(sys.argv[1])
+          entries = [entry["path"] for entry in yaml.safe_load(
+              pathlib.Path("tests/declared_exclusion.yaml").read_text(encoding="utf-8"))["entries"]]
+          here = [line.strip() for line in (out / "declared.txt").read_text().splitlines() if line.strip()]
+          rows, red, total = [], set(), dict.fromkeys(("passed", "failed", "errors", "skipped"), 0)
+          for path in entries:
+              stem = pathlib.PurePosixPath(path).stem
+              if not any((out / where / f"{stem}.xml").exists() for where in ("reports", "declared-reports")):
+                  rows.append(f"{path}: NOT RUN by step 5 or step 5a, so dropped from both suites")
+                  red.add(path)
+          for path in here:
+              report = out / "declared-reports" / f"{pathlib.PurePosixPath(path).stem}.xml"
+              if not report.exists():
+                  continue
+              root = ET.parse(report).getroot()
+              n = dict.fromkeys(("tests", "failures", "errors", "skipped"), 0)
+              module = path[:-3].replace("/", ".")
+              for ts in (root.iter("testsuite") if root.tag == "testsuites" else [root]):
+                  for key in n:
+                      n[key] += int(ts.get(key, 0))
+                  for case in ts.iter("testcase"):
+                      if case.find("failure") is None and case.find("error") is None:
+                          continue
+                      cls, name = case.get("classname", ""), case.get("name", "")
+                      if not cls:  # a collection error names the file, not a test
+                          red.add(path)
+                          continue
+                      rest = cls[len(module):] if cls == module or cls.startswith(module + ".") else cls
+                      red.add("::".join([path, *[p for p in rest.split(".") if p], name]))
+              passed = n["tests"] - n["failures"] - n["errors"] - n["skipped"]
+              for key, value in (("passed", passed), ("failed", n["failures"]),
+                                 ("errors", n["errors"]), ("skipped", n["skipped"])):
+                  total[key] += value
+              rows.append(f"{path}: {passed} passed, {n['failures']} failed, "
+                          f"{n['errors']} errors, {n['skipped']} skipped")
+          lines = [*rows,
+                   f"TOTAL over {len(here)} declared integration tests: {total['passed']} passed, "
+                   f"{total['failed']} failed, {total['errors']} errors, {total['skipped']} skipped; "
+                   f"{total['failed'] + total['errors']} red, in {len(red)} red nodes",
+                   *(f"RED {node}" for node in sorted(red))]
+          print("\n".join(lines))
+          (out / "declared-red-nodes.txt").write_text("".join(f"{node}\n" for node in sorted(red)))
+          if os.environ.get("GITHUB_STEP_SUMMARY"):
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
+                  handle.write("## The declared integration tests, composed\n\n```\n" + "\n".join(lines) + "\n```\n")
+          sys.exit(1 if red else 0)
           PY
           exit "$red"
 
