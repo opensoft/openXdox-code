@@ -210,14 +210,17 @@ def test_a_host_schema_the_console_cannot_apply_refuses_as_gate_refused(tmp_path
     is empty, is not a valid JSON Schema, or cannot be applied refuses as
     `GateRefused`, never as another exception. The demotion verb writes its
     receipt after it has moved files, and reports only a `GateRefused` there
-    as a receipt not written (Copilot on #40, r4194497045 and r4197914632:
-    the loader raises `RecursionError` and `ValueError` past `YAMLError`)."""
+    as a receipt not written (Copilot on #40: r4194497045; r4197914632, the
+    loader raises `RecursionError` and `ValueError` past `YAMLError`;
+    r4198638746, a cyclic alias the meta-schema check cannot finish)."""
     sources = {}
     for name, text in {"empty": "", "not_a_schema": "required: 1\n",
                        "unresolvable": json.dumps({"$ref": "#/$defs/absent"}),
                        "not_yaml": "type: [object\n",
                        "too_deep": "[" * 5000 + "]" * 5000,
-                       "impossible_date": "type: object\nx: 2001-02-30\n"}.items():
+                       "impossible_date": "type: object\nx: 2001-02-30\n",
+                       "cyclic_mapping": "properties: &p {a: {properties: *p}}\n",
+                       "cyclic_list": "allOf: &loop [*loop]\n"}.items():
         directory = tmp_path / name
         directory.mkdir()
         (directory / "demotion-execution-receipt.schema.yaml").write_text(
@@ -246,6 +249,13 @@ def test_a_host_schema_the_console_cannot_apply_refuses_as_gate_refused(tmp_path
         assert out[name].startswith(
             "GateRefused: the demotion execution receipt schema could not be "
             "parsed"), out[name]
+    # A cyclic mapping never finishes the meta-schema check. A cyclic list is
+    # refused by the check itself under the pinned jsonschema; either way, a
+    # GateRefused.
+    assert out["cyclic_mapping"].startswith(
+        "GateRefused: the demotion execution receipt schema could not be "
+        "checked: RecursionError"), out["cyclic_mapping"]
+    assert out["cyclic_list"].startswith("GateRefused: "), out["cyclic_list"]
 
 
 def test_the_console_reads_no_schema_from_beside_the_checkout() -> None:
