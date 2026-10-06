@@ -313,6 +313,86 @@ def test_ambient_git_repository_variables_do_not_redirect_the_checks(
         assert composed.destination.read_text(encoding="utf-8") == "runbook A\n"
 
 
+@pytest.mark.parametrize("flag", ["--assume-unchanged", "--skip-worktree"])
+def test_an_edit_the_index_is_told_to_overlook_is_refused(composed, flag):
+    # Copilot r4201032934: with either flag `git diff` calls the file clean
+    # without reading it. The check compares the bytes with the pinned blob.
+    _git("update-index", flag, RUNBOOK, cwd=composed.spec)
+    composed.source.write_text("edited in the working tree\n", encoding="utf-8")
+    said = composed.refused()
+    assert "differs from openDox-spec's pinned commit" in said
+    assert not os.path.lexists(composed.destination)
+
+
+def _pin(composed: Composed, commit: str) -> None:
+    """Move the openDox root's `spec` gitlink to `commit`, and check it out."""
+    _git("checkout", "-q", commit, cwd=composed.spec)
+    _git("update-index", "--cacheinfo", f"160000,{commit},spec", cwd=composed.root)
+    _git("commit", "-q", "-m", "pin", cwd=composed.root)
+
+
+def test_a_runbook_the_pinned_commit_tracks_as_a_link_is_refused(composed):
+    # Copilot r4201424060: the pinned "document" is a link to a file whose
+    # bytes `git diff` on the link never reads.
+    real = composed.spec / "docs" / "real-runbook.md"
+    real.write_text("runbook A\n", encoding="utf-8")
+    composed.source.unlink()
+    composed.source.symlink_to("real-runbook.md")
+    _git("add", "-A", "docs", cwd=composed.spec)
+    _git("commit", "-q", "-m", "the runbook as a link", cwd=composed.spec)
+    _pin(composed, _git("rev-parse", "HEAD", cwd=composed.spec))
+    real.write_text("edited behind the link\n", encoding="utf-8")
+    said = composed.refused()
+    assert "is a symbolic link" in said
+    assert not os.path.lexists(composed.destination)
+
+
+def test_a_runbook_replaced_by_a_link_to_identical_bytes_is_refused(composed,
+                                                                    tmp_path):
+    # Identical bytes today; a link can be repointed after the check.
+    copy = tmp_path / "identical-runbook.md"
+    copy.write_text("runbook A\n", encoding="utf-8")
+    composed.source.unlink()
+    composed.source.symlink_to(copy)
+    said = composed.refused()
+    assert "is a symbolic link" in said
+    assert not os.path.lexists(composed.destination)
+
+
+def test_an_opendox_root_answered_by_an_enclosing_repository_is_refused(
+        composed):
+    # Copilot r4201032886: without its own repository, git would answer
+    # `HEAD:spec` from the repository above, if its tree had a `spec` entry.
+    pinned = composed.pinned
+    shutil.rmtree(composed.root / ".git")
+    _git("init", "-q", cwd=composed.openxfactory)
+    _git("update-index", "--add", "--cacheinfo", f"160000,{pinned},spec",
+         cwd=composed.openxfactory)
+    _git("commit", "-q", "-m", "an enclosing repository", cwd=composed.openxfactory)
+    said = composed.refused()
+    assert "is not an openDox root checkout with a `spec` gitlink" in said
+    assert not os.path.lexists(composed.destination)
+
+
+def test_an_opendox_root_without_a_spec_gitlink_is_refused(composed):
+    _git("rm", "-q", "--cached", "spec", cwd=composed.root)
+    _git("commit", "-q", "-m", "no spec leg", cwd=composed.root)
+    said = composed.refused()
+    assert "is not an openDox root checkout with a `spec` gitlink" in said
+    assert not os.path.lexists(composed.destination)
+
+
+def test_a_spec_leg_whose_work_tree_is_configured_elsewhere_is_refused(
+        composed, tmp_path):
+    # Copilot r4201032886: `core.worktree` points the checks at another tree.
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    _git("config", "core.worktree", str(elsewhere), cwd=composed.spec)
+    said = composed.refused()
+    assert "is not checked out" in said
+    assert not os.path.lexists(composed.destination)
+
+
 # --- what it never overwrites or takes away ---------------------------------
 
 

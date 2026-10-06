@@ -25,9 +25,11 @@ can be committed.
 
 WHAT IT CHECKS BEFORE IT PLACES ANYTHING, refusing (exit 2) and naming the
 remedy otherwise:
-  * each source is a file openDox-spec TRACKS, UNMODIFIED, in a spec checkout
-    whose HEAD is the commit the openDox root's `spec` gitlink names. So the
-    run reads the pinned document, and not whatever a working tree holds;
+  * each source is a regular file (not a link) openDox-spec TRACKS whose
+    bytes are the pinned blob, in a spec checkout whose HEAD is the commit
+    the openDox root's `spec` gitlink names, each answered by its own
+    repository and work tree. So the run reads the pinned document, and not
+    whatever a working tree or an index flag says;
   * each destination is ignored by this checkout's own `.gitignore`, not
     only by a local exclude (`.git/info/exclude`, `core.excludesFile`);
   * a destination already present is this script's own link to that same
@@ -110,21 +112,34 @@ def _git(*args: str, cwd: Path) -> subprocess.CompletedProcess:
             "git is not on PATH, and the placements are checked with it") from exc
 
 
+def _is_its_own_work_tree(path: Path) -> bool:
+    """Git answers for `path` from `path`'s own repository, whose work tree is
+    `path`: not from a repository above it (an uninitialized submodule is an
+    empty directory) and not from a work tree its configuration puts
+    elsewhere (`core.worktree`). As `openxdox.domain_corpus_adapter` checks
+    `--show-toplevel` before it trusts a revision (Copilot r4201032886)."""
+    if not (path / ".git").exists():
+        return False
+    top = _git("rev-parse", "--show-toplevel", cwd=path)
+    return (top.returncode == 0
+            and Path(top.stdout.strip()).resolve() == path.resolve())
+
+
 def _pinned_spec(openxfactory: Path) -> Path:
     """The spec checkout, once its HEAD is the commit the openDox root pins."""
     root = openxfactory / OPENDOX_ROOT
     spec = root / SPEC_LEG
     pinned = _git("rev-parse", "--verify", f"HEAD:{SPEC_LEG}", cwd=root) \
-        if root.is_dir() else None
+        if _is_its_own_work_tree(root) else None
     if pinned is None or pinned.returncode != 0:
         raise PlacementRefused(
             f"{root} is not an openDox root checkout with a `spec` gitlink. "
             "Check openxFactory out with its submodules initialized "
             "recursively (`git submodule update --init --recursive`).")
-    # Its own `.git`: an uninitialized leg is an empty directory, and git
+    # Its own work tree: an uninitialized leg is an empty directory, and git
     # would answer for the openDox root above it.
     head = _git("rev-parse", "--verify", "HEAD", cwd=spec) \
-        if (spec / ".git").exists() else None
+        if _is_its_own_work_tree(spec) else None
     if head is None or head.returncode != 0:
         raise PlacementRefused(
             f"{spec} is not checked out. Initialize openxFactory's submodules "
@@ -146,8 +161,19 @@ def _check(placement: Placement, spec: Path) -> tuple[Path, Path]:
         raise PlacementRefused(
             f"openDox-spec does not track {placement.source} at its pinned "
             "commit, so there is nothing pinned to place")
-    clean = _git("diff", "--quiet", "HEAD", "--", str(placement.source), cwd=spec)
-    if clean.returncode != 0:
+    if source.is_symlink():
+        raise PlacementRefused(
+            f"{source} is a symbolic link. The run links only the regular "
+            "file openDox-spec tracks at its pinned commit, whose bytes a link "
+            "does not fix (Copilot r4201424060).")
+    # The bytes themselves against the pinned blob. `git diff` can call a file
+    # clean without reading it, where the index marks it `assume-unchanged` or
+    # `skip-worktree` (Copilot r4201032934).
+    pinned_blob = _git("rev-parse", "--verify", f"HEAD:{placement.source}",
+                       cwd=spec)
+    on_disk = _git("hash-object", "--", str(placement.source), cwd=spec)
+    if (pinned_blob.returncode != 0 or on_disk.returncode != 0
+            or pinned_blob.stdout.strip() != on_disk.stdout.strip()):
         raise PlacementRefused(
             f"{source} differs from openDox-spec's pinned commit. The run must "
             "read the pinned document; restore it with `git checkout -- "
