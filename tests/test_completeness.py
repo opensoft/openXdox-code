@@ -22,12 +22,14 @@ The scoring family's non-negotiables:
 from __future__ import annotations
 
 import ast
+import importlib.util
 import re
 import shutil
 from pathlib import Path
 
 from conftest import (  # noqa: F401  (sys.path side effect)
-    BASE_REPO, PINNED_REVISION, FakeGit, REPO_ROOT, staging_fragment, thin_fragment,
+    BASE_REPO, PINNED_REVISION, FakeGit, REPO_ROOT, carved_module_path,
+    staging_fragment, thin_fragment,
 )
 
 from doc_health import corpus
@@ -36,7 +38,13 @@ from openxdox import snapshot
 from openxdox import completeness as C
 from openxdox.generator import generate_snapshot, live_topic_health
 
-SCRIPTS = REPO_ROOT / "scripts"
+# WHERE THE PURITY AND GATING-BOUND CHECKS READ, after the carve (plan 038
+# T103). Before it, one import root, openxFactory's `scripts/`, held both the
+# scoring module and `doc_health`. Now the scoring module and its importers are
+# this leg's, under `src/` (the `openxdox` package's import root), and
+# `doc_health` is openxFactory's, read where this process imports it from: the
+# composed tree.
+SRC = REPO_ROOT / "src"
 
 
 def _tree(tmp_path: Path) -> Path:
@@ -174,7 +182,7 @@ def test_the_scoring_module_touches_nothing_outside_its_arguments():
     # builtin escape hatch is called either. `doc_health.lines` is admitted
     # specifically because IT is itself pure by the same standard (asserted
     # below, not assumed): it imports only `re`, and defines no I/O.
-    tree = ast.parse((SCRIPTS / "ideation_dashboard" / "completeness.py").read_text("utf-8"))
+    tree = ast.parse(carved_module_path("completeness.py").read_text("utf-8"))
     modules: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -187,7 +195,8 @@ def test_the_scoring_module_touches_nothing_outside_its_arguments():
               if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)}
     assert not called & {"open", "eval", "exec", "input", "print", "compile"}, called
 
-    lines_tree = ast.parse((SCRIPTS / "doc_health" / "lines.py").read_text("utf-8"))
+    lines_tree = ast.parse(
+        Path(importlib.util.find_spec("doc_health.lines").origin).read_text("utf-8"))
     lines_modules: set[str] = set()
     for node in ast.walk(lines_tree):
         if isinstance(node, ast.Import):
@@ -501,14 +510,15 @@ def test_the_scoring_modules_only_importers_are_the_generator_and_the_guard():
         r"|from\s+\.completeness\s+import\b"
         r"|import\s+\S*\bcompleteness\b)")
     importers = sorted(
-        p.relative_to(SCRIPTS).as_posix()
-        for p in SCRIPTS.rglob("*.py")
+        p.relative_to(SRC).as_posix()
+        for p in SRC.rglob("*.py")
         if p.name != "completeness.py" and import_re.search(p.read_text("utf-8")))
-    assert importers == ["ideation_dashboard/generator.py",
-                         "ideation_dashboard/kickoff.py"], importers
+    assert importers == ["openxdox/generator.py",
+                         "openxdox/kickoff.py"], importers
     # ...and no doc-health / readiness path consults the score at all: the
     # per-document signal produces no finding and feeds no readiness tier.
-    for module in sorted((SCRIPTS / "doc_health").rglob("*.py")):
+    [doc_health] = importlib.util.find_spec("doc_health").submodule_search_locations
+    for module in sorted(Path(doc_health).rglob("*.py")):
         text = module.read_text("utf-8")
         assert not import_re.search(text), module
         assert "topic_health" not in text and "READY_MIN_SCORE" not in text, module

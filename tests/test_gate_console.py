@@ -867,7 +867,7 @@ def test_the_cli_tells_the_human_the_snapshot_was_preserved(tmp_path, capsys):
     _fragment(root).parent.mkdir(parents=True, exist_ok=True)
     _fragment(root).write_text(LIVE, encoding="utf-8")
 
-    from ideation_dashboard import cli
+    from opendox import cli
 
     # Through the REAL parser, not a hand-built Namespace: a Namespace's field set
     # can drift from the CLI's while the test keeps passing.
@@ -1814,7 +1814,7 @@ def test_the_hostile_gate_descriptors_still_reach_the_real_cli(tmp_path):
     refuse it — inside the process, which is the layer that can refuse."""
     import shlex
 
-    from ideation_dashboard import cli
+    from opendox import cli
 
     out = _hostile_gate_commands(tmp_path)
     parser = cli.build_parser()
