@@ -879,7 +879,11 @@ def _serving_keyed(tmp_path, *, head):
 
 def _raw_get(host, port, raw_path, method="GET"):
     conn = http.client.HTTPConnection(host, port, timeout=5)
-    conn.putrequest(method, raw_path, skip_host=False, skip_accept_encoding=True)
+    # ONE `Host` line, the one written below: `skip_host=False` had
+    # `http.client` add its own as well, and openDox's loopback Host guard
+    # (openDox-code `390e2c2`, its T103) refuses a request carrying a second
+    # one as `403 invalid_host` (plan 038 T101, R2-INV-R9's HH).
+    conn.putrequest(method, raw_path, skip_host=True, skip_accept_encoding=True)
     conn.putheader("Host", f"{host}:{port}")
     conn.endheaders()
     resp = conn.getresponse()
@@ -904,17 +908,30 @@ def test_keyed_source_route_returns_exact_bytes_and_the_snapshot_ref_header(tmp_
 # ----------------------------------------------------------------------------
 
 def test_the_save_seam_is_composed_in_the_sibling_transport_and_forwarded():
-    """The doctrinal placement the pins themselves mandate: the ROUTE is a
-    model constant, the POSTER lives in swb-session.js (the sibling verbs
-    module, through its ONE request site `submitSession` — no new request
-    site, no new write-method literal), app.js bundles the ready-made seam
-    into its `doxbench` option, and the shell FORWARDS it exactly like
-    loadSource/hash. The shell and model stay transport-free."""
+    """The doctrinal placement the pins themselves mandate: the POSTER lives in
+    swb-session.js (the sibling verbs module, through its ONE request site
+    `submitSession` — no new request site, no new write-method literal),
+    app.js bundles the ready-made seam into its `doxbench` option, and the
+    shell FORWARDS it exactly like loadSource/hash. The shell and model stay
+    transport-free.
+
+    WHERE THE CARVE PUT EACH PIECE, by its rulings (plan 038 T101, R2-INV-R9's
+    CP). The ROUTE left openDox's model for the session column itself, which
+    is this leg's `swb-session.js` (RULED Q3, openxFactory#656
+    `5642758731`). And app.js no longer imports the transport:
+    `firstEditTransport` travels as a DECLARED NON-MOUNT EXPORT of the
+    workbench's session binding, reached at app.js's one call site through the
+    registry, with a refusal-shaped fallback when the column is absent — never
+    a blank (§ 3.4 slice S5, openDox-code `8efb3cf`; RULED Q10,
+    `5648065587`)."""
+    session = (WEB / "views" / "swb-session.js").read_text(encoding="utf-8")
+    assert 'FIRST_EDIT_ROUTE = "/actions/gate/first-edit"' in session
+    assert "[SESSION_FIRST_EDIT]: FIRST_EDIT_ROUTE," in session
     model = (WEB / "views" / "staging-workbench-model.js").read_text(
         encoding="utf-8")
-    assert 'FIRST_EDIT_ROUTE = "/actions/gate/first-edit"' in model
-    assert "[SESSION_FIRST_EDIT]: FIRST_EDIT_ROUTE," in model
-    session = (WEB / "views" / "swb-session.js").read_text(encoding="utf-8")
+    assert 'FIRST_EDIT_ROUTE = "/actions/gate/first-edit"' not in model, (
+        "the route is the session column's (Q3), not a second copy in the "
+        "transport-free model")
     assert "export function firstEditTransport(" in session
     seam_fn = session.split("export function firstEditTransport(", 1)[1]
     assert "submitSession(" in seam_fn.split("export function", 1)[0], (
@@ -927,8 +944,20 @@ def test_the_save_seam_is_composed_in_the_sibling_transport_and_forwarded():
     view = STAGING_WORKBENCH_JS.read_text(encoding="utf-8")
     assert "save: doxbench?.save," in view
     app = APP_JS.read_text(encoding="utf-8")
-    assert 'import { firstEditTransport } from "./views/swb-session.js";' in app
+    # Q10: no static import of the class-B module, the export reached at the
+    # one call site off the session binding, and the refusal its fallback.
+    assert not re.search(r"^\s*import\b[^;]*swb-session\.js", app, re.MULTILINE)
+    assert app.count(".session.firstEditTransport(") == 1
+    assert ": refusalTransport()," in app
     assert "runSave(" in app and "savePlanState(request)" in app
+    # ...and the export is DECLARED on that binding, in this leg's own record
+    # of what the shell may reach (`view_extensions.py`, RULED Q2's `exports`).
+    from openxdox import view_extensions
+    session_binding = [spec for spec in view_extensions.VIEW_BINDING_SPECS
+                       if spec["id"] == "gate.workbench.session"]
+    assert len(session_binding) == 1
+    assert session_binding[0]["module"] == "./views/swb-session.js"
+    assert "firstEditTransport" in session_binding[0]["exports"]
 
 
 def test_the_seam_mappings_are_pure_model_functions():
