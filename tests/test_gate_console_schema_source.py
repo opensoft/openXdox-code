@@ -206,14 +206,18 @@ def test_the_seam_holds_one_source_and_refuses_a_second(tmp_path) -> None:
 
 
 def test_a_host_schema_the_console_cannot_apply_refuses_as_gate_refused(tmp_path) -> None:
-    """A registered source whose receipt schema is empty, is not a valid JSON
-    Schema, or cannot be applied refuses as `GateRefused`, never as another
-    exception. The demotion verb writes its receipt after it has moved files,
-    and reports only a `GateRefused` there as a receipt not written (Copilot
-    on #40, r4194497045)."""
+    """A registered source whose receipt schema the safe loader cannot read,
+    is empty, is not a valid JSON Schema, or cannot be applied refuses as
+    `GateRefused`, never as another exception. The demotion verb writes its
+    receipt after it has moved files, and reports only a `GateRefused` there
+    as a receipt not written (Copilot on #40, r4194497045 and r4197914632:
+    the loader raises `RecursionError` and `ValueError` past `YAMLError`)."""
     sources = {}
     for name, text in {"empty": "", "not_a_schema": "required: 1\n",
-                       "unresolvable": json.dumps({"$ref": "#/$defs/absent"})}.items():
+                       "unresolvable": json.dumps({"$ref": "#/$defs/absent"}),
+                       "not_yaml": "type: [object\n",
+                       "too_deep": "[" * 5000 + "]" * 5000,
+                       "impossible_date": "type: object\nx: 2001-02-30\n"}.items():
         directory = tmp_path / name
         directory.mkdir()
         (directory / "demotion-execution-receipt.schema.yaml").write_text(
@@ -238,6 +242,10 @@ def test_a_host_schema_the_console_cannot_apply_refuses_as_gate_refused(tmp_path
     assert out["unresolvable"].startswith(
         "GateRefused: the demotion execution receipt schema could not be "
         "applied"), out["unresolvable"]
+    for name in ("not_yaml", "too_deep", "impossible_date"):
+        assert out[name].startswith(
+            "GateRefused: the demotion execution receipt schema could not be "
+            "parsed"), out[name]
 
 
 def test_the_console_reads_no_schema_from_beside_the_checkout() -> None:
