@@ -22,6 +22,11 @@ commit carrying the `Arc:` line. Each case holds one rule of the check:
   (`--chains`), and only where every step holds on its own texts, the steps
   in between record the blob of the text they leave, and the chain's texts are
   the landing's diff and nothing else. 12.5's call refuses a chain.
+* an edit to a NAMED MODULE-LEVEL SPAN (plan 038 T026; R-1 (a), its spans
+  widened at openxFactory#656 comment 6016648451) is admitted only where it
+  lies inside that one module-level constant or helper function, before the
+  landing and at it, and only an admitted entry names one. No span is added,
+  and a class, an import, a test or a name bound twice is never one.
 
 The last cases hold this repository's own allow-list to those rules. Which
 landing each entry holds at is the falsifier's to show, at the head it runs
@@ -525,3 +530,169 @@ def test_a_respelling_names_what_it_respelled(tmp_path) -> None:
 
 def test_this_repositorys_allow_list_keeps_its_rules() -> None:
     assert ps.load_allow_list(REPO_ROOT / ps.ALLOW_LIST), "the allow-list enters no edit"
+
+
+# --------------------------------------------------------------------------
+# R-1 (a)'s span kind (plan 038 T026)
+# --------------------------------------------------------------------------
+
+SPAN_BEFORE = textwrap.dedent('''\
+    import functools
+    import json
+
+    HARNESS = """
+    import { a } from './m.mjs';
+    console.log(a);
+    """
+
+    TWICE = "one"
+    TWICE = "two"
+
+    if True:
+        NESTED = "n"
+
+    SHADOWED = "s"
+    if json:
+        SHADOWED = "t"
+
+    if json:
+        GUARDED = "g"
+    else:
+        GUARDED = "h"
+
+
+    class Harness:
+        TEXT = "c"
+
+
+    @functools.cache
+    def helper():
+        return 1
+
+
+    def test_first() -> None:
+        assert HARNESS and helper()
+''')
+WHOLE_HARNESS = '''HARNESS = """
+import { a } from './m.mjs';
+console.log(a);
+"""
+'''
+
+
+def _span_entry(repo: Repo, old: str, new: str, *, span: str = "HARNESS") -> tuple[dict, str]:
+    """An admitted entry naming `span` for one edit of SPAN_BEFORE, and the
+    suite's text after it. The base is committed first, as no landing."""
+    repo.commit({SUITE: SPAN_BEFORE}, "the span fixture, no landing")
+    after = SPAN_BEFORE.replace(old, new, 1)
+    entry = _entry(repo, before=SPAN_BEFORE, after=after, old=old, new=new)
+    del entry["test"]
+    entry["span"] = span
+    return entry, after
+
+
+def _span_check(repo: Repo, old: str, new: str, *, span: str = "HARNESS") -> ps.Finding:
+    entry, after = _span_entry(repo, old, new, span=span)
+    repo.commit({SUITE: after}, f"edit\n\n{ARC}")
+    [finding] = _check(repo, [entry])
+    return finding
+
+
+def test_an_edit_spanning_a_whole_named_constant_is_admitted(repo) -> None:
+    whole_new = WHOLE_HARNESS.replace("{ a }", "{ b }").replace("log(a)", "log(b)")
+    finding = _span_check(repo, WHOLE_HARNESS, whole_new)
+    assert finding.admitted_by == 1, finding.why
+
+
+def test_an_edit_inside_a_named_constant_is_admitted(repo) -> None:
+    finding = _span_check(repo, "console.log(a);\n", "console.log(a, a);\n")
+    assert finding.admitted_by == 1, finding.why
+
+
+def test_an_edit_inside_a_named_helper_function_is_admitted(repo) -> None:
+    """Comment 6016648451 names three helpers among the six spans."""
+    finding = _span_check(repo, "    return 1\n", "    return 2\n", span="helper")
+    assert finding.admitted_by == 1, finding.why
+
+
+def test_a_helpers_decorator_is_inside_its_span(repo) -> None:
+    finding = _span_check(repo, "@functools.cache\n", "@functools.lru_cache\n",
+                          span="helper")
+    assert finding.admitted_by == 1, finding.why
+
+
+def test_an_old_text_outside_the_span_is_refused(repo) -> None:
+    finding = _span_check(repo, "    assert HARNESS and helper()\n",
+                          "    assert HARNESS or helper()\n")
+    assert finding.admitted_by is None
+    assert "old text is not inside HARNESS before the landing" in finding.why
+
+
+def test_a_new_text_that_leaves_the_span_is_refused(repo) -> None:
+    finding = _span_check(repo, 'console.log(a);\n"""\n', 'console.log(a);\n"""\nX = 1\n')
+    assert finding.admitted_by is None
+    assert "new text is not inside HARNESS at the landing" in finding.why
+
+
+def test_a_new_text_that_leaves_a_helper_is_refused(repo) -> None:
+    finding = _span_check(repo, "    return 1\n", "    return 1\n\n\nX = 1\n", span="helper")
+    assert finding.admitted_by is None
+    assert "new text is not inside helper at the landing" in finding.why
+
+
+def test_a_helper_renamed_at_the_landing_is_refused(repo) -> None:
+    finding = _span_check(repo, "def helper():\n", "def helper_two():\n", span="helper")
+    assert finding.admitted_by is None
+    assert "new text is not inside helper at the landing" in finding.why
+
+
+@pytest.mark.parametrize("span, old, new", [
+    ("Harness", '    TEXT = "c"\n', '    TEXT = "d"\n'),               # a class
+    ("json", "import json\n", "import json  # the module\n"),         # an import
+    ("TWICE", 'TWICE = "one"\n', 'TWICE = "uno"\n'),                 # bound twice
+    ("GUARDED", '    GUARDED = "g"\n', '    GUARDED = "G"\n'),         # twice, in blocks
+    ("NESTED", '    NESTED = "n"\n', '    NESTED = "m"\n'),            # only in a block
+    ("SHADOWED", 'SHADOWED = "s"\n', 'SHADOWED = "S"\n'),              # and in a block
+    ("ADDED", "import json\n", 'import json\n\nADDED = "x"\n'),          # added
+], ids=["class", "import", "twice", "twice-in-blocks", "block-only", "shadowed", "added"])
+def test_what_is_never_a_span_is_refused(repo, span, old, new) -> None:
+    finding = _span_check(repo, old, new, span=span)
+    assert finding.admitted_by is None
+    assert f"{span} is not one module-level constant or function before" in finding.why
+
+
+def test_a_chain_of_a_test_entry_and_a_span_entry_is_admitted(repo) -> None:
+    """One landing, an edit in a test and one in a span: a chain, F5.2's call."""
+    span_step, middle = _span_entry(repo, "console.log(a);\n", "console.log(a, a);\n")
+    both = middle.replace("assert HARNESS and helper()", "assert HARNESS or helper()")
+    test_step = _entry(repo, before=middle, after=both, test="test_first",
+                       old="    assert HARNESS and helper()\n",
+                       new="    assert HARNESS or helper()\n")
+    repo.commit({SUITE: both}, f"two edits\n\n{ARC}")
+    [finding] = _check(repo, [span_step, test_step], chains=True)
+    assert finding.admitted_by == 1, finding.why
+    assert finding.chain == (1, 2)
+
+
+def test_a_span_entry_with_its_keys_loads(tmp_path) -> None:
+    entry = _valid_entry(span="_CREATE_HARNESS")
+    del entry["test"]
+    assert ps.load_allow_list(_write(tmp_path, {
+        "schema_version": 1, "kind": ps.KIND, "entries": [entry]})) == [entry]
+
+
+@pytest.mark.parametrize("changes, why", [
+    ({"edit": "respelling", "respelled": "a -> b"}, "only an admitted entry may"),
+    ({"test": "test_first"}, "carries"),
+    ({"span": "test_first"}, "not a module-level name, or is a test's"),
+    ({"span": "a.b"}, "not a module-level name, or is a test's"),
+], ids=["respelling", "test-and-span", "a-test", "not-a-name"])
+def test_a_span_entry_that_breaks_the_rules_subtracts_nothing(tmp_path, changes, why) -> None:
+    entry = _valid_entry(span="_CREATE_HARNESS")
+    del entry["test"]
+    entry.update(changes)
+    if entry["edit"] == "respelling":
+        del entry["reason"]
+    with pytest.raises(ps.AllowListInvalid, match=why):
+        ps.load_allow_list(_write(tmp_path, {
+            "schema_version": 1, "kind": ps.KIND, "entries": [entry]}))

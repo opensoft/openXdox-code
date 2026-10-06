@@ -496,11 +496,19 @@ _CREATE_HARNESS = """
 import {
   workbenchScope, lensScopeSnapshot, lensSessionSeed, scopeKey, toggleKeyword,
   createArea, createSeed, createOffered, createRequest,
-  createSource, createDocumentCommand, CREATE_ROUTE, CREATE_TABS,
-  BRAINSTORM_AREA, STAGING_AREA,
+  createSource, createDocumentCommand, CREATE_TABS,
+  capturedArea, organizedArea, setDisplay,
 } from './staging-workbench-model.mjs';
+// the create route is the create column's own since RULED Q3, and the display
+// reader is display.js's (plan 038 T026, R-1 (a))
+import { CREATE_ROUTE } from './swb-create.js';
+import { readDisplay } from './display.js';
 import { readFileSync } from 'node:fs';
 const cases = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+// THE SERVED DISPLAY, installed before anything derives, as the shell installs
+// it at mount (section 3.4 slice S7): the areas and statuses below are the
+// registered host's words, as the page reads them
+setDisplay(readDisplay({ display: cases.display }));
 
 const scopes = {};
 for (const [id, snapshot, kind, tileId] of cases.scopes) {
@@ -543,7 +551,7 @@ for (const [id, snapshot, kind, tileId] of cases.scopes) {
 }
 console.log(JSON.stringify({
   scopes, route: CREATE_ROUTE, tabs: CREATE_TABS,
-  areas: { brainstorm: BRAINSTORM_AREA, staging: STAGING_AREA },
+  areas: { brainstorm: capturedArea(), staging: organizedArea() },
   // the `Status:` a create into each of these areas seeds — `brainstorm`
   // everywhere, per the ruling; the area is never consulted
   statuses: cases.areas.map((a) => [a,
@@ -566,10 +574,32 @@ def _run_create(cases, tmp_path):
     if NODE is None:
         pytest.skip("node not available for the JS derivation probe")
     shutil.copy(MODEL_JS, tmp_path / "staging-workbench-model.mjs")
+    # THE MODEL'S SIBLINGS AND THE SERVED DISPLAY (plan 038 T026; R-1 (a), its
+    # spans widened at openxFactory#656 comment 6016648451). RULED Q3 moved
+    # `CREATE_ROUTE` into the create column, `swb-create.js`, and since section
+    # 3.4 slice S7 the model spells its areas and statuses in the vocabulary the
+    # shell installs (`setDisplay`). So the harness imports the route from
+    # `swb-create.js` and the display reader from `display.js`, copied beside
+    # the model under their own names with what they import, and
+    # `package.json` makes node read `.js` as a module, as
+    # `test_session_confinement.py`'s harness does. It is handed the display
+    # `/capabilities` serves: the statement `serve.build_server()` makes, under
+    # the host this run registers, replayed as `test_gate_loop_views.py`'s
+    # `_served_display` replays it.
+    for sibling in ("display.js", "helpers.js", "dispose.js", "swb-create.js"):
+        shutil.copy(WEB / "views" / sibling, tmp_path / sibling)
+    (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
+    from opendox import display_profile, view_extension
+    from opendox.profile_proxy import profile_openxfactory
+
+    display = display_profile.display_manifest(
+        display_profile.host_display(profile_openxfactory),
+        host_profile=view_extension.host_profile_name(profile_openxfactory))
     (tmp_path / "harness.mjs").write_text(_CREATE_HARNESS, encoding="utf-8")
     cases_path = tmp_path / "create-cases.json"
     cases_path.write_text(json.dumps({"scopes": cases, "areas": _STATUS_AREAS,
-                                      "toggles": _TOGGLES, "sources": _SOURCES}),
+                                      "toggles": _TOGGLES, "sources": _SOURCES,
+                                      "display": display}),
                           encoding="utf-8")
     proc = subprocess.run([NODE, str(tmp_path / "harness.mjs"), str(cases_path)],
                           capture_output=True, text=True, timeout=60)
@@ -775,7 +805,13 @@ def test_gate_off_descriptor_is_the_real_cli_invocation(tmp_path):
                               "gate create-document ")
     argv = shlex.split(command)[2:]          # drop `python3 <script>`
     args = cli.build_parser().parse_args(argv)
-    assert args.func is cli.cmd_gate_create_document
+    # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+    # split-opendox carve (section 2.4) moved the gate verbs to
+    # `openxdox.cli_gate`, so the verb is read there; the parser stays
+    # openDox's `cli`, carrying them under the registered host.
+    from openxdox import cli_gate
+
+    assert args.func is cli_gate.cmd_gate_create_document
     assert args.actor == "brett"
     assert args.area == "ideation/staging/topic-x/"
     assert args.status == "brainstorm"
@@ -1016,14 +1052,21 @@ import {
   workbenchScope, lensScopeSnapshot, lensSessionSeed,
   sessionPosture, sessionRequest, sessionCommand, notebookRefreshCommand,
   sessionBranchBase, sessionOrdinal, sessionRefs, tileSessionRefs,
-  sessionActionsLive, sessionSurfaceHidden, sessionRoute, createSeed, createRequest,
+  sessionActionsLive, sessionSurfaceHidden, createSeed, createRequest,
   createDocumentCommand, normalizeContinuation,
   advertisedTiles, otherTileBranches,
   SESSION_AFFORDANCES, LIVE_SESSION_AFFORDANCES, DESCRIPTOR_ONLY_AFFORDANCES,
-  SESSION_VERBS, SESSION_LABELS, CONTINUATIONS, MAIN_REF,
+  SESSION_VERBS, SESSION_LABELS, CONTINUATIONS, MAIN_REF, setDisplay,
 } from './staging-workbench-model.mjs';
+// the session routes are the session column's own since RULED Q3, and the
+// display reader is display.js's (plan 038 T026, R-1 (a))
+import { sessionRoute } from './swb-session.js';
+import { readDisplay } from './display.js';
 import { readFileSync } from 'node:fs';
 const cases = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+// THE SERVED DISPLAY, installed before anything derives, as the shell installs
+// it at mount (section 3.4 slice S7)
+setDisplay(readDisplay({ display: cases.display }));
 const snapshot = cases.snapshot;
 // one snapshot per posture case, so a case can grow the TILE INVENTORY the G12
 // question is asked against (finding 18) without changing every other case
@@ -1246,6 +1289,20 @@ def _run_session(tmp_path):
     if NODE is None:
         pytest.skip("node not available for the JS derivation probe")
     shutil.copy(MODEL_JS, tmp_path / "staging-workbench-model.mjs")
+    # THE MODEL'S SIBLINGS AND THE SERVED DISPLAY, as `_run_create` takes them
+    # (plan 038 T026; R-1 (a), its spans widened at openxFactory#656 comment
+    # 6016648451): RULED Q3 moved the session routes into the session column,
+    # `swb-session.js`, so the harness imports `sessionRoute` from there, and it
+    # installs the display `/capabilities` serves.
+    for sibling in ("display.js", "helpers.js", "dispose.js", "swb-session.js"):
+        shutil.copy(WEB / "views" / sibling, tmp_path / sibling)
+    (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
+    from opendox import display_profile, view_extension
+    from opendox.profile_proxy import profile_openxfactory
+
+    display = display_profile.display_manifest(
+        display_profile.host_display(profile_openxfactory),
+        host_profile=view_extension.host_profile_name(profile_openxfactory))
     (tmp_path / "harness.mjs").write_text(_SESSION_HARNESS, encoding="utf-8")
     cases_path = tmp_path / "session-cases.json"
     cases_path.write_text(json.dumps({
@@ -1256,6 +1313,7 @@ def _run_session(tmp_path):
         "continuations": _CONTINUATION_CASES,
         "inventories": ["main", "sibling"],
         "others": _OTHER_TILE_CASES,
+        "display": display,
     }), encoding="utf-8")
     proc = subprocess.run([NODE, str(tmp_path / "harness.mjs"), str(cases_path)],
                           capture_output=True, text=True, timeout=60)
@@ -1682,9 +1740,15 @@ def test_gate_off_session_affordances_are_the_real_cli_invocations(tmp_path):
 
     out = _run_session(tmp_path)
     parser = cli.build_parser()
-    expected = {"edit": cli.cmd_gate_edit_document,
-                "save": cli.cmd_gate_open_pr,
-                "abandon": cli.cmd_gate_abandon_session}
+    # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+    # split-opendox carve (section 2.4) moved the gate verbs to
+    # `openxdox.cli_gate`, so the verb is read there; the parser stays
+    # openDox's `cli`, carrying them under the registered host.
+    from openxdox import cli_gate
+
+    expected = {"edit": cli_gate.cmd_gate_edit_document,
+                "save": cli_gate.cmd_gate_open_pr,
+                "abandon": cli_gate.cmd_gate_abandon_session}
     for affordance, func in expected.items():
         command = out["commands"][affordance]
         assert command.startswith("python3 src/opendox/cli.py gate "
@@ -1721,7 +1785,18 @@ def test_the_notebook_refresh_is_a_descriptor_in_BOTH_gate_postures(tmp_path):
                    "--session-ref 'draft/topic-x'")
     assert out["notebookApply"] == dry + " --apply"
     # the flags are the sync script's real ones, and there is no route or verb
-    sync = (REPO_ROOT / "scripts" / "sync-notebooklm-books.py").read_text(encoding="utf-8")
+    # THE SCRIPT'S OWN HOME (plan 038 T026, under batch Q's CF-4). The carve
+    # left the sync script openxFactory's, in its `scripts/`, which the composed
+    # run puts on the import path (R1Q23 (a)); this leg's `scripts/` has none.
+    # It is read where it is found, and a run that finds it in none of the
+    # path's directories, or in more than one, fails.
+    import sys
+
+    homes = {path.resolve() for path in (Path(entry) / "sync-notebooklm-books.py"
+                                         for entry in sys.path if entry)
+             if path.is_file()}
+    assert len(homes) == 1, homes
+    sync = homes.pop().read_text(encoding="utf-8")
     assert '"--session-ref"' in sync and '"--apply"' in sync
     assert "refresh-notebook" not in gate_routes_mod.EXECUTING_VERBS
     for path in sorted(WEB.rglob("*.js")):
@@ -1982,10 +2057,15 @@ _HOSTILE_VALUES = {
 _HOSTILE_HARNESS = """
 import {
   workbenchScope, createSeed, createDocumentCommand, sessionCommand,
-  notebookRefreshCommand,
+  notebookRefreshCommand, setDisplay,
 } from './staging-workbench-model.mjs';
+// the display reader is display.js's (plan 038 T026, R-1 (a))
+import { readDisplay } from './display.js';
 import { readFileSync } from 'node:fs';
 const cases = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+// THE SERVED DISPLAY, installed before anything derives, as the shell installs
+// it at mount (section 3.4 slice S7)
+setDisplay(readDisplay({ display: cases.display }));
 const v = cases.values;
 const snapshot = cases.snapshot;
 const scope = workbenchScope(snapshot, 'staged', 'topic-x') || {
@@ -2030,9 +2110,23 @@ def _hostile_descriptors(tmp_path):
     if NODE is None:
         pytest.skip("node not available for the JS derivation probe")
     shutil.copy(MODEL_JS, tmp_path / "staging-workbench-model.mjs")
+    # THE SERVED DISPLAY, as `_run_create` takes it (plan 038 T026; R-1 (a), its
+    # spans widened at openxFactory#656 comment 6016648451): the create
+    # descriptor carries an area and a status, which the model spells in the
+    # vocabulary the shell installs since section 3.4 slice S7, so the harness
+    # installs the display `/capabilities` serves, through `display.js`.
+    shutil.copy(WEB / "views" / "display.js", tmp_path / "display.js")
+    (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
+    from opendox import display_profile, view_extension
+    from opendox.profile_proxy import profile_openxfactory
+
+    display = display_profile.display_manifest(
+        display_profile.host_display(profile_openxfactory),
+        host_profile=view_extension.host_profile_name(profile_openxfactory))
     (tmp_path / "hostile.mjs").write_text(_HOSTILE_HARNESS, encoding="utf-8")
     cases = tmp_path / "hostile-cases.json"
-    cases.write_text(json.dumps({"snapshot": SNAP, "values": _HOSTILE_VALUES}),
+    cases.write_text(json.dumps({"snapshot": SNAP, "values": _HOSTILE_VALUES,
+                                 "display": display}),
                      encoding="utf-8")
     proc = subprocess.run([NODE, str(tmp_path / "hostile.mjs"), str(cases)],
                           capture_output=True, text=True, timeout=60)

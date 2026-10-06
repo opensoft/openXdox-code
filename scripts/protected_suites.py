@@ -57,14 +57,18 @@ at L when all of these are true:
 * A NAMED MODULE-LEVEL SPAN (plan 038 T026; R-1 (a), RULED by Brett Heap at
   openxFactory#656 comment 6013547504, "Admitted edit kind (Recommended)", and
   recorded at 12.5's falsifier by T005's batch Q). An `admitted` entry may
-  name, in place of `test`, a `span`: one module-level constant of the suite,
-  such as a harness text several tests run, which lies inside no test. Its
-  `old` text must then lie inside that constant's statement in the before
-  text, and its `new` text inside it in the after text, so the entry admits
-  an edit to that one constant and to nothing else of the suite. A span is
-  one module-level assignment to that one name, and it must exist before the
-  landing and at it: no span is added, and a function or class is never one.
-  A respelling names its test, never a span.
+  name, in place of `test`, a `span`: one module-level constant or helper
+  function of the suite, such as a harness text several tests run or the
+  helper that runs it, which lies inside no test. Comment 6016648451 ("Widen
+  the spans, served display (Recommended)") names three helpers among the six
+  spans, so a function may be one. Its `old` text must then lie inside that
+  constant's or function's statement in the before text, and its `new` text
+  inside it in the after text, so the entry admits an edit to that one
+  statement and to nothing else of the suite. A span is one module-level
+  assignment to that one name, or one module-level function of that name,
+  and it must exist before the landing and at it: no span is added, and a
+  class, an import or a second binding of the name is never one. A
+  respelling names its test, never a span, and a test is never a span.
 
 A landing that touches a protected suite is admitted for that suite only if one
 entry holds at it, or, in F5.2's call, a CHAIN of entries does. Every other
@@ -144,7 +148,8 @@ COMMON_KEYS = frozenset({"suite", "test", "landing", "edit", "ruled", "review",
 EDIT_KEYS = {"respelling": frozenset({"respelled"}),
              "admitted": frozenset({"reason"})}
 #: R-1 (a) (plan 038 T026): the key an `admitted` entry names IN PLACE OF
-#: `test` when its edit lies in a module-level constant of the suite.
+#: `test` when its edit lies in a module-level constant or helper function of
+#: the suite.
 SPAN_KEY = "span"
 SPAN_EDITS = frozenset({"admitted"})
 
@@ -324,12 +329,15 @@ def _test_lines(text: str, test: str) -> tuple[int, int] | None:
 
 
 def _span_lines(text: str, span: str) -> tuple[int, int] | None:
-    """The 1-based line span of the module-level constant `span`, or None.
+    """The 1-based line span of the module-level constant or function `span`,
+    or None.
 
     R-1 (a) (plan 038 T026): a span is ONE module-level assignment whose one
-    target is the bare name `span`, and no other module-level statement binds
-    that name, so a function, a class, an import or a second assignment is
-    never a span."""
+    target is the bare name `span`, or ONE module-level function named `span`
+    (comment 6016648451 names three helpers among the spans), and no other
+    module-level statement binds that name. So a class, an import or a second
+    binding is never a span. A function's span starts at its first decorator,
+    as a test's does."""
     try:
         tree = ast.parse(text)
     except SyntaxError:
@@ -338,6 +346,8 @@ def _span_lines(text: str, span: str) -> tuple[int, int] | None:
     if len(binders) != 1 or binders[0] not in tree.body:
         return None
     node = binders[0]
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return min([node.lineno, *(d.lineno for d in node.decorator_list)]), node.end_lineno
     if isinstance(node, ast.Assign):
         single = len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
     else:
@@ -391,7 +401,8 @@ def _inside_the_test(text: str, start: int, piece: str, test: str) -> bool:
 
 def _inside_the_span(text: str, start: int, piece: str, span: str) -> bool:
     """`_inside_the_test`'s rule, amended by R-1 (a) to admit the new kind:
-    `piece` lies inside the one module-level constant `span` names."""
+    `piece` lies inside the one module-level constant or function `span`
+    names."""
     return _inside(_span_lines(text, span), text, start, piece)
 
 
@@ -507,11 +518,13 @@ def _edit_holds(before_text: str, after_text: str, entry: dict) -> str | None:
     if before_text.replace(old, new, 1) != after_text:
         return "replacing the entry's old text with its new text does not give the suite at the landing"
     if SPAN_KEY in entry:
-        # R-1 (a): the edit lies inside the one module-level constant the entry
-        # names, before the landing and at it. No span is ever added.
+        # R-1 (a): the edit lies inside the one module-level constant or
+        # function the entry names, before the landing and at it. No span is
+        # ever added.
         span = entry[SPAN_KEY]
         if _span_lines(before_text, span) is None:
-            return f"{span} is not one module-level constant before the landing"
+            return (f"{span} is not one module-level constant or function "
+                    "before the landing")
         if not _inside_the_span(before_text, at, old, span):
             return f"the entry's old text is not inside {span} before the landing"
         if not _inside_the_span(after_text, at, new, span):

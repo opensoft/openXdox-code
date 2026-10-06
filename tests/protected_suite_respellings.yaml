@@ -22,7 +22,9 @@
 #     weakened (R1Q7 (a), batch C). For 12.5's governed suites that includes
 #     the seventeen respellings of names the split-opendox CARVE moved before
 #     the arc (CF-4, H-2, confirmed with plan 038's ruling at `6013547504`;
-#     batch Q), and the 'cluster' node's in-test entry (R-1 (a)'s note).
+#     batch Q), three more of that kind in `tests/test_staging_workbench.py`
+#     that T026's measurement found (`6016415390` point 2, ruled at
+#     `6016648451`), and the 'cluster' node's in-test entry (R-1 (a)'s note).
 #   * The two edits F7.1 requires (R1Q14 (a), `5850003126`, batch F), in
 #     `tests/test_snapshot.py` and `tests/test_snapshot_validator_home.py`.
 #   * The two edits 5.3a's `values` block requires (R1Q26 (a), `5851950767`,
@@ -32,8 +34,12 @@
 #     `tests/test_snapshot.py`: each one's walk premise becomes 7.3's answer,
 #     and its assertions stay.
 #   * An edit to a NAMED MODULE-LEVEL SPAN of one of 12.5's governed suites,
-#     such as a harness text several tests run, which lies inside no test
-#     (R-1 (a), RULED with plan 038 at `6013547504`; batch Q).
+#     such as a harness text several tests run or the helper that runs it,
+#     which lies inside no test (R-1 (a), RULED with plan 038 at
+#     `6013547504`; batch Q). The named spans are six, as `6016648451`
+#     widened them: `_CREATE_HARNESS`, `_SESSION_HARNESS` and
+#     `_HOSTILE_HARNESS`, and the helpers `_run_create`, `_run_session` and
+#     `_hostile_descriptors`, all in `tests/test_staging_workbench.py`.
 # The F7.1, 5.3a, batch K and span kinds are each entered with a reason, and
 # none is entered as a respelling.
 #
@@ -56,8 +62,8 @@
 #   * `entries` are in landing order, one per edit. Each entry names:
 #     - `suite`, the protected file, written plainly (`tests/<name>`);
 #     - `test`, the one test the edit changes, or, for an admitted edit to a
-#       module-level constant (R-1 (a)), `span`, that constant's name, in
-#       its place;
+#       module-level constant or helper function (R-1 (a)), `span`, that
+#       name, in its place;
 #     - `landing`, the pull request that lands the edit,
 #       `opensoft/openXdox-code#<n>`, because the landing's commit is not
 #       known inside it (T019's rule);
@@ -82,10 +88,12 @@
 #     entry cannot admit an edit to another test of the suite.
 #   * A SPAN (plan 038 T026; R-1 (a)). For an entry that names `span`, the
 #     fourth condition reads the span for the test: `old` lies inside that
-#     constant's statement in the `before_blob` text, and `new` inside it in
-#     the `after_blob` text. A span is one module-level assignment to one
-#     bare name that nothing else in module scope binds, it exists before the
-#     edit and after it, and only an admitted entry names one.
+#     constant's or function's statement in the `before_blob` text, and `new`
+#     inside it in the `after_blob` text. A span is one module-level
+#     assignment to one bare name, or one module-level function of that name,
+#     that nothing else in module scope binds; it is never a test or a class,
+#     it exists before the edit and after it, and only an admitted entry names
+#     one.
 #   * AN ADDED TEST (plan 034 T061; batch F admits one). Where `test` does not
 #     exist in the `before_blob` text, the fourth condition reads instead: `new`
 #     is `old` followed by that test's whole definition and blank lines, and
@@ -93,16 +101,17 @@
 #   * Entries for one suite CHAIN: each one's `before_blob` is the previous
 #     one's `after_blob`, because each edit is made to the suite the last one
 #     left.
-#   * SEVERAL EDITS IN ONE LANDING (plan 034 T061; batch K), in F5.2's call
-#     alone (`--chains`; 12.5's keeps one entry per suite per landing). A
-#     landing that edits one suite in several tests enters each edit as its
-#     own entry, in the order they apply, all naming that landing. The first
-#     one's `before_blob` is the suite before the landing and the last one's
-#     `after_blob` the suite at it. Each one between records, as its
-#     `after_blob`, the blob id of the text its edit leaves (`git
-#     hash-object`; no commit need hold it). Each holds on its own texts by the
-#     conditions above, so the landing's diff for the suite is exactly their
-#     texts, each inside its own test.
+#   * SEVERAL EDITS IN ONE LANDING (plan 034 T061; batch K), in a call that
+#     passes `--chains`: F5.2's since batch K, and 12.5's from batch Q (RULED
+#     at `6016648451`; a call without it keeps one entry per suite per
+#     landing). A landing that edits one suite in several tests, or spans,
+#     enters each edit as its own entry, in the order they apply, all naming
+#     that landing. The first one's `before_blob` is the suite before the
+#     landing and the last one's `after_blob` the suite at it. Each one between
+#     records, as its `after_blob`, the blob id of the text its edit leaves
+#     (`git hash-object`; no commit need hold it). Each holds on its own texts
+#     by the conditions above, so the landing's diff for the suite is exactly
+#     their texts, each inside its own test or span.
 #   * No entry weakens an assertion. The pull request that adds an entry is
 #     reviewed on exactly that basis (batch C).
 
@@ -1925,3 +1934,538 @@ entries:
           # the create column's own predicate since section 3.4 slice S5
           # (`createColumn`; plan 038 T026, under batch Q's CF-4)
           pill = view.split("const gateOn = createColumn.createGateLive(caps);", 1)[1].split(
+  - suite: tests/test_staging_workbench.py
+    span: _CREATE_HARNESS
+    landing: opensoft/openXdox-code#43
+    edit: admitted
+    reason: >-
+      The create harness's imports, as the product now places them:
+      `CREATE_ROUTE` from the create column, `swb-create.js`, where RULED Q3
+      (opensoft/openxFactory#656 comment 5642758731) moved it, and the display
+      reader from `display.js`; the model's `BRAINSTORM_AREA` and
+      `STAGING_AREA` are its `capturedArea` and `organizedArea` readers since
+      slice S7. The harness installs the display the helper hands it
+      (`setDisplay(readDisplay({ display: cases.display }))`) before anything
+      derives, as the shell does. Since section 3.4 slice S7 (openDox-code
+      `1e46971`) the model spells its areas and statuses in the vocabulary the
+      shell installs at mount (`setDisplay`), so a harness that installs none
+      reads openDox's neutral words (area `''`, status `source`), which the
+      gate route and the real CLI parser refuse.
+    ruled: >-
+      R-1 (a), RULED by Brett Heap with plan 038 at opensoft/openxFactory#656
+      comment 6013547504 ("Admitted edit kind (Recommended)") and recorded at
+      #1144's 12.5 falsifier by plan 038's T005 (batch Q). Its named spans are
+      widened to six by comment 6016648451 ("Widen the spans, served display
+      (Recommended)"): `_CREATE_HARNESS`, `_SESSION_HARNESS`, `_run_create`,
+      `_run_session`, `_hostile_descriptors` and `_HOSTILE_HARNESS`, the
+      helpers copying the model's siblings and handing each harness the SERVED
+      governed display.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test or span, and this step's is `old` to
+      `new`, inside the span named. Every derivation the harness runs, and
+      every value it reports, is unchanged; it now runs in the vocabulary the
+      served page runs in. No test's assertion is touched, and none is
+      weakened.
+    before_blob: 4bf069cdf4177e9dc65fe4051be015d9e3ed06fa
+    after_blob: 0c523554ce35d4438633504c53e171ed4f56ec76
+    old: |2
+        createSource, createDocumentCommand, CREATE_ROUTE, CREATE_TABS,
+        BRAINSTORM_AREA, STAGING_AREA,
+      } from './staging-workbench-model.mjs';
+      import { readFileSync } from 'node:fs';
+      const cases = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+    new: |2
+        createSource, createDocumentCommand, CREATE_TABS,
+        capturedArea, organizedArea, setDisplay,
+      } from './staging-workbench-model.mjs';
+      // the create route is the create column's own since RULED Q3, and the display
+      // reader is display.js's (plan 038 T026, R-1 (a))
+      import { CREATE_ROUTE } from './swb-create.js';
+      import { readDisplay } from './display.js';
+      import { readFileSync } from 'node:fs';
+      const cases = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+      // THE SERVED DISPLAY, installed before anything derives, as the shell installs
+      // it at mount (section 3.4 slice S7): the areas and statuses below are the
+      // registered host's words, as the page reads them
+      setDisplay(readDisplay({ display: cases.display }));
+  - suite: tests/test_staging_workbench.py
+    span: _CREATE_HARNESS
+    landing: opensoft/openXdox-code#43
+    edit: admitted
+    reason: >-
+      The two area constants the harness reports, read through the model's
+      slice S7 readers: `BRAINSTORM_AREA` and `STAGING_AREA` to
+      `capturedArea()` and `organizedArea()`, which answer the installed
+      display's captured and organized areas.
+    ruled: >-
+      R-1 (a), RULED by Brett Heap with plan 038 at opensoft/openxFactory#656
+      comment 6013547504 ("Admitted edit kind (Recommended)") and recorded at
+      #1144's 12.5 falsifier by plan 038's T005 (batch Q). Its named spans are
+      widened to six by comment 6016648451 ("Widen the spans, served display
+      (Recommended)"): `_CREATE_HARNESS`, `_SESSION_HARNESS`, `_run_create`,
+      `_run_session`, `_hostile_descriptors` and `_HOSTILE_HARNESS`, the
+      helpers copying the model's siblings and handing each harness the SERVED
+      governed display.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test or span, and this step's is `old` to
+      `new`, inside the span named. The reported keys are unchanged, and under
+      the served display the values are the same two areas. No test's
+      assertion is touched, and none is weakened.
+    before_blob: 0c523554ce35d4438633504c53e171ed4f56ec76
+    after_blob: 2d2cde03dc86c53d7cf17ee935fef4b638fb4540
+    old: |2
+        areas: { brainstorm: BRAINSTORM_AREA, staging: STAGING_AREA },
+    new: |2
+        areas: { brainstorm: capturedArea(), staging: organizedArea() },
+  - suite: tests/test_staging_workbench.py
+    span: _run_create
+    landing: opensoft/openXdox-code#43
+    edit: admitted
+    reason: >-
+      The create helper copies the model's siblings the harness now imports
+      (`display.js`; `swb-create.js`, which carries `CREATE_ROUTE` since RULED
+      Q3, and the `helpers.js` and `dispose.js` it imports), with a
+      `package.json` that makes node read them as modules, and hands the
+      harness the SERVED display: `/capabilities["display"]`, by the statement
+      `serve.build_server()` makes under the registered host. Since section
+      3.4 slice S7 (openDox-code `1e46971`) the model spells its areas and
+      statuses in the vocabulary the shell installs at mount (`setDisplay`),
+      so a harness that installs none reads openDox's neutral words (area
+      `''`, status `source`), which the gate route and the real CLI parser
+      refuse.
+    ruled: >-
+      R-1 (a), RULED by Brett Heap with plan 038 at opensoft/openxFactory#656
+      comment 6013547504 ("Admitted edit kind (Recommended)") and recorded at
+      #1144's 12.5 falsifier by plan 038's T005 (batch Q). Its named spans are
+      widened to six by comment 6016648451 ("Widen the spans, served display
+      (Recommended)"): `_CREATE_HARNESS`, `_SESSION_HARNESS`, `_run_create`,
+      `_run_session`, `_hostile_descriptors` and `_HOSTILE_HARNESS`, the
+      helpers copying the model's siblings and handing each harness the SERVED
+      governed display.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test or span, and this step's is `old` to
+      `new`, inside the span named. The helper still copies the one model and
+      still runs the harness on the same cases; it adds the siblings and the
+      display beside them. No test's assertion is touched, and none is
+      weakened.
+    before_blob: 2d2cde03dc86c53d7cf17ee935fef4b638fb4540
+    after_blob: 432b867049e8b51598faa3b2f75f7b419d2a8c23
+    old: |2
+          shutil.copy(MODEL_JS, tmp_path / "staging-workbench-model.mjs")
+          (tmp_path / "harness.mjs").write_text(_CREATE_HARNESS, encoding="utf-8")
+          cases_path = tmp_path / "create-cases.json"
+          cases_path.write_text(json.dumps({"scopes": cases, "areas": _STATUS_AREAS,
+                                            "toggles": _TOGGLES, "sources": _SOURCES}),
+                                encoding="utf-8")
+    new: |2
+          shutil.copy(MODEL_JS, tmp_path / "staging-workbench-model.mjs")
+          # THE MODEL'S SIBLINGS AND THE SERVED DISPLAY (plan 038 T026; R-1 (a), its
+          # spans widened at openxFactory#656 comment 6016648451). RULED Q3 moved
+          # `CREATE_ROUTE` into the create column, `swb-create.js`, and since section
+          # 3.4 slice S7 the model spells its areas and statuses in the vocabulary the
+          # shell installs (`setDisplay`). So the harness imports the route from
+          # `swb-create.js` and the display reader from `display.js`, copied beside
+          # the model under their own names with what they import, and
+          # `package.json` makes node read `.js` as a module, as
+          # `test_session_confinement.py`'s harness does. It is handed the display
+          # `/capabilities` serves: the statement `serve.build_server()` makes, under
+          # the host this run registers, replayed as `test_gate_loop_views.py`'s
+          # `_served_display` replays it.
+          for sibling in ("display.js", "helpers.js", "dispose.js", "swb-create.js"):
+              shutil.copy(WEB / "views" / sibling, tmp_path / sibling)
+          (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
+          from opendox import display_profile, view_extension
+          from opendox.profile_proxy import profile_openxfactory
+
+          display = display_profile.display_manifest(
+              display_profile.host_display(profile_openxfactory),
+              host_profile=view_extension.host_profile_name(profile_openxfactory))
+          (tmp_path / "harness.mjs").write_text(_CREATE_HARNESS, encoding="utf-8")
+          cases_path = tmp_path / "create-cases.json"
+          cases_path.write_text(json.dumps({"scopes": cases, "areas": _STATUS_AREAS,
+                                            "toggles": _TOGGLES, "sources": _SOURCES,
+                                            "display": display}),
+                                encoding="utf-8")
+  - suite: tests/test_staging_workbench.py
+    test: test_gate_off_descriptor_is_the_real_cli_invocation
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The gate verb's home: `cli.cmd_gate_create_document` to
+      `cli_gate.cmd_gate_create_document`, imported inside the test from
+      `openxdox.cli_gate`, where the split-opendox carve's section 2.4 moved
+      openDox's gate verbs (a commit with no `Arc:` trailer). `opendox.cli` no
+      longer carries the name, so the old spelling raised AttributeError. The
+      parser stays openDox's `cli.build_parser()`.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q). The
+      residue sits in this suite, outside the seventeen plan 038 names; T026's
+      measurement reported it at comment 6016415390 (point 2), and comment
+      6016648451 ruled that point.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. The descriptor is still parsed by the real
+      parser, and it must still dispatch to the create-document verb, with
+      every argument assertion unchanged. No assertion is weakened.
+    before_blob: 432b867049e8b51598faa3b2f75f7b419d2a8c23
+    after_blob: 23eb19a86cb5cdbcf534060040b5ebec7a9b90f1
+    old: |2
+          assert args.func is cli.cmd_gate_create_document
+    new: |2
+          # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+          # split-opendox carve (section 2.4) moved the gate verbs to
+          # `openxdox.cli_gate`, so the verb is read there; the parser stays
+          # openDox's `cli`, carrying them under the registered host.
+          from openxdox import cli_gate
+
+          assert args.func is cli_gate.cmd_gate_create_document
+  - suite: tests/test_staging_workbench.py
+    span: _SESSION_HARNESS
+    landing: opensoft/openXdox-code#43
+    edit: admitted
+    reason: >-
+      The session harness's imports, as the product now places them:
+      `sessionRoute` from the session column, `swb-session.js`, where RULED Q3
+      (opensoft/openxFactory#656 comment 5642758731) moved the session routes,
+      and the display reader from `display.js`, with the model's `setDisplay`.
+      The harness installs the display the helper hands it before anything
+      derives, as the shell does. Since section 3.4 slice S7 (openDox-code
+      `1e46971`) the model spells its areas and statuses in the vocabulary the
+      shell installs at mount (`setDisplay`), so a harness that installs none
+      reads openDox's neutral words (area `''`, status `source`), which the
+      gate route and the real CLI parser refuse.
+    ruled: >-
+      R-1 (a), RULED by Brett Heap with plan 038 at opensoft/openxFactory#656
+      comment 6013547504 ("Admitted edit kind (Recommended)") and recorded at
+      #1144's 12.5 falsifier by plan 038's T005 (batch Q). Its named spans are
+      widened to six by comment 6016648451 ("Widen the spans, served display
+      (Recommended)"): `_CREATE_HARNESS`, `_SESSION_HARNESS`, `_run_create`,
+      `_run_session`, `_hostile_descriptors` and `_HOSTILE_HARNESS`, the
+      helpers copying the model's siblings and handing each harness the SERVED
+      governed display.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test or span, and this step's is `old` to
+      `new`, inside the span named. Every derivation the harness runs, and
+      every value it reports, is unchanged; it now runs in the vocabulary the
+      served page runs in. No test's assertion is touched, and none is
+      weakened.
+    before_blob: 23eb19a86cb5cdbcf534060040b5ebec7a9b90f1
+    after_blob: 42e5694556172eb21d559bad79b2715a3128984e
+    old: |2
+        sessionActionsLive, sessionSurfaceHidden, sessionRoute, createSeed, createRequest,
+        createDocumentCommand, normalizeContinuation,
+        advertisedTiles, otherTileBranches,
+        SESSION_AFFORDANCES, LIVE_SESSION_AFFORDANCES, DESCRIPTOR_ONLY_AFFORDANCES,
+        SESSION_VERBS, SESSION_LABELS, CONTINUATIONS, MAIN_REF,
+      } from './staging-workbench-model.mjs';
+      import { readFileSync } from 'node:fs';
+      const cases = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+    new: |2
+        sessionActionsLive, sessionSurfaceHidden, createSeed, createRequest,
+        createDocumentCommand, normalizeContinuation,
+        advertisedTiles, otherTileBranches,
+        SESSION_AFFORDANCES, LIVE_SESSION_AFFORDANCES, DESCRIPTOR_ONLY_AFFORDANCES,
+        SESSION_VERBS, SESSION_LABELS, CONTINUATIONS, MAIN_REF, setDisplay,
+      } from './staging-workbench-model.mjs';
+      // the session routes are the session column's own since RULED Q3, and the
+      // display reader is display.js's (plan 038 T026, R-1 (a))
+      import { sessionRoute } from './swb-session.js';
+      import { readDisplay } from './display.js';
+      import { readFileSync } from 'node:fs';
+      const cases = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+      // THE SERVED DISPLAY, installed before anything derives, as the shell installs
+      // it at mount (section 3.4 slice S7)
+      setDisplay(readDisplay({ display: cases.display }));
+  - suite: tests/test_staging_workbench.py
+    span: _run_session
+    landing: opensoft/openXdox-code#43
+    edit: admitted
+    reason: >-
+      The session helper copies the model's siblings the harness now imports
+      (`display.js`; `swb-session.js`, which carries the session routes since
+      RULED Q3, and the `helpers.js` and `dispose.js` it imports), with a
+      `package.json` that makes node read them as modules, and hands the
+      harness the SERVED display, as `_run_create` does. Since section 3.4
+      slice S7 (openDox-code `1e46971`) the model spells its areas and
+      statuses in the vocabulary the shell installs at mount (`setDisplay`),
+      so a harness that installs none reads openDox's neutral words (area
+      `''`, status `source`), which the gate route and the real CLI parser
+      refuse.
+    ruled: >-
+      R-1 (a), RULED by Brett Heap with plan 038 at opensoft/openxFactory#656
+      comment 6013547504 ("Admitted edit kind (Recommended)") and recorded at
+      #1144's 12.5 falsifier by plan 038's T005 (batch Q). Its named spans are
+      widened to six by comment 6016648451 ("Widen the spans, served display
+      (Recommended)"): `_CREATE_HARNESS`, `_SESSION_HARNESS`, `_run_create`,
+      `_run_session`, `_hostile_descriptors` and `_HOSTILE_HARNESS`, the
+      helpers copying the model's siblings and handing each harness the SERVED
+      governed display.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test or span, and this step's is `old` to
+      `new`, inside the span named. The helper still copies the one model and
+      still runs the harness on the same cases; it adds the siblings and the
+      display beside them. No test's assertion is touched, and none is
+      weakened.
+    before_blob: 42e5694556172eb21d559bad79b2715a3128984e
+    after_blob: 4eef7231cb5535ce67eb3621d6dbfb491bad873a
+    old: |2
+          shutil.copy(MODEL_JS, tmp_path / "staging-workbench-model.mjs")
+          (tmp_path / "harness.mjs").write_text(_SESSION_HARNESS, encoding="utf-8")
+          cases_path = tmp_path / "session-cases.json"
+          cases_path.write_text(json.dumps({
+              "snapshot": SNAP, "siblingSnapshot": SIBLING_SNAP,
+              "postures": _POSTURE_CASES, "branches": _BRANCH_CASES,
+              "ordinals": _ORDINAL_CASES, "caps": _CAP_CASES, "refs": _REF_CASES,
+              "family": _FAMILY_CASES, "values": _SESSION_VALUES,
+              "continuations": _CONTINUATION_CASES,
+              "inventories": ["main", "sibling"],
+              "others": _OTHER_TILE_CASES,
+          }), encoding="utf-8")
+    new: |2
+          shutil.copy(MODEL_JS, tmp_path / "staging-workbench-model.mjs")
+          # THE MODEL'S SIBLINGS AND THE SERVED DISPLAY, as `_run_create` takes them
+          # (plan 038 T026; R-1 (a), its spans widened at openxFactory#656 comment
+          # 6016648451): RULED Q3 moved the session routes into the session column,
+          # `swb-session.js`, so the harness imports `sessionRoute` from there, and it
+          # installs the display `/capabilities` serves.
+          for sibling in ("display.js", "helpers.js", "dispose.js", "swb-session.js"):
+              shutil.copy(WEB / "views" / sibling, tmp_path / sibling)
+          (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
+          from opendox import display_profile, view_extension
+          from opendox.profile_proxy import profile_openxfactory
+
+          display = display_profile.display_manifest(
+              display_profile.host_display(profile_openxfactory),
+              host_profile=view_extension.host_profile_name(profile_openxfactory))
+          (tmp_path / "harness.mjs").write_text(_SESSION_HARNESS, encoding="utf-8")
+          cases_path = tmp_path / "session-cases.json"
+          cases_path.write_text(json.dumps({
+              "snapshot": SNAP, "siblingSnapshot": SIBLING_SNAP,
+              "postures": _POSTURE_CASES, "branches": _BRANCH_CASES,
+              "ordinals": _ORDINAL_CASES, "caps": _CAP_CASES, "refs": _REF_CASES,
+              "family": _FAMILY_CASES, "values": _SESSION_VALUES,
+              "continuations": _CONTINUATION_CASES,
+              "inventories": ["main", "sibling"],
+              "others": _OTHER_TILE_CASES,
+              "display": display,
+          }), encoding="utf-8")
+  - suite: tests/test_staging_workbench.py
+    test: test_gate_off_session_affordances_are_the_real_cli_invocations
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The gate verbs' home: `cli.cmd_gate_edit_document`,
+      `cli.cmd_gate_open_pr` and `cli.cmd_gate_abandon_session` to
+      `cli_gate.…`, imported inside the test from `openxdox.cli_gate`, where
+      the split-opendox carve's section 2.4 moved openDox's gate verbs (a
+      commit with no `Arc:` trailer). `opendox.cli` no longer carries the
+      names, so the old spelling raised AttributeError. The parser stays
+      openDox's `cli.build_parser()`.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q). The
+      residue sits in this suite, outside the seventeen plan 038 names; T026's
+      measurement reported it at comment 6016415390 (point 2), and comment
+      6016648451 ruled that point.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. Each descriptor is still parsed by the real
+      parser and must still dispatch to its own verb, with every argument
+      assertion unchanged. No assertion is weakened.
+    before_blob: 4eef7231cb5535ce67eb3621d6dbfb491bad873a
+    after_blob: 63ae2d45d3287eec07bf8f1d20a5a5585502f3dd
+    old: |2
+          expected = {"edit": cli.cmd_gate_edit_document,
+                      "save": cli.cmd_gate_open_pr,
+                      "abandon": cli.cmd_gate_abandon_session}
+    new: |2
+          # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+          # split-opendox carve (section 2.4) moved the gate verbs to
+          # `openxdox.cli_gate`, so the verb is read there; the parser stays
+          # openDox's `cli`, carrying them under the registered host.
+          from openxdox import cli_gate
+
+          expected = {"edit": cli_gate.cmd_gate_edit_document,
+                      "save": cli_gate.cmd_gate_open_pr,
+                      "abandon": cli_gate.cmd_gate_abandon_session}
+  - suite: tests/test_staging_workbench.py
+    test: test_the_notebook_refresh_is_a_descriptor_in_BOTH_gate_postures
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      Where the sync script is read: `REPO_ROOT / "scripts" /
+      "sync-notebooklm-books.py"`, the pre-carve home, to the one directory on
+      the import path that holds it. The carve left the script openxFactory's
+      (`scripts/`, not carved), and the composed run puts openxFactory's
+      `scripts/` on the path (R1Q23 (a)); this leg's `scripts/` has no such
+      file, so the old path raised FileNotFoundError.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q). The
+      residue sits in this suite, outside the seventeen plan 038 names; T026's
+      measurement reported it at comment 6016415390 (point 2), and comment
+      6016648451 ruled that point.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. Both flags are still asserted to be the script's
+      own, read from the script itself, and a run that finds the script in
+      none of the path's directories, or in more than one, now FAILS. No
+      assertion is weakened.
+    before_blob: 63ae2d45d3287eec07bf8f1d20a5a5585502f3dd
+    after_blob: 8f4807562a114d9dbc97fba68fbc947e961db31a
+    old: |2
+          sync = (REPO_ROOT / "scripts" / "sync-notebooklm-books.py").read_text(encoding="utf-8")
+    new: |2
+          # THE SCRIPT'S OWN HOME (plan 038 T026, under batch Q's CF-4). The carve
+          # left the sync script openxFactory's, in its `scripts/`, which the composed
+          # run puts on the import path (R1Q23 (a)); this leg's `scripts/` has none.
+          # It is read where it is found, and a run that finds it in none of the
+          # path's directories, or in more than one, fails.
+          import sys
+
+          homes = {path.resolve() for path in (Path(entry) / "sync-notebooklm-books.py"
+                                               for entry in sys.path if entry)
+                   if path.is_file()}
+          assert len(homes) == 1, homes
+          sync = homes.pop().read_text(encoding="utf-8")
+  - suite: tests/test_staging_workbench.py
+    span: _HOSTILE_HARNESS
+    landing: opensoft/openXdox-code#43
+    edit: admitted
+    reason: >-
+      The hostile harness installs the display the helper hands it
+      (`setDisplay(readDisplay({ display: cases.display }))`) before anything
+      derives, as the shell does, importing the reader from `display.js` and
+      the model's `setDisplay`. Without it the create descriptor carried
+      `--status source`, the neutral word, and the real parser exited 2
+      (`invalid choice: 'source'`) before the quoting the test is about was
+      reached. Since section 3.4 slice S7 (openDox-code `1e46971`) the model
+      spells its areas and statuses in the vocabulary the shell installs at
+      mount (`setDisplay`), so a harness that installs none reads openDox's
+      neutral words (area `''`, status `source`), which the gate route and the
+      real CLI parser refuse.
+    ruled: >-
+      R-1 (a), RULED by Brett Heap with plan 038 at opensoft/openxFactory#656
+      comment 6013547504 ("Admitted edit kind (Recommended)") and recorded at
+      #1144's 12.5 falsifier by plan 038's T005 (batch Q). Its named spans are
+      widened to six by comment 6016648451 ("Widen the spans, served display
+      (Recommended)"): `_CREATE_HARNESS`, `_SESSION_HARNESS`, `_run_create`,
+      `_run_session`, `_hostile_descriptors` and `_HOSTILE_HARNESS`, the
+      helpers copying the model's siblings and handing each harness the SERVED
+      governed display.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test or span, and this step's is `old` to
+      `new`, inside the span named. Every descriptor is still built through
+      the real seeding path with the same hostile values, and every quoting
+      and parsing assertion on it is unchanged. No test's assertion is
+      touched, and none is weakened.
+    before_blob: 8f4807562a114d9dbc97fba68fbc947e961db31a
+    after_blob: 75a082f13c4056c7484dba9c9efb10cd10f27ea6
+    old: |2
+        notebookRefreshCommand,
+      } from './staging-workbench-model.mjs';
+      import { readFileSync } from 'node:fs';
+      const cases = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+    new: |2
+        notebookRefreshCommand, setDisplay,
+      } from './staging-workbench-model.mjs';
+      // the display reader is display.js's (plan 038 T026, R-1 (a))
+      import { readDisplay } from './display.js';
+      import { readFileSync } from 'node:fs';
+      const cases = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+      // THE SERVED DISPLAY, installed before anything derives, as the shell installs
+      // it at mount (section 3.4 slice S7)
+      setDisplay(readDisplay({ display: cases.display }));
+  - suite: tests/test_staging_workbench.py
+    span: _hostile_descriptors
+    landing: opensoft/openXdox-code#43
+    edit: admitted
+    reason: >-
+      The hostile helper copies `display.js`, the sibling the harness now
+      imports, with a `package.json` that makes node read it as a module, and
+      hands the harness the SERVED display, as `_run_create` does. Since
+      section 3.4 slice S7 (openDox-code `1e46971`) the model spells its areas
+      and statuses in the vocabulary the shell installs at mount
+      (`setDisplay`), so a harness that installs none reads openDox's neutral
+      words (area `''`, status `source`), which the gate route and the real
+      CLI parser refuse.
+    ruled: >-
+      R-1 (a), RULED by Brett Heap with plan 038 at opensoft/openxFactory#656
+      comment 6013547504 ("Admitted edit kind (Recommended)") and recorded at
+      #1144's 12.5 falsifier by plan 038's T005 (batch Q). Its named spans are
+      widened to six by comment 6016648451 ("Widen the spans, served display
+      (Recommended)"): `_CREATE_HARNESS`, `_SESSION_HARNESS`, `_run_create`,
+      `_run_session`, `_hostile_descriptors` and `_HOSTILE_HARNESS`, the
+      helpers copying the model's siblings and handing each harness the SERVED
+      governed display.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test or span, and this step's is `old` to
+      `new`, inside the span named. The helper still copies the one model and
+      still runs the harness on the same snapshot and hostile values; it adds
+      the sibling and the display beside them. No test's assertion is touched,
+      and none is weakened.
+    before_blob: 75a082f13c4056c7484dba9c9efb10cd10f27ea6
+    after_blob: 5a32a265ffac872c886a34a4d7a29e42c48f8bc9
+    old: |2
+          shutil.copy(MODEL_JS, tmp_path / "staging-workbench-model.mjs")
+          (tmp_path / "hostile.mjs").write_text(_HOSTILE_HARNESS, encoding="utf-8")
+          cases = tmp_path / "hostile-cases.json"
+          cases.write_text(json.dumps({"snapshot": SNAP, "values": _HOSTILE_VALUES}),
+                           encoding="utf-8")
+    new: |2
+          shutil.copy(MODEL_JS, tmp_path / "staging-workbench-model.mjs")
+          # THE SERVED DISPLAY, as `_run_create` takes it (plan 038 T026; R-1 (a), its
+          # spans widened at openxFactory#656 comment 6016648451): the create
+          # descriptor carries an area and a status, which the model spells in the
+          # vocabulary the shell installs since section 3.4 slice S7, so the harness
+          # installs the display `/capabilities` serves, through `display.js`.
+          shutil.copy(WEB / "views" / "display.js", tmp_path / "display.js")
+          (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
+          from opendox import display_profile, view_extension
+          from opendox.profile_proxy import profile_openxfactory
+
+          display = display_profile.display_manifest(
+              display_profile.host_display(profile_openxfactory),
+              host_profile=view_extension.host_profile_name(profile_openxfactory))
+          (tmp_path / "hostile.mjs").write_text(_HOSTILE_HARNESS, encoding="utf-8")
+          cases = tmp_path / "hostile-cases.json"
+          cases.write_text(json.dumps({"snapshot": SNAP, "values": _HOSTILE_VALUES,
+                                       "display": display}),
+                           encoding="utf-8")
