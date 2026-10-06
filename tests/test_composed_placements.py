@@ -287,6 +287,32 @@ def test_without_git_on_path_it_refuses(composed, tmp_path):
     assert not os.path.lexists(composed.destination)
 
 
+@pytest.mark.parametrize("edited", [False, True], ids=["clean", "edited"])
+def test_ambient_git_repository_variables_do_not_redirect_the_checks(
+        composed, tmp_path, edited):
+    # Copilot r4200975244: git sets GIT_DIR and GIT_WORK_TREE for every hook,
+    # and honours them over the directory each check runs in. Pointed at a
+    # decoy repository, they must change nothing.
+    decoy = tmp_path / "decoy"
+    decoy.mkdir()
+    _git("init", "-q", cwd=decoy)
+    (decoy / "README.md").write_text("decoy\n", encoding="utf-8")
+    _git("add", "README.md", cwd=decoy)
+    _git("commit", "-q", "-m", "decoy", cwd=decoy)
+    ambient = {"GIT_DIR": str(decoy / ".git"), "GIT_WORK_TREE": str(decoy),
+               "GIT_INDEX_FILE": str(decoy / ".git" / "index")}
+    if edited:
+        composed.source.write_text("edited in the working tree\n",
+                                   encoding="utf-8")
+        said = composed.refused(**ambient)
+        assert "differs from openDox-spec's pinned commit" in said
+        assert not os.path.lexists(composed.destination)
+    else:
+        result = composed.run(**ambient)
+        assert result.returncode == 0, result.stderr
+        assert composed.destination.read_text(encoding="utf-8") == "runbook A\n"
+
+
 # --- what it never overwrites or takes away ---------------------------------
 
 

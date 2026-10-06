@@ -86,10 +86,25 @@ class PlacementRefused(Exception):
     """A placement this script will not make, with the reason and the remedy."""
 
 
+#: Git variables that select a repository, work tree or index. Git honours
+#: them over the directory each check runs in, and it sets `GIT_DIR` and
+#: `GIT_WORK_TREE` for every hook it runs, so a hook running this script would
+#: point the pin, clean and ignore checks at another repository. They are
+#: dropped for every call, as `openxdox.domain_corpus_adapter`'s
+#: `AMBIENT_GIT_VARIABLES` drops them (Copilot r4200975244).
+AMBIENT_GIT_VARIABLES = (
+    "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CEILING_DIRECTORIES", "GIT_PREFIX",
+)
+
+
 def _git(*args: str, cwd: Path) -> subprocess.CompletedProcess:
+    environment = {key: value for key, value in os.environ.items()
+                   if key not in AMBIENT_GIT_VARIABLES}
     try:
-        return subprocess.run(["git", *args], cwd=cwd, capture_output=True,
-                              text=True, check=False)
+        return subprocess.run(["git", *args], cwd=cwd, env=environment,
+                              capture_output=True, text=True, check=False)
     except FileNotFoundError as exc:
         raise PlacementRefused(
             "git is not on PATH, and the placements are checked with it") from exc
