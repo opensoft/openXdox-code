@@ -688,7 +688,13 @@ def test_the_cli_verb_enforces_the_human_gate_itself(scratch_repo, tmp_path,
     # FR-019's agent/automation clause when that clause arrived). The pin follows
     # the obligation to where it is discharged, and is STRICTER for it: it now
     # asserts the shared implementation, so the four siblings are covered too.
-    source = inspect.getsource(cli_mod.cmd_gate_edit_document)
+    # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+    # split-opendox carve (section 2.4) moved the gate verbs to
+    # `openxdox.cli_gate`, so the verb is read there; the shared helper
+    # stays openDox's `cli`.
+    from openxdox import cli_gate
+
+    source = inspect.getsource(cli_gate.cmd_gate_edit_document)
     assert "_session_identity_gate(" in source
     shared = inspect.getsource(cli_mod._session_identity_gate)
     assert "require_human_gate" in shared
@@ -783,7 +789,13 @@ def test_the_cli_offers_no_inline_content_and_no_bypass_flag():
                               "--actor", "brett", "--scope-kind",
                               bs.STAGED_TOPIC, "--scope-id", TOPIC,
                               "--document", "d.md", "--content-file", "c.md"])
-    assert args.func is cli_mod.cmd_gate_edit_document
+    # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+    # split-opendox carve (section 2.4) moved the gate verbs to
+    # `openxdox.cli_gate`, so the verb is read there; the shared helper
+    # stays openDox's `cli`.
+    from openxdox import cli_gate
+
+    assert args.func is cli_gate.cmd_gate_edit_document
     assert args.records_dir == gc.DEFAULT_RECORDS_DIR      # _add_gate_identity_args
     with pytest.raises(SystemExit):                        # --document is required
         parser.parse_args(["gate", "edit-document", "--repo-root", ".",
@@ -1173,7 +1185,13 @@ def test_the_save_cli_verb_enforces_the_human_gate_itself(scratch_repo, tmp_path
     FR-019 is a PER-VERB obligation here (contracts/cli.md) — discharged through
     the ONE shared helper, called FIRST, before any read and any resolution."""
     registry, created, worktree = _session(scratch_repo, tmp_path)
-    assert "_session_identity_gate" in inspect.getsource(cli_mod.cmd_gate_open_pr)
+    # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+    # split-opendox carve (section 2.4) moved the gate verbs to
+    # `openxdox.cli_gate`, so the verb is read there; the shared helper
+    # stays openDox's `cli`.
+    from openxdox import cli_gate
+
+    assert "_session_identity_gate" in inspect.getsource(cli_gate.cmd_gate_open_pr)
     assert "require_human_gate" in inspect.getsource(cli_mod._session_identity_gate)
 
     with pytest.raises(SystemExit) as exited:              # missing --actor
@@ -1251,7 +1269,13 @@ def test_the_save_cli_offers_no_token_and_no_bypass_flag():
     args = parser.parse_args(["gate", "open-pr", "--repo-root", ".", "--actor",
                               "brett", "--scope-kind", bs.STAGED_TOPIC,
                               "--scope-id", TOPIC])
-    assert args.func is cli_mod.cmd_gate_open_pr
+    # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+    # split-opendox carve (section 2.4) moved the gate verbs to
+    # `openxdox.cli_gate`, so the verb is read there; the shared helper
+    # stays openDox's `cli`.
+    from openxdox import cli_gate
+
+    assert args.func is cli_gate.cmd_gate_open_pr
     assert args.records_dir == gc.DEFAULT_RECORDS_DIR       # _add_gate_identity_args
     assert args.title is None and args.body_file is None    # both OPTIONAL
     source = Path(cli_mod.__file__).read_text(encoding="utf-8")
@@ -1361,7 +1385,10 @@ def test_open_pr_proceeds_on_an_unready_topic_without_reaching_require_ready(
 
     monkeypatch.setattr(kickoff_mod, "_require_ready", _spy)
     monkeypatch.setattr(
-        "ideation_dashboard.generator.live_topic_health",
+        # THE MODULE'S OWN HOME (plan 038 T026, under batch Q's CF-4): the carve
+        # moved `generator` to `openxdox.generator`, where this suite already
+        # imports `live_topic_health` from.
+        "openxdox.generator.live_topic_health",
         lambda *a, **k: (_ for _ in ()).throw(
             AssertionError("open-pr consulted live topic health (FR-031)")))
 
