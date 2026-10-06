@@ -1,0 +1,311 @@
+name: composed
+
+# THE COMPOSED RUN, PERMANENT (plan 038 task T029, U-9, in openxFactory
+# `specs/038-opendox-document-tool-self-maintenance/`). It runs F12.1, the
+# falsifier of #1144's 12.5 ("the governed flow is unchanged"), where it can
+# run: composed with openxFactory, as F5.2 runs under R1Q23 (a). In a lone
+# checkout 15 of 12.5's 16 governed suites cannot even be collected, because
+# they reach openxFactory's `doc_health`. ARC-Q2 (a) (openxFactory#656 comment
+# 6003918488) makes this composition their permanent home (CF-5). Decision
+# N-7a gives the run its own file and its own pin, apart from `validate.yml`.
+# Both were ruled with plan 038 (comment 6013547504).
+#
+# WHAT IT RUNS, IN ORDER.
+#   1. This checkout, with its whole history, because the oracle reads the
+#      arc's landings since ARC_BASE.
+#   2. The package and its test extra, in a fresh venv, with `validate.yml`'s
+#      install command. So openDox arrives at the pin `pyproject.toml` names,
+#      and F9.2's pin assertion holds it there.
+#   3. openxFactory, at the ONE commit `tests/composed_host_pin.yaml` names,
+#      with `openDox`, `openXdox` and `openXwallet` initialized recursively.
+#      Without them, `corpus_adapter_openxfactory` refuses at import. The run
+#      initializes ONLY those three. openxFactory's fourth submodule,
+#      `installs/omnigent-install`, is a private repository that this run never
+#      imports and that this repository's token cannot read, so a blanket
+#      recursive init would fail before any test ran.
+#   4. T022's `scripts/composed_placements.py`, which links the composed tree's
+#      session runbook into `docs/` for the run.
+#   5. 12.5's governed suites, computed the way its falsifier computes them
+#      (16 is the floor). Each suite runs alone, with
+#      `PYTHONPATH="$OPENXFACTORY/scripts"` (R1Q23 (a)'s form).
+#   6. The oracle, `scripts/protected_suites.py`, in 12.5's call: no landing
+#      of the arc touched a governed suite outside an allow-list entry that
+#      holds.
+#   7. The assembled `--help` tree, against the golden it records (R2Q3 (a):
+#      the hosts' help goldens are unchanged). `validate.yml` leaves that test
+#      out (`LEFT_OUT`), because building the tree needs `doc_health`. Composed,
+#      it can run.
+# Steps 6 and 7 run even when step 5 is red, so one run reports every red.
+#
+# WHAT IS NOT HERE. Making `composed` a REQUIRED check is the holder's act,
+# after this workflow's first green run on `main` (N-7b (a), ruled
+# 6013547504), and it is recorded in T029's evidence. This file changes no
+# repository setting.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  composed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: openXdox-code
+    env:
+      # The openxFactory checkout of the composed run, beside this one.
+      OPENXFACTORY: ${{ github.workspace }}/openxFactory
+      # openXdox-code's ARC_BASE, as plan 034 T003 recorded it (openxFactory
+      # `specs/034-opendox-standalone-operation/evidence/arc-base.md`). The
+      # oracle's landings are the commits from it to HEAD that carry the
+      # arc's trailer.
+      ARC_BASE: e28930bf052febff0c7bdd0463a72ce3c4f5e8fe
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: openXdox-code
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # A fresh venv, as 12.5's falsifier makes one. Its `bin/` goes on PATH,
+      # so every later step's `python` is this one.
+      - name: install the package and its test extra, openDox at the pin
+        id: install
+        run: |
+          echo "COMPOSED=$RUNNER_TEMP/composed" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/composed"
+          python -m venv --clear "$RUNNER_TEMP/venv"
+          echo "$RUNNER_TEMP/venv/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install -e ".[test]"
+          # F9.2's pin assertion: the composition names a full-commit pin, and
+          # the openDox installed is that one.
+          "$RUNNER_TEMP/venv/bin/python" - <<'PY'
+          import importlib.metadata as md, json, pathlib, re, tomllib
+          deps = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["dependencies"]
+          pins = [d for d in deps if re.match(r"opendox\s*@", d)]
+          assert len(pins) == 1 and re.search(r"@[0-9a-f]{40}$", pins[0]), f"the composition names no full-commit pin: {pins}"
+          got = json.loads(md.distribution("opendox").read_text("direct_url.json") or "{}").get("vcs_info", {}).get("commit_id")
+          assert got == pins[0].rsplit("@", 1)[1], f"the installed openDox is {got!r}, not the pinned commit"
+          print(f"openDox installed at the pin: openDox-code@{got}")
+          PY
+
+      # The pin file's rules are in its own header. A file that breaks one is
+      # refused, naming the rule, and nothing is checked out.
+      - name: read the host pin
+        id: pin
+        run: |
+          python - <<'PY'
+          import os, re, sys
+          import yaml
+
+          PIN = "tests/composed_host_pin.yaml"
+
+
+          def refuse(why):
+              sys.exit(f"::error file={PIN}::{PIN} is refused: {why}")
+
+
+          class Strict(yaml.SafeLoader):
+              """Refuses a key given twice, which YAML would quietly collapse."""
+
+
+          def mapping(loader, node, deep=False):
+              keys = [loader.construct_object(key, deep=deep) for key, _ in node.value]
+              twice = sorted({str(key) for key in keys if keys.count(key) > 1})
+              if twice:
+                  raise yaml.constructor.ConstructorError(
+                      None, None, f"a key is given twice: {twice}", node.start_mark)
+              return loader.construct_mapping(node, deep=deep)
+
+
+          Strict.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, mapping)
+          try:
+              with open(PIN, encoding="utf-8") as handle:
+                  pin = yaml.load(handle, Loader=Strict)
+          except (OSError, yaml.YAMLError) as exc:
+              refuse(f"it cannot be read as YAML ({exc})")
+          if not isinstance(pin, dict):
+              refuse("it is not a mapping")
+          keys = {"schema_version", "kind", "commit"}
+          if set(pin) != keys:
+              refuse(f"its keys are {sorted(map(str, pin))}, and they must be exactly {sorted(keys)}")
+          if type(pin["schema_version"]) is not int or pin["schema_version"] != 1:
+              refuse(f"schema_version is {pin['schema_version']!r}, not the integer 1")
+          if pin["kind"] != "composed-host-pin":
+              refuse(f"kind is {pin['kind']!r}, not 'composed-host-pin'")
+          commit = pin["commit"]
+          if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
+              refuse(f"commit is {commit!r}, not a full 40-character lowercase commit id")
+          for name, value in (("GITHUB_OUTPUT", f"commit={commit}"),
+                              ("GITHUB_ENV", f"COMPOSED_HOST_COMMIT={commit}")):
+              with open(os.environ[name], "a", encoding="utf-8") as handle:
+                  handle.write(value + "\n")
+          print(f"the composed run's host: opensoft/openxFactory@{commit}")
+          PY
+
+      - uses: actions/checkout@v4
+        with:
+          repository: opensoft/openxFactory
+          ref: ${{ steps.pin.outputs.commit }}
+          path: openxFactory
+          fetch-depth: 0
+          persist-credentials: false
+
+      # openxFactory's `.gitmodules` spells these three as ssh URLs, and this
+      # run holds no ssh key. All three, and the legs nested in them, are
+      # public, so the URLs are read over https. They are rewritten in this
+      # checkout's own `.git/config`, which `git submodule init` writes, and
+      # `.gitmodules` is not touched.
+      - name: initialize openDox, openXdox and openXwallet, recursively
+        id: submodules
+        working-directory: openxFactory
+        run: |
+          paths=(openDox openXdox openXwallet)
+          git submodule init -- "${paths[@]}"
+          for path in "${paths[@]}"; do
+            url=$(git config --get "submodule.$path.url")
+            case "$url" in
+              git@github.com:*) git config "submodule.$path.url" "https://github.com/${url#git@github.com:}" ;;
+            esac
+          done
+          git submodule update --init --recursive -- "${paths[@]}"
+          head=$(git rev-parse HEAD)
+          if [ "$head" != "$COMPOSED_HOST_COMMIT" ]; then
+            echo "::error::the openxFactory checkout is at $head, and tests/composed_host_pin.yaml pins $COMPOSED_HOST_COMMIT"
+            exit 1
+          fi
+          echo "OPENXFACTORY (an openxFactory checkout) at $head"
+          git submodule status --recursive -- "${paths[@]}"
+
+      - name: place the composed tree's files (T022)
+        id: placements
+        run: python scripts/composed_placements.py --openxfactory "$OPENXFACTORY"
+
+      # 12.5's falsifier computes the set and holds it to a floor: every suite
+      # that drives `open-pr` or injects the fake. Fewer than 16 means a proof
+      # vanished.
+      - name: the governed set, computed
+        id: governed
+        run: |
+          status=0
+          git grep -l -e 'open-pr' -e 'open_pr' -e 'FakePullRequests' -- 'tests/test_*.py' > "$COMPOSED/governed.txt" || status=$?
+          # git grep exits 1 when nothing matches, which the floor below names.
+          if [ "$status" -gt 1 ]; then
+            echo "::error::git grep could not read this checkout (exit $status)"
+            exit "$status"
+          fi
+          count=$(wc -l < "$COMPOSED/governed.txt")
+          echo "governed suites: $count (the floor is 16)"
+          cat "$COMPOSED/governed.txt"
+          if [ "$count" -lt 16 ]; then
+            echo "::error::12.5's governed set has $count suites, below its floor of 16: a proof vanished"
+            exit 1
+          fi
+
+      # Each suite runs alone, as 12.5's falsifier runs it. pytest's stdin is
+      # /dev/null, so no test can read the list this loop reads. Every suite
+      # runs whatever the one before it did, and the step fails at the end if
+      # any of them did.
+      - name: the governed suites, composed, each alone
+        id: suites
+        run: |
+          export PYTHONPATH="$OPENXFACTORY/scripts"
+          echo "OPENXFACTORY (an openxFactory checkout) at $(git -C "$OPENXFACTORY" rev-parse HEAD)"
+          echo "python $(python -c 'import platform; print(platform.python_version())'), $(python -m pytest --version 2>&1), node $(node --version 2>&1)"
+          mkdir -p "$COMPOSED/reports"
+          red=0
+          while read -r suite <&3; do
+            echo "::group::$suite"
+            rc=0
+            python -m pytest -q -p no:cacheprovider -rfE \
+              --junitxml="$COMPOSED/reports/$(basename "$suite" .py).xml" "$suite" < /dev/null || rc=$?
+            echo "::endgroup::"
+            echo "$suite: pytest exit $rc"
+            if [ "$rc" -ne 0 ]; then red=1; fi
+          done 3< "$COMPOSED/governed.txt"
+          python - "$COMPOSED" <<'PY'
+          import os, pathlib, sys
+          import xml.etree.ElementTree as ET
+
+          out = pathlib.Path(sys.argv[1])
+          suites = [l.strip() for l in (out / "governed.txt").read_text().splitlines() if l.strip()]
+          rows, red, total = [], set(), dict.fromkeys(("passed", "failed", "errors", "skipped"), 0)
+          for suite in suites:
+              report = out / "reports" / (pathlib.PurePosixPath(suite).stem + ".xml")
+              if not report.exists():
+                  rows.append(f"{suite}: NO REPORT (pytest did not finish)")
+                  red.add(suite)
+                  continue
+              root = ET.parse(report).getroot()
+              n = dict.fromkeys(("tests", "failures", "errors", "skipped"), 0)
+              module = suite[:-3].replace("/", ".")
+              for ts in (root.iter("testsuite") if root.tag == "testsuites" else [root]):
+                  for key in n:
+                      n[key] += int(ts.get(key, 0))
+                  for case in ts.iter("testcase"):
+                      if case.find("failure") is None and case.find("error") is None:
+                          continue
+                      cls, name = case.get("classname", ""), case.get("name", "")
+                      if not cls:  # a collection error names the file, not a test
+                          red.add(suite)
+                          continue
+                      rest = cls[len(module):] if cls == module or cls.startswith(module + ".") else cls
+                      red.add("::".join([suite, *[p for p in rest.split(".") if p], name]))
+              passed = n["tests"] - n["failures"] - n["errors"] - n["skipped"]
+              for key, value in (("passed", passed), ("failed", n["failures"]),
+                                 ("errors", n["errors"]), ("skipped", n["skipped"])):
+                  total[key] += value
+              rows.append(f"{suite}: {passed} passed, {n['failures']} failed, "
+                          f"{n['errors']} errors, {n['skipped']} skipped")
+          lines = [*rows,
+                   f"TOTAL over {len(suites)} suites: {total['passed']} passed, "
+                   f"{total['failed']} failed, {total['errors']} errors, {total['skipped']} skipped; "
+                   f"{total['failed'] + total['errors']} red, in {len(red)} red nodes",
+                   *(f"RED {node}" for node in sorted(red))]
+          print("\n".join(lines))
+          (out / "red-nodes.txt").write_text("".join(f"{node}\n" for node in sorted(red)))
+          if os.environ.get("GITHUB_STEP_SUMMARY"):
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as handle:
+                  handle.write("## 12.5's governed suites, composed\n\n```\n" + "\n".join(lines) + "\n```\n")
+          PY
+          exit "$red"
+
+      # 12.5's call: one entry per suite per landing, so no `--chains`.
+      - name: the oracle, protected_suites.py
+        id: oracle
+        if: ${{ !cancelled() && steps.governed.outcome == 'success' }}
+        run: |
+          git log --first-parent --format=%H --grep='^Arc: neutral-product-standalone-operability$' "$ARC_BASE..HEAD" > "$COMPOSED/x-arc.txt"
+          if [ ! -s "$COMPOSED/x-arc.txt" ]; then
+            echo "::error::no landing since ARC_BASE $ARC_BASE carries the arc's trailer, so the trailer was dropped"
+            exit 1
+          fi
+          echo "the arc's landings since ARC_BASE: $(wc -l < "$COMPOSED/x-arc.txt")"
+          python scripts/protected_suites.py --landings="$(cat "$COMPOSED/x-arc.txt")" --suites="$(cat "$COMPOSED/governed.txt")"
+
+      # The test builds the tree in a child process. It hands the child this
+      # run's environment LESS `PYTHONPATH` (its `SCRUBBED_ENVIRONMENT`), so
+      # the composition of step 5 never reaches it, and the child needs
+      # `doc_health` (`cli_gate` imports `gate_console`, which imports it). So
+      # the composed tree's `scripts/` reaches the child through a `.pth` file
+      # in this run's own venv. The file is written here, after the governed
+      # suites have run in R1Q23 (a)'s form, and nothing runs after it.
+      - name: the assembled --help tree, against its recorded golden
+        id: help-tree
+        if: ${{ !cancelled() && steps.submodules.outcome == 'success' }}
+        run: |
+          purelib=$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')
+          printf '%s\n' "$OPENXFACTORY/scripts" > "$purelib/composed-openxfactory-scripts.pth"
+          python -m pytest -q -p no:cacheprovider -rfE \
+            "tests/integration/test_assembled_surface.py::test_the_assembled_help_tree_is_the_32_entry_tree_the_manifest_records" < /dev/null
