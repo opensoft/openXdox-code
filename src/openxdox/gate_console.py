@@ -631,22 +631,22 @@ def build_gate_action_record(
 
 
 def _validate_contract_document(
-    document: Mapping[str, Any], *, schema_filename: str, label: str,
+    document: Mapping[str, Any], *, schema_text: str, label: str,
 ) -> None:
-    """Validate one document against a repository-pinned released schema."""
+    """Validate one document against a released schema's text, which its
+    caller reads where the schema's owner keeps it: `_packaged_schema_text`
+    or `_host_schema_text`, under "THE CONTRACT SCHEMAS THE CONSOLE VALIDATES
+    AGAINST" near the end of this module (plan 038 T021)."""
     try:
         from jsonschema import Draft202012Validator, FormatChecker
     except ImportError as exc:  # pragma: no cover - release dependency guard
         raise GateRefused(
             f"jsonschema is required to validate {label}") from exc
-    schema_path = (Path(__file__).resolve().parents[2] / "contracts" / "schemas"
-                   / schema_filename)
     try:
-        schema = yaml.safe_load(schema_path.read_text(encoding="utf-8"))
-    except (OSError, yaml.YAMLError) as exc:
+        schema = yaml.safe_load(schema_text)
+    except yaml.YAMLError as exc:
         raise GateRefused(
-            f"the {label} schema could not be loaded from {schema_path}: "
-            f"{exc}") from exc
+            f"the {label} schema could not be parsed: {exc}") from exc
     errors = sorted(
         Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(
             dict(document)),
@@ -661,8 +661,8 @@ def _validate_contract_document(
 
 def validate_gate_action_record(record: Mapping[str, Any]) -> None:
     """Validate one record against the repository-pinned released schema."""
-    _validate_contract_document(
-        record, schema_filename="gate-action-record.schema.yaml",
+    _validate_contract_document(record, schema_text=_packaged_schema_text(
+        GATE_ACTION_RECORD_SCHEMA, label="gate-action record"),
         label="gate-action record")
     if record.get("action") != ACTION_CLEANUP_ABANDONED_BRANCH:
         return
@@ -707,8 +707,8 @@ def validate_gate_action_record(record: Mapping[str, Any]) -> None:
 
 
 def validate_demotion_execution_receipt(receipt: Mapping[str, Any]) -> None:
-    _validate_contract_document(
-        receipt, schema_filename="demotion-execution-receipt.schema.yaml",
+    _validate_contract_document(receipt, schema_text=_host_schema_text(
+        DEMOTION_RECEIPT_SCHEMA, label="demotion execution receipt"),
         label="demotion execution receipt")
     destination = receipt.get("destination")
     if not isinstance(destination, Mapping) or str(destination.get("path") or "") \
@@ -2346,6 +2346,120 @@ class GateConsole:
             self.gate, project_id, add=add, remove=remove, roster=roster,
             register_source=register_source, outline=outline, note=note,
             at=at, records_dir=self.records_dir, provenance=provenance, **extra)
+
+
+# --------------------------------------------------------------------------
+# THE CONTRACT SCHEMAS THE CONSOLE VALIDATES AGAINST, AND WHERE EACH IS READ
+# (plan 038 T021, U-2; R2Q8 (a); P4F-4, ruled with plan 038 on
+# openxFactory#656 comment 6013547504; R1Q27 (a), comment 5851950767).
+#
+# Two documents are validated here, against two schemas with two owners:
+#   * a gate-action record, against openXdox-spec's
+#     `gate-action-record.schema.yaml`. This distribution packages it in
+#     `openxdox.contracts`, as one of the consumer validator's own three kinds,
+#     held to its digest by `copies.yaml`. So it is read from there, through
+#     `contracts.verified_bytes()`, wherever this package runs;
+#   * a demotion execution receipt, against openxFactory's
+#     `demotion-execution-receipt.schema.yaml`. That schema is the HOST's
+#     contract: openXdox-spec carries only its examples, and the copy record
+#     admits the validator's three kinds and no fourth
+#     (`tests/test_packaged_validator.py`), so nothing of it is vendored here.
+#     A host that writes receipts registers, once, at process start, the
+#     directory its schema is in, with `register_contract_schema_source()`.
+#     With none registered, validating a receipt refuses, naming that call:
+#     R1Q27 (a)'s "only where the tree it runs from supplies their schemas".
+#
+# Both used to be read from `parents[2] / "contracts" / "schemas"` beside
+# this module. That was openxFactory's own tree before the carve. In this
+# leg it is the checkout's root, which holds no `contracts/`.
+# --------------------------------------------------------------------------
+
+#: The gate-action record schema's copy id in `openxdox.contracts`.
+GATE_ACTION_RECORD_SCHEMA = "gate-action-record"
+#: The demotion execution receipt schema's file name in the host's source.
+DEMOTION_RECEIPT_SCHEMA = "demotion-execution-receipt.schema.yaml"
+
+_contract_schema_source: Path | None = None
+
+
+class ContractSchemaSourceRefused(RuntimeError):
+    """A contract schema source the gate console cannot take, refused when it
+    is registered rather than when a receipt is first validated."""
+
+
+def register_contract_schema_source(source: str | Path) -> Path:
+    """Register the host's contract schema directory. Returns it, resolved.
+
+    The directory must hold `demotion-execution-receipt.schema.yaml`, the one
+    schema the console reads from a host. Registering the same directory again
+    is a no-op, so an idempotent host start is not punished. A DIFFERENT one is
+    refused: one process whose receipts are validated against two schemas,
+    depending on which registration a caller reached, is the failure one
+    registration exists to prevent. Call `unregister_contract_schema_source()`
+    first if the swap is deliberate."""
+    global _contract_schema_source
+    directory = Path(source).resolve()
+    if not (directory / DEMOTION_RECEIPT_SCHEMA).is_file():
+        raise ContractSchemaSourceRefused(
+            f"{directory} holds no {DEMOTION_RECEIPT_SCHEMA}, so the gate "
+            "console cannot read a demotion execution receipt's schema from "
+            "it. Register the directory the host keeps its contract schemas "
+            "in, its contracts/schemas/.")
+    if (_contract_schema_source is not None
+            and _contract_schema_source != directory):
+        raise ContractSchemaSourceRefused(
+            f"a contract schema source is already registered "
+            f"({_contract_schema_source}), and {directory} would replace it. "
+            "Registration happens once, at process start. Call "
+            "openxdox.gate_console.unregister_contract_schema_source() first "
+            "if the swap is deliberate.")
+    _contract_schema_source = directory
+    return directory
+
+
+def unregister_contract_schema_source() -> None:
+    """Drop the registration. For test isolation and for a host tearing down."""
+    global _contract_schema_source
+    _contract_schema_source = None
+
+
+def contract_schema_source_registered() -> bool:
+    """Is a contract schema source registered, without reading anything?"""
+    return _contract_schema_source is not None
+
+
+def _packaged_schema_text(copy_id: str, *, label: str) -> str:
+    """A schema this distribution packages, once its digest has been checked."""
+    from . import contracts
+
+    try:
+        return contracts.verified_bytes(copy_id).decode("utf-8")
+    except (contracts.CopyRefused, UnicodeDecodeError) as exc:
+        raise GateRefused(
+            f"the {label} schema could not be read from openXdox's packaged "
+            f"copy: {exc}") from exc
+
+
+def _host_schema_text(filename: str, *, label: str) -> str:
+    """A schema the host supplies, from the source it registered."""
+    source = _contract_schema_source
+    if source is None:
+        raise GateRefused(
+            f"the {label} cannot be validated: its schema, {filename}, is the "
+            "host's contract, and no contract schema source is registered. A "
+            "host registers the directory it keeps its contract schemas in, "
+            "once, at process start, with "
+            "openxdox.gate_console.register_contract_schema_source(<directory>)"
+            " (R1Q27 (a): a kind is validated only where the tree it runs "
+            "from supplies its schema).")
+    path = source / filename
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise GateRefused(
+            f"the {label} schema could not be loaded from {path}: "
+            f"{exc}") from exc
+
 
 
 # ---------------------------------------------------------------------------
