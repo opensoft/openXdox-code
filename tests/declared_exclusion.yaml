@@ -92,11 +92,11 @@ reasons:
   - id: status-exemption-rail
     reason: "needs openxFactory's status-exemption rail, which only openxFactory registers at openDox's status-exemption seam"
     ruled: "R1Q24 (a), openxFactory#656 comment 5850003126"
-    open_until: "the doc_health direction arc (plan 034 T008); run composed, as a declared integration test, by .github/workflows/composed.yml at the openxFactory commit tests/composed_host_pin.yaml names (ARC-Q2 (a), openxFactory#656 comment 6003918488)"
+    open_until: "never in a lone checkout: a declared integration test, run composed by .github/workflows/composed.yml at the openxFactory commit tests/composed_host_pin.yaml names (ARC-Q2 (a), openxFactory#656 comment 6003918488)"
   - id: openxfactory-contracts
     reason: "reads openxFactory's contracts (the contract family's validator, schemas and examples, or its contracts/manifest.yaml) where openxFactory's tree keeps them, which is outside this checkout"
     ruled: "R1Q24 (a), openxFactory#656 comment 5850003126"
-    open_until: "the doc_health direction arc (plan 034 T008); run composed, as a declared integration test, by .github/workflows/composed.yml at the openxFactory commit tests/composed_host_pin.yaml names (ARC-Q2 (a), openxFactory#656 comment 6003918488)"
+    open_until: "never in a lone checkout: a declared integration test, run composed by .github/workflows/composed.yml at the openxFactory commit tests/composed_host_pin.yaml names (ARC-Q2 (a), openxFactory#656 comment 6003918488)"
 
 entries:
   - {path: tests/test_authoring_agent.py, reasons: [doc_health]}
