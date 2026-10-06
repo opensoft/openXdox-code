@@ -1703,6 +1703,127 @@ entries:
           # than imported (plan 038 T026, under batch Q's CF-4)
           assert "MODEL = (ctx && ctx.model) || null;" in body
   - suite: tests/test_staging_workbench.py
+    test: test_the_session_surface_added_no_transport_to_the_view_or_the_model
+    landing: opensoft/openXdox-code#43
+    edit: admitted
+    reason: >-
+      A claim about where the session routes are defined, relocated as RULED
+      Q3 (opensoft/openxFactory#656 comment 5642758731) moved them: from the
+      pure model to the session column, `swb-session.js`, the binding that
+      POSTs them (section 3.4 slice S4). The claim is still that each route is
+      ONE constant and that the view names none; it now also holds that the
+      model names none. Beside it, the view's reach is respelled: it takes the
+      session column the gate column contributes (`const sessionColumn =
+      gate?.session || NO_SESSION_COLUMN;`) rather than importing
+      `./swb-session.js` (section 3.4 slice S5, openXdox-code#18 `c1ad341`).
+    ruled: >-
+      R-1 (a), RULED by Brett Heap with plan 038 at opensoft/openxFactory#656
+      comment 6013547504 ("Admitted edit kind (Recommended)"), which names
+      this claim's relocation (`:1291`, `:1333` at openXdox-code 56e1c238)
+      among the admitted edits; recorded at #1144's 12.5 falsifier by plan
+      038's T005 (batch Q). The respelling beside it is CF-4's (H-2), on R1Q7
+      (a), comment 5817152735.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. The import-free, transport-free and
+      dynamic-import pins on the view and the model are untouched, and so is
+      the self-pin on the older test. Each route is still asserted to be one
+      constant and absent from the view, now in the module that owns it, and
+      it is newly asserted absent from the model. No assertion is weakened.
+    before_blob: cc46b03553e3c222d59222daefc9032a70e0d61c
+    after_blob: 208617ff09fcfa96d28cacf503abbb00198b65f2
+    old: |2
+          # the three session routes are MODEL constants; the view names none of them
+          for route in ("/actions/gate/edit-document", "/actions/gate/open-pr",
+                        "/actions/gate/abandon-session"):
+              assert route in model, f"{route} is not a model constant"
+              assert route not in view, f"the view names the route {route}"
+          assert "/actions/" not in view
+          # the view reaches the transport ONLY through the sibling module
+          assert 'from "./swb-session.js"' in view
+    new: |2
+          # THE ROUTES TRAVEL WITH THEIR BINDING (plan 038 T026; R-1 (a), RULED with
+          # plan 038 at openxFactory#656 comment 6013547504). RULED Q3 (comment
+          # 5642758731) moved the three session routes from the model to the session
+          # column, `swb-session.js`, the binding that POSTs them: each is still ONE
+          # constant there, and neither the view nor the model names any of them.
+          session = SESSION_JS.read_text(encoding="utf-8")
+          for route in ("/actions/gate/edit-document", "/actions/gate/open-pr",
+                        "/actions/gate/abandon-session"):
+              assert len(re.findall(rf'^export const [A-Z_]+_ROUTE = "{re.escape(route)}";$',
+                                    session, re.MULTILINE)) == 1, \
+                  f"{route} is not one session-column constant"
+              assert route not in model, f"the model names the route {route}"
+              assert route not in view, f"the view names the route {route}"
+          assert "/actions/" not in view
+          # the view reaches the transport ONLY through the session column the gate
+          # column contributes (section 3.4 slice S5)
+          assert "const sessionColumn = gate?.session || NO_SESSION_COLUMN;" in view
+  - suite: tests/test_staging_workbench.py
+    test: test_session_transport_uses_the_injected_fetcher_spelling
+    landing: opensoft/openXdox-code#43
+    edit: admitted
+    reason: >-
+      A claim about route literals in the transport, relocated as RULED Q3
+      (opensoft/openxFactory#656 comment 5642758731) moved the routes into
+      this module: "a route constant travels with the binding that calls it".
+      `"/actions/gate/" not in body` no longer holds, because the module now
+      declares its routes, so the claim becomes what it guarded: every route
+      literal in the module is its one `export const ..._ROUTE` declaration,
+      each route declared once, and nothing else in the module spells one.
+      Beside it, the model's reach is respelled: the payload builders arrive
+      as the shell's `ctx.model` (`MODEL = (ctx && ctx.model) || null;`)
+      rather than by importing `./staging-workbench-model.js` (section 3.4
+      slice S5, RULED counterpart Q6, comment 5649094228).
+    ruled: >-
+      R-1 (a), RULED by Brett Heap with plan 038 at opensoft/openxFactory#656
+      comment 6013547504 ("Admitted edit kind (Recommended)"), which names
+      this claim's relocation (`:1291`, `:1333` at openXdox-code 56e1c238)
+      among the admitted edits; recorded at #1144's 12.5 falsifier by plan
+      038's T005 (batch Q). The respelling beside it is CF-4's (H-2), on R1Q7
+      (a), comment 5817152735.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. The fetch, XHR, dynamic-import, single-POST,
+      single-helper, dispose-panel and innerHTML pins are untouched, and the
+      four model symbols are still consulted. A route literal anywhere but its
+      one declaration still fails, and so does a route declared twice. No
+      assertion is weakened.
+    before_blob: 208617ff09fcfa96d28cacf503abbb00198b65f2
+    after_blob: d2ef93e4ab7696be1e621967c15ff132d4ffb817
+    old: |2
+          # routes and payloads come from the pure model, never from a literal here
+          assert 'from "./staging-workbench-model.js"' in body
+          for symbol in ("sessionRoute", "sessionRequest", "sessionCommand",
+                         "sessionActionsLive"):
+              assert symbol in body, f"{symbol} is not consulted by the transport"
+          assert "/actions/gate/" not in body, \
+              "a route literal in the transport would be a second definition"
+    new: |2
+          # THE ROUTES TRAVEL WITH THEIR BINDING (plan 038 T026; R-1 (a), RULED with
+          # plan 038 at openxFactory#656 comment 6013547504). Payloads still come from
+          # the pure model, now the shell's `ctx.model` (section 3.4 slice S5, RULED
+          # counterpart Q6, comment 5649094228) rather than an import; the routes are
+          # this module's own constants since RULED Q3 (comment 5642758731), each
+          # declared ONCE, and no other line of the transport spells one.
+          assert "MODEL = (ctx && ctx.model) || null;" in body
+          for symbol in ("sessionRoute", "sessionRequest", "sessionCommand",
+                         "sessionActionsLive"):
+              assert symbol in body, f"{symbol} is not consulted by the transport"
+          literals = [line for line in body.splitlines() if "/actions/gate/" in line]
+          assert literals and all(
+              re.fullmatch(r'export const [A-Z_]+_ROUTE = "/actions/gate/[a-z-]+";', line)
+              for line in literals), \
+              "a route literal outside its one constant would be a second definition"
+          routes = [line.split('"')[1] for line in literals]
+          assert len(routes) == len(set(routes)), "a route is declared twice"
+  - suite: tests/test_staging_workbench.py
     test: test_no_session_write_is_reachable_from_a_gate_off_page
     landing: opensoft/openXdox-code#43
     edit: respelling
@@ -1726,8 +1847,8 @@ entries:
       inside the test named. The gate-off early return still comes before any
       live control, the capability is still asked once, and the descriptor
       renderer still cannot reach the transport. No assertion is weakened.
-    before_blob: cc46b03553e3c222d59222daefc9032a70e0d61c
-    after_blob: 2c297f6c727d79a96b2d708bff1d9730ddbc0144
+    before_blob: d2ef93e4ab7696be1e621967c15ff132d4ffb817
+    after_blob: a2bb0d82d0ea0153380fedcaa5881c869f80a049
     old: |2
           assert ("if (!sessionActionsLive(o.caps)) "
                   "return renderSessionDescriptors(host, ctx, o);") in body
@@ -1762,8 +1883,8 @@ entries:
       inside the test named. The pair is still asserted together and in order,
       and the ordered wiring and the four session-module exports stay. No
       assertion is weakened.
-    before_blob: 2c297f6c727d79a96b2d708bff1d9730ddbc0144
-    after_blob: 3822ac818505660f9b834778f94c6133b1689748
+    before_blob: a2bb0d82d0ea0153380fedcaa5881c869f80a049
+    after_blob: 623d6fe253b36814eb3a52c009528456ee68185c
     old: |2
           assert "opened: openedSessions(), ended: endedSessions()" in view
     new: |2
@@ -1796,8 +1917,8 @@ entries:
       inside the test named. The pill is still the text between the same two
       statements, and both assertions on it stay: it names the product and not
       the predecessor. No assertion is weakened.
-    before_blob: 3822ac818505660f9b834778f94c6133b1689748
-    after_blob: d4b46a8270306a3aa40335f15cbf590144b03ebd
+    before_blob: 623d6fe253b36814eb3a52c009528456ee68185c
+    after_blob: 4bf069cdf4177e9dc65fe4051be015d9e3ed06fa
     old: |2
           pill = view.split("const gateOn = createGateLive(caps);", 1)[1].split(
     new: |2

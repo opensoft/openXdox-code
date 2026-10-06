@@ -1291,14 +1291,23 @@ def test_the_session_surface_added_no_transport_to_the_view_or_the_model():
         assert "import(" not in body, f"{name} carries a dynamic import"
     assert not re.findall(r"^\s*import\s", model, re.MULTILINE), \
         "the pure model module must stay import-free (node-harness standalone)"
-    # the three session routes are MODEL constants; the view names none of them
+    # THE ROUTES TRAVEL WITH THEIR BINDING (plan 038 T026; R-1 (a), RULED with
+    # plan 038 at openxFactory#656 comment 6013547504). RULED Q3 (comment
+    # 5642758731) moved the three session routes from the model to the session
+    # column, `swb-session.js`, the binding that POSTs them: each is still ONE
+    # constant there, and neither the view nor the model names any of them.
+    session = SESSION_JS.read_text(encoding="utf-8")
     for route in ("/actions/gate/edit-document", "/actions/gate/open-pr",
                   "/actions/gate/abandon-session"):
-        assert route in model, f"{route} is not a model constant"
+        assert len(re.findall(rf'^export const [A-Z_]+_ROUTE = "{re.escape(route)}";$',
+                              session, re.MULTILINE)) == 1, \
+            f"{route} is not one session-column constant"
+        assert route not in model, f"the model names the route {route}"
         assert route not in view, f"the view names the route {route}"
     assert "/actions/" not in view
-    # the view reaches the transport ONLY through the sibling module
-    assert 'from "./swb-session.js"' in view
+    # the view reaches the transport ONLY through the session column the gate
+    # column contributes (section 3.4 slice S5)
+    assert "const sessionColumn = gate?.session || NO_SESSION_COLUMN;" in view
     # and the pre-existing pin is still THE pin: a clobber cannot pass by
     # deleting the assertion it was supposed to satisfy
     own = Path(__file__).read_text(encoding="utf-8")
@@ -1331,13 +1340,23 @@ def test_session_transport_uses_the_injected_fetcher_spelling():
     # session-bar affordances and the doxBench Save transport (T080, 2026-07-30);
     # both ride the same single write-method literal above
     assert body.count("submitSession(") == 3
-    # routes and payloads come from the pure model, never from a literal here
-    assert 'from "./staging-workbench-model.js"' in body
+    # THE ROUTES TRAVEL WITH THEIR BINDING (plan 038 T026; R-1 (a), RULED with
+    # plan 038 at openxFactory#656 comment 6013547504). Payloads still come from
+    # the pure model, now the shell's `ctx.model` (section 3.4 slice S5, RULED
+    # counterpart Q6, comment 5649094228) rather than an import; the routes are
+    # this module's own constants since RULED Q3 (comment 5642758731), each
+    # declared ONCE, and no other line of the transport spells one.
+    assert "MODEL = (ctx && ctx.model) || null;" in body
     for symbol in ("sessionRoute", "sessionRequest", "sessionCommand",
                    "sessionActionsLive"):
         assert symbol in body, f"{symbol} is not consulted by the transport"
-    assert "/actions/gate/" not in body, \
-        "a route literal in the transport would be a second definition"
+    literals = [line for line in body.splitlines() if "/actions/gate/" in line]
+    assert literals and all(
+        re.fullmatch(r'export const [A-Z_]+_ROUTE = "/actions/gate/[a-z-]+";', line)
+        for line in literals), \
+        "a route literal outside its one constant would be a second definition"
+    routes = [line.split('"')[1] for line in literals]
+    assert len(routes) == len(set(routes)), "a route is declared twice"
     # session refusals render in dispose.js's panel, identically to every other
     # refusal on the page (research R6)
     assert 'from "./dispose.js"' in body
