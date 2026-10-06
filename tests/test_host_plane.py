@@ -663,6 +663,28 @@ def test_the_farm_links_the_familys_schemas_and_examples(tmp_path) -> None:
     }
 
 
+def test_the_farm_leaves_out_only_opendox_specs_snapshot_examples(tmp_path) -> None:
+    """The `opendox-snapshot-` prefix is left out for openDox-spec's own
+    examples only (T073; Copilot r4201411760 on #46, the holder's
+    r4201421102). An example of the same prefix from openxFactory or from
+    openXdox-spec is linked like any other."""
+    root = tmp_path / "openxFactory"
+    _a_tree(root, {
+        "examples/ideation-dashboard/opendox-snapshot-a.example.yaml": "",
+        "openXdox/spec/examples/ideation-dashboard/negative/opendox-snapshot-b.negative.yaml": "",
+        "openDox/spec/examples/ideation-dashboard/opendox-snapshot-c.example.yaml": "",
+        "openDox/spec/examples/ideation-dashboard/negative/opendox-snapshot-d.negative.yaml": "",
+    })
+    farm = tmp_path / "farm"
+    tests_conftest.build_contracts_farm(_a_reach(root, {}), farm)
+    assert _links(farm / "examples" / "ideation-dashboard") == {
+        "opendox-snapshot-a.example.yaml":
+            root / "examples/ideation-dashboard/opendox-snapshot-a.example.yaml",
+        "negative/opendox-snapshot-b.negative.yaml":
+            root / "openXdox/spec/examples/ideation-dashboard/negative/opendox-snapshot-b.negative.yaml",
+    }
+
+
 def test_the_farm_refuses_an_example_two_owners_keep(tmp_path) -> None:
     root = tmp_path / "openxFactory"
     _a_tree(root, {

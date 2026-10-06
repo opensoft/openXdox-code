@@ -1027,8 +1027,11 @@ def _the_hosts_seams_for_the_seam_suites(request):
 #   * `<farm>/examples/ideation-dashboard/`: a link to each YAML example the
 #     three owners keep under `examples/ideation-dashboard/`, at the same
 #     relative path, less openDox's own `opendox-snapshot-*` examples, whose
-#     kind the family's validator does not serve. Two owners naming one path
-#     is refused, never resolved.
+#     kind the family's validator does not serve. Only openDox-spec's are left
+#     out: an example of that prefix from openxFactory or openXdox-spec is
+#     linked like any other (T073; Copilot r4201411760 on openXdox-code#46,
+#     the holder's r4201421102). Two owners naming one path is refused, never
+#     resolved.
 # It is OUTSIDE the checkout, in a temporary directory removed at exit: the
 # validator refuses a `contracts/` that links out of its tree (`:157-163`). A
 # temporary root inside the checkout (a TMPDIR, or `under`, beneath it) is
@@ -1036,6 +1039,9 @@ def _the_hosts_seams_for_the_seam_suites(request):
 # The reach is read with `sys.path` saved and put back, and it must be the
 # composed tree's own.
 CONTRACT_EXAMPLE_LEFT_OUT = "opendox-snapshot-"
+#: The one owner whose examples of that prefix are left out: openDox-spec,
+#: as `carved_reach.MOUNTS` names it.
+CONTRACT_EXAMPLE_LEFT_OUT_OWNER = "opendox_spec"
 
 
 def build_contracts_farm(reach, farm: Path) -> Path:
@@ -1054,11 +1060,13 @@ def build_contracts_farm(reach, farm: Path) -> Path:
     examples = farm / "examples" / "ideation-dashboard"
     examples.mkdir(parents=True)
     linked: dict[Path, Path] = {}
+    left_out_from = reach.MOUNTS[CONTRACT_EXAMPLE_LEFT_OUT_OWNER]
     for owner in (reach.REPO_ROOT, reach.MOUNTS["opendox_spec"],
                   reach.MOUNTS["openxdox_spec"]):
         base = owner / "examples" / "ideation-dashboard"
         for path in sorted(base.rglob("*.yaml")):
-            if path.name.startswith(CONTRACT_EXAMPLE_LEFT_OUT):
+            if (owner == left_out_from
+                    and path.name.startswith(CONTRACT_EXAMPLE_LEFT_OUT)):
                 continue
             relative = path.relative_to(base)
             if relative in linked:
