@@ -63,6 +63,7 @@ The read verbs' PURE halves land here as well, all tested outside the browser
 
 from __future__ import annotations
 
+import functools
 import json
 import math
 import shutil
@@ -70,7 +71,7 @@ import subprocess
 
 import pytest
 
-from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit  # noqa: F401
+from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit, governed_host  # noqa: F401
 
 from opendox.fixtures import project_possibles
 from openxdox.generator import generate_snapshot
@@ -81,6 +82,61 @@ WEB = OPENDOX_WEB
 WHEEL_MODEL_JS = WEB / "views" / "wheel-model.js"
 WHEEL_JS = WEB / "views" / "wheel.js"
 NODE = shutil.which("node")
+
+
+def _copy_wheel_model(tmp_path):
+    """Copy the model into the harness directory WITH ITS ONE SIBLING.
+
+    Plan 038 T097, under R9-W1 (A″) (openxFactory#656 comment 6021830531).
+    Since § 3.4 slice S7 `wheel-model.js` imports `./display.js`, the
+    vocabulary every class-C module resolves through, so a harness that copies
+    the model alone fails with `ERR_MODULE_NOT_FOUND`. Every harness below
+    copies the model through this helper. It puts `display.js` beside the model
+    under its own name (`display.js` itself imports nothing), and writes a
+    `package.json` so that node reads `.js` as a module. That is what T026's
+    harness in `test_staging_workbench.py` does for the staging model's
+    siblings.
+
+    The model's wheel keys are S7's six stage ROLES (`WHEEL_KEYS =
+    STAGE_ROLES`): `source`, `grouping`, `candidate`, `selection`,
+    `submission`, `completion`. They were `documents`, `clusters`,
+    `possibles`, `staged`, `active`, `archived`. So every wheel key below is a
+    role key. The snapshot's own FIELD names (`documents`, `clusters`, …) are
+    unchanged, because they are its schema."""
+    shutil.copy(WHEEL_MODEL_JS, tmp_path / "wheel-model.mjs")
+    shutil.copy(WEB / "views" / "display.js", tmp_path / "display.js")
+    (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
+
+
+@functools.cache
+def _served_display() -> dict:
+    """The display `/capabilities` serves under the GOVERNED host.
+
+    Plan 038 T097. R9-R1 (a) (openxFactory#656 comment 6021830531) respells
+    every word-asserting pin to the SERVED words, under Brett Heap's
+    served-display ruling for the staging suite (comment 6016648451). Since
+    slice S7, three things the expanded tile's cases assert come from the
+    display facet:
+    - a verb row's label is `display.act(role)`;
+    - the possibles wheel's promotability matches `display.registerState(...)`;
+    - the packet flyout's labels and its ordered front matter are the facet's
+      artifact axis.
+    The page hands every one of them the served display (`wheel.js` puts
+    `display: vocab` in each action env). So the two harnesses whose cases
+    assert those words or values are handed the same display.
+
+    The governed host is read from `governed_host()`, the conftest's (T020),
+    through `display_profile.host_display`'s injected-profile seam. Nothing is
+    registered: this suite's run registers no host. Composed, the host is
+    openxFactory's composite, and the statement replayed is the one
+    `test_gate_loop_views.py`'s `_served_display` replays."""
+    from opendox import display_profile, view_extension
+
+    host = governed_host()
+    return display_profile.display_manifest(
+        display_profile.host_display(host),
+        host_profile=view_extension.host_profile_name(host))
+
 
 _NODE_HARNESS = """
 import { buildWheelModel, connectionsOf, SPRING, REEL,
@@ -153,8 +209,13 @@ console.log(JSON.stringify(cases.map(([n, linked, mid]) => {
 _EXPAND_HARNESS = """
 import { nextExpanded, isExpandedTile, actionsFor, WHEEL_ACTIONS, EXPANDED,
   tileScale, actionRowIsStale } from './wheel-model.mjs';
+import { readDisplay } from './display.js';
 import { readFileSync } from 'node:fs';
 const cases = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+// THE SERVED DISPLAY in every action env, as wheel.js hands it down
+// (`display: vocab`); a case that supplies NO env keeps none
+const display = readDisplay({ display: cases.display });
+const served = (env) => (env ? { ...env, display } : env);
 // each expand case replays its event list through the reducer, recording the
 // state after every event (the trail) and the final state
 const expand = cases.expand.map(([, current, events]) => {
@@ -162,9 +223,9 @@ const expand = cases.expand.map(([, current, events]) => {
   const trail = [];
   for (const ev of events) { state = nextExpanded(state, ev); trail.push(state); }
   return { final: state, trail,
-           selfProbe: isExpandedTile(state, 'staged', 1) };
+           selfProbe: isExpandedTile(state, 'selection', 1) };
 });
-const actions = cases.actions.map(([, key, item, env]) => actionsFor(key, item, env));
+const actions = cases.actions.map(([, key, item, env]) => actionsFor(key, item, served(env)));
 const stale = {
   identical: actionRowIsStale(['a','b'], ['a','b']),
   retired: actionRowIsStale(['promote-to-staging','research-brief'], ['research-brief']),
@@ -200,12 +261,15 @@ console.log(JSON.stringify({
 
 _STAGED_HARNESS = """
 import { primaryFragmentPath, fragmentSummary, packetGroups } from './wheel-model.mjs';
+import { readDisplay } from './display.js';
 import { readFileSync } from 'node:fs';
 const cases = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+// THE SERVED DISPLAY, which wheel.js hands `packetGroups` (`vocab`)
+const display = readDisplay({ display: cases.display });
 console.log(JSON.stringify({
   paths: cases.paths.map(([, id, files]) => primaryFragmentPath(id, files)),
   summaries: cases.summaries.map(([, text]) => fragmentSummary(text)),
-  packets: cases.packets.map(([, files, folder]) => packetGroups(files, folder)),
+  packets: cases.packets.map(([, files, folder]) => packetGroups(files, folder, display)),
 }));
 """
 
@@ -218,7 +282,7 @@ def _snapshot():
 def _run_wheel_model(snapshot, tmp_path):
     if NODE is None:
         pytest.skip("node not available for the JS derivation probe")
-    shutil.copy(WHEEL_MODEL_JS, tmp_path / "wheel-model.mjs")
+    _copy_wheel_model(tmp_path)
     (tmp_path / "harness.mjs").write_text(_NODE_HARNESS, encoding="utf-8")
     snap_path = tmp_path / "snapshot.json"
     snap_path.write_text(json.dumps(snapshot), encoding="utf-8")
@@ -234,7 +298,7 @@ def _run_reorder(cases, tmp_path):
     returning {case id: {blockLo, k, sBy, iAt}} with the Maps as int dicts."""
     if NODE is None:
         pytest.skip("node not available for the JS derivation probe")
-    shutil.copy(WHEEL_MODEL_JS, tmp_path / "wheel-model.mjs")
+    _copy_wheel_model(tmp_path)
     (tmp_path / "reorder.mjs").write_text(_REORDER_HARNESS, encoding="utf-8")
     cases_path = tmp_path / "reorder-cases.json"
     cases_path.write_text(
@@ -258,7 +322,7 @@ def _run_drum(cases, tmp_path):
     "candidates": {case id: clamped-url-candidate-or-None}}."""
     if NODE is None:
         pytest.skip("node not available for the JS derivation probe")
-    shutil.copy(WHEEL_MODEL_JS, tmp_path / "wheel-model.mjs")
+    _copy_wheel_model(tmp_path)
     (tmp_path / "drum.mjs").write_text(_DRUM_HARNESS, encoding="utf-8")
     cases_path = tmp_path / "drum-cases.json"
     cases_path.write_text(json.dumps(cases), encoding="utf-8")
@@ -280,11 +344,12 @@ def _run_expand(expand_cases, action_cases, tmp_path):
      "actions": {case id: [descriptor, ...]}, plus the table + scale facts}."""
     if NODE is None:
         pytest.skip("node not available for the JS derivation probe")
-    shutil.copy(WHEEL_MODEL_JS, tmp_path / "wheel-model.mjs")
+    _copy_wheel_model(tmp_path)
     (tmp_path / "expand.mjs").write_text(_EXPAND_HARNESS, encoding="utf-8")
     cases_path = tmp_path / "expand-cases.json"
     cases_path.write_text(json.dumps({"expand": expand_cases,
-                                      "actions": action_cases}), encoding="utf-8")
+                                      "actions": action_cases,
+                                      "display": _served_display()}), encoding="utf-8")
     proc = subprocess.run(
         [NODE, str(tmp_path / "expand.mjs"), str(cases_path)],
         capture_output=True, text=True, timeout=60)
@@ -307,7 +372,7 @@ def _run_landed(landed_cases, path_cases, tmp_path):
     "paths": {case id: {selected, flags}}}."""
     if NODE is None:
         pytest.skip("node not available for the JS derivation probe")
-    shutil.copy(WHEEL_MODEL_JS, tmp_path / "wheel-model.mjs")
+    _copy_wheel_model(tmp_path)
     (tmp_path / "landed.mjs").write_text(_LANDED_HARNESS, encoding="utf-8")
     cases_path = tmp_path / "landed-cases.json"
     cases_path.write_text(json.dumps({"landed": landed_cases, "paths": path_cases}),
@@ -331,11 +396,12 @@ def _run_staged(path_cases, summary_cases, packet_cases, tmp_path):
      "packets": {case id: [group, ...]}}."""
     if NODE is None:
         pytest.skip("node not available for the JS derivation probe")
-    shutil.copy(WHEEL_MODEL_JS, tmp_path / "wheel-model.mjs")
+    _copy_wheel_model(tmp_path)
     (tmp_path / "staged.mjs").write_text(_STAGED_HARNESS, encoding="utf-8")
     cases_path = tmp_path / "staged-cases.json"
     cases_path.write_text(json.dumps({"paths": path_cases, "summaries": summary_cases,
-                                      "packets": packet_cases}), encoding="utf-8")
+                                      "packets": packet_cases,
+                                      "display": _served_display()}), encoding="utf-8")
     proc = subprocess.run(
         [NODE, str(tmp_path / "staged.mjs"), str(cases_path)],
         capture_output=True, text=True, timeout=60)
@@ -393,8 +459,8 @@ def _hand_snapshot(possibles):
 
 def test_six_wheels_in_locked_funnel_order(tmp_path):
     r = _run_wheel_model(_snapshot(), tmp_path)
-    assert r["keys"] == ["documents", "clusters", "possibles", "staged",
-                         "active", "archived"]
+    assert r["keys"] == ["source", "grouping", "candidate", "selection",
+                         "submission", "completion"]
     assert set(r["wheels"]) == set(r["keys"])
 
 
@@ -410,9 +476,9 @@ def test_real_relations_are_indexed_edges(tmp_path):
     r = _run_wheel_model(_hand_snapshot([]), tmp_path)
     kinds = {(e["from"][0], e["to"][0]) for e in r["edges"]}
     # the realization data contract's edge families all materialize
-    assert ("documents", "clusters") in kinds
-    assert ("clusters", "staged") in kinds
-    assert ("staged", "active") in kinds
+    assert ("source", "grouping") in kinds
+    assert ("grouping", "selection") in kinds
+    assert ("selection", "submission") in kinds
     for e in r["edges"]:
         if not e["from"][1].startswith("demo-") and not e["to"][1].startswith("demo-"):
             assert e["cls"] == "indexed"
@@ -424,13 +490,13 @@ def test_undisposed_derived_possible_edges_are_inferred(tmp_path):
                            _derived("pos-derived-accepted", disposed="accepted")])
     r = _run_wheel_model(snap, tmp_path)
     cls_by_possible = {e["to"][1]: e["cls"] for e in r["edges"]
-                       if e["to"][0] == "possibles"}
+                       if e["to"][0] == "candidate"}
     # undisposed (incl. deferred) -> non-`indexed` (the delta's distinct-class
     # rule); an ACCEPTED derived possible is real register data -> indexed
     assert cls_by_possible["pos-derived-open"] == "inferred"
     assert cls_by_possible["pos-derived-deferred"] == "inferred"
     assert cls_by_possible["pos-derived-accepted"] == "indexed"
-    subs = {it["id"]: it for it in r["wheels"]["possibles"]["items"]}
+    subs = {it["id"]: it for it in r["wheels"]["candidate"]["items"]}
     assert subs["pos-derived-open"]["derivedPending"] is True
     assert subs["pos-derived-open"]["sub"] == "pending review"
     assert subs["pos-derived-accepted"]["derivedPending"] is False
@@ -442,16 +508,16 @@ def test_undisposed_derived_possible_edges_are_inferred(tmp_path):
 def test_honesty_rule_synthesizes_demo_possibles_only_when_register_empty(tmp_path):
     r = _run_wheel_model(_hand_snapshot([]), tmp_path)
     assert r["demoMode"] is True
-    demo = r["wheels"]["possibles"]["items"]
+    demo = r["wheels"]["candidate"]["items"]
     assert demo and all(it["demo"] and it["sub"] == "demo" for it in demo)
-    demo_edges = [e for e in r["edges"] if e["to"][0] == "possibles"]
+    demo_edges = [e for e in r["edges"] if e["to"][0] == "candidate"]
     assert demo_edges and all(e["cls"] == "synthesized" for e in demo_edges)
     # never a pick edge from a demo possible (a pick is a human act)
-    assert not any(e["from"][0] == "possibles" for e in r["edges"])
+    assert not any(e["from"][0] == "candidate" for e in r["edges"])
 
     real = _run_wheel_model(_hand_snapshot([_derived()]), tmp_path)
     assert real["demoMode"] is False
-    assert not any(it["demo"] for it in real["wheels"]["possibles"]["items"])
+    assert not any(it["demo"] for it in real["wheels"]["candidate"]["items"])
 
 
 # ---- degrees + connections -----------------------------------------------------
@@ -459,19 +525,19 @@ def test_honesty_rule_synthesizes_demo_possibles_only_when_register_empty(tmp_pa
 def test_degrees_count_every_touching_edge(tmp_path):
     r = _run_wheel_model(_hand_snapshot([]), tmp_path)
     wheels = r["wheels"]
-    docs = wheels["documents"]
+    docs = wheels["source"]
     # d.md touches exactly its doc->cluster edge
     assert docs["degrees"][docs["items"].index(
         next(it for it in docs["items"] if it["id"] == "d.md"))] == 1
-    staged = wheels["staged"]
+    staged = wheels["selection"]
     # st-a: cluster->staged + staged->active + demo edges never touch staged
     assert staged["degrees"][0] == 2
 
 
 def test_connections_group_linked_indices_per_wheel(tmp_path):
     r = _run_wheel_model(_hand_snapshot([]), tmp_path)
-    conns = r["focusConns"]["clusters"]  # cluster cl-a at index 0
-    assert "documents" in conns and "staged" in conns
+    conns = r["focusConns"]["grouping"]  # cluster cl-a at index 0
+    assert "source" in conns and "selection" in conns
 
 
 # ---- second-degree connections (Brett 2026-07-25: always-on second-degree,
@@ -518,7 +584,7 @@ def _run_second_degree(cases, tmp_path):
     actually returns (for the sortedness/dedup/determinism checks)."""
     if NODE is None:
         pytest.skip("node not available for the JS derivation probe")
-    shutil.copy(WHEEL_MODEL_JS, tmp_path / "wheel-model.mjs")
+    _copy_wheel_model(tmp_path)
     (tmp_path / "seconddeg.mjs").write_text(_SECOND_DEGREE_HARNESS, encoding="utf-8")
     cases_path = tmp_path / "seconddeg-cases.json"
     cases_path.write_text(
@@ -585,37 +651,37 @@ def _chain_snapshot():
 
 
 SECOND_DEGREE_CASES = [
-    ("hub-doc-focus", _hub_snapshot(), "documents", 0),
+    ("hub-doc-focus", _hub_snapshot(), "source", 0),
     # d4: reachable only through cl-c, whose sole document edge IS d4 itself —
     # no other document to surface, so second degree is empty despite a
     # nonempty first degree
-    ("hub-isolated-cluster-neighbour", _hub_snapshot(), "documents", 3),
+    ("hub-isolated-cluster-neighbour", _hub_snapshot(), "source", 3),
     # d5: no edges at all — first AND second degree both empty
-    ("hub-fully-isolated", _hub_snapshot(), "documents", 4),
-    ("chain-cluster-to-staged", _chain_snapshot(), "clusters", 0),
+    ("hub-fully-isolated", _hub_snapshot(), "source", 4),
+    ("chain-cluster-to-staged", _chain_snapshot(), "grouping", 0),
     # cl-b in the plain hand snapshot carries no edges of its own
-    ("empty-snapshot", _hand_snapshot([]), "clusters", 1),
+    ("empty-snapshot", _hand_snapshot([]), "grouping", 1),
 ]
 
 
 def test_second_degree_hub_shows_sibling_documents_via_shared_clusters(tmp_path):
     r = _run_second_degree(SECOND_DEGREE_CASES, tmp_path)["hub-doc-focus"]
     # first degree: d1's own three clusters
-    assert set(r["first"]["clusters"]) == {"cl-a", "cl-b", "cl-d"}
+    assert set(r["first"]["grouping"]) == {"cl-a", "cl-b", "cl-d"}
     # second degree: the OTHER documents those clusters link — d2 (shared by
     # cl-a AND cl-d) and d3 (cl-b) — deduped to one entry each
-    assert sorted(r["items"]["documents"]) == ["d2.md", "d3.md"]
+    assert sorted(r["items"]["source"]) == ["d2.md", "d3.md"]
     # the focused document and every first-degree cluster are excluded from
     # the second-degree result entirely
-    assert "d1.md" not in r["items"]["documents"]
-    assert "clusters" not in r["items"] or not r["items"]["clusters"]
+    assert "d1.md" not in r["items"]["source"]
+    assert "grouping" not in r["items"] or not r["items"]["grouping"]
     # d4 (cl-c's document — a cluster never reached from d1) never leaks in
-    assert "d4.md" not in r["items"]["documents"]
+    assert "d4.md" not in r["items"]["source"]
 
 
 def test_second_degree_edges_anchor_at_the_first_degree_item_not_the_focus(tmp_path):
     r = _run_second_degree(SECOND_DEGREE_CASES, tmp_path)["hub-doc-focus"]
-    assert all(e["from"][0] == "clusters" and e["to"][0] == "documents"
+    assert all(e["from"][0] == "grouping" and e["to"][0] == "source"
                for e in r["edges"])
     assert all(e["from"][1] != "d1.md" for e in r["edges"])  # never the focus
     edge_pairs = {(e["from"][1], e["to"][1]) for e in r["edges"]}
@@ -628,17 +694,17 @@ def test_second_degree_dedupes_items_but_keeps_every_real_edge(tmp_path):
     """d2 is reached through TWO distinct real edges (cl-a and cl-d both link
     it) — the item list dedupes to one entry, but both edges still draw."""
     r = _run_second_degree(SECOND_DEGREE_CASES, tmp_path)["hub-doc-focus"]
-    assert r["items"]["documents"].count("d2.md") == 1
-    to_d2 = [e for e in r["edges"] if e["to"] == ["documents", "d2.md"]]
+    assert r["items"]["source"].count("d2.md") == 1
+    to_d2 = [e for e in r["edges"] if e["to"] == ["source", "d2.md"]]
     assert len(to_d2) == 2
     assert {e["from"][1] for e in to_d2} == {"cl-a", "cl-d"}
 
 
 def test_second_degree_crosses_wheel_classes_cluster_to_staged_via_possibles(tmp_path):
     r = _run_second_degree(SECOND_DEGREE_CASES, tmp_path)["chain-cluster-to-staged"]
-    assert r["first"] == {"possibles": ["p1"]}
-    assert r["items"] == {"staged": ["st-y"]}
-    assert r["edges"] == [{"from": ["possibles", "p1"], "to": ["staged", "st-y"]}]
+    assert r["first"] == {"candidate": ["p1"]}
+    assert r["items"] == {"selection": ["st-y"]}
+    assert r["edges"] == [{"from": ["candidate", "p1"], "to": ["selection", "st-y"]}]
 
 
 def test_second_degree_is_empty_when_nothing_reaches_beyond_first_degree(tmp_path):
@@ -701,7 +767,7 @@ def _run_gather(cases, tmp_path):
     lists for the sortedness/dedup/determinism checks."""
     if NODE is None:
         pytest.skip("node not available for the JS derivation probe")
-    shutil.copy(WHEEL_MODEL_JS, tmp_path / "wheel-model.mjs")
+    _copy_wheel_model(tmp_path)
     (tmp_path / "gather.mjs").write_text(_GATHER_HARNESS, encoding="utf-8")
     cases_path = tmp_path / "gather-cases.json"
     cases_path.write_text(
@@ -734,11 +800,11 @@ def _gather_priority_snapshot():
 
 
 GATHER_CASES = [
-    ("hub-doc", _hub_snapshot(), "documents", 0),
-    ("chain-cluster", _chain_snapshot(), "clusters", 0),
-    ("priority-both-degrees", _gather_priority_snapshot(), "clusters", 0),
+    ("hub-doc", _hub_snapshot(), "source", 0),
+    ("chain-cluster", _chain_snapshot(), "grouping", 0),
+    ("priority-both-degrees", _gather_priority_snapshot(), "grouping", 0),
     # d5 has no edges at all — nothing to gather in any wheel
-    ("isolated", _hub_snapshot(), "documents", 4),
+    ("isolated", _hub_snapshot(), "source", 4),
 ]
 
 
@@ -746,16 +812,16 @@ def test_gather_folds_second_degree_tiles_into_the_reel(tmp_path):
     r = _run_gather(GATHER_CASES, tmp_path)["hub-doc"]["resolved"]
     # the two wheels the hub focus reaches: its own clusters (first degree) and
     # the sibling documents one hop beyond (second degree)
-    assert set(r) == {"clusters", "documents"}
+    assert set(r) == {"grouping", "source"}
     # first-degree clusters gather as first degree, nothing second
-    assert set(r["clusters"]["first"]) == {"cl-a", "cl-b", "cl-d"}
-    assert r["clusters"]["second"] == []
-    assert set(r["clusters"]["gather"]) == {"cl-a", "cl-b", "cl-d"}
+    assert set(r["grouping"]["first"]) == {"cl-a", "cl-b", "cl-d"}
+    assert r["grouping"]["second"] == []
+    assert set(r["grouping"]["gather"]) == {"cl-a", "cl-b", "cl-d"}
     # the documents wheel is reached ONLY at second degree — d2/d3 now GATHER
     # (before this ruling the docs wheel had no gather target and stayed put)
-    assert r["documents"]["first"] == []
-    assert sorted(r["documents"]["second"]) == ["d2.md", "d3.md"]
-    assert sorted(r["documents"]["gather"]) == ["d2.md", "d3.md"]
+    assert r["source"]["first"] == []
+    assert sorted(r["source"]["second"]) == ["d2.md", "d3.md"]
+    assert sorted(r["source"]["gather"]) == ["d2.md", "d3.md"]
 
 
 def test_gather_gives_first_degree_priority_on_the_line(tmp_path):
@@ -763,14 +829,14 @@ def test_gather_gives_first_degree_priority_on_the_line(tmp_path):
     POSITIONS on the first-degree tiles alone (`align`) so they rest on the
     focus line and second-degree tiles gather around them."""
     r = _run_gather(GATHER_CASES, tmp_path)["priority-both-degrees"]["resolved"]
-    staged = r["staged"]
+    staged = r["selection"]
     assert staged["first"] == ["st-1"]           # direct lineage pick
     assert staged["second"] == ["st-2"]          # via the claimed possible
     assert staged["gather"] == ["st-1", "st-2"]  # both packed, index-sorted
     assert staged["align"] == ["st-1"]           # ...but only first sits on the line
     # a wheel with only first-degree links aligns on them (no fallback needed)
-    assert r["possibles"]["first"] == ["p1"]
-    assert r["possibles"]["align"] == ["p1"]
+    assert r["candidate"]["first"] == ["p1"]
+    assert r["candidate"]["align"] == ["p1"]
 
 
 def test_gather_aligns_on_second_degree_when_no_first_degree(tmp_path):
@@ -778,12 +844,12 @@ def test_gather_aligns_on_second_degree_when_no_first_degree(tmp_path):
     possible chain, are reached only at second degree — `align` falls back to
     the second-degree set so the wheel still spins its tiles into view."""
     out = _run_gather(GATHER_CASES, tmp_path)
-    docs = out["hub-doc"]["resolved"]["documents"]
+    docs = out["hub-doc"]["resolved"]["source"]
     assert docs["align"] == docs["second"] == sorted(docs["second"])
     chain = out["chain-cluster"]["resolved"]
-    assert chain["possibles"]["align"] == ["p1"]        # first degree
-    assert chain["staged"]["first"] == []
-    assert chain["staged"]["align"] == ["st-y"]          # second-degree fallback
+    assert chain["candidate"]["align"] == ["p1"]        # first degree
+    assert chain["selection"]["first"] == []
+    assert chain["selection"]["align"] == ["st-y"]       # second-degree fallback
 
 
 def test_gather_is_empty_when_nothing_links(tmp_path):
@@ -843,7 +909,7 @@ def _run_align(cases, tmp_path):
     ACTUAL alignTarget, returning (ALIGN.near, {case id: result})."""
     if NODE is None:
         pytest.skip("node not available for the JS derivation probe")
-    shutil.copy(WHEEL_MODEL_JS, tmp_path / "wheel-model.mjs")
+    _copy_wheel_model(tmp_path)
     (tmp_path / "align.mjs").write_text(_ALIGN_HARNESS, encoding="utf-8")
     cases_path = tmp_path / "align-cases.json"
     cases_path.write_text(json.dumps([list(c) for c in cases]), encoding="utf-8")
@@ -1184,27 +1250,27 @@ def test_reorder_whole_wheel_linked_is_the_identity(tmp_path):
 # focused AND centred expands it in place; clicking it again collapses. Escape,
 # focus changes, spins of that wheel, the reorder choreography, paging, and
 # teardown all arrive as {"type": "collapse"}.
-TILE_1 = {"key": "staged", "i": 1}
+TILE_1 = {"key": "selection", "i": 1}
 EXPAND_CASES = [
     ("first-click-focuses-only", None,
-     [{"type": "tile", "key": "staged", "i": 1, "centred": False}]),
+     [{"type": "tile", "key": "selection", "i": 1, "centred": False}]),
     ("second-click-expands", None,
-     [{"type": "tile", "key": "staged", "i": 1, "centred": False},
-      {"type": "tile", "key": "staged", "i": 1, "centred": True}]),
+     [{"type": "tile", "key": "selection", "i": 1, "centred": False},
+      {"type": "tile", "key": "selection", "i": 1, "centred": True}]),
     ("third-click-collapses", TILE_1,
-     [{"type": "tile", "key": "staged", "i": 1, "centred": True}]),
+     [{"type": "tile", "key": "selection", "i": 1, "centred": True}]),
     ("escape-collapses", TILE_1, [{"type": "collapse"}]),
     ("other-tile-same-wheel-collapses", TILE_1,
-     [{"type": "tile", "key": "staged", "i": 4, "centred": False}]),
+     [{"type": "tile", "key": "selection", "i": 4, "centred": False}]),
     ("other-wheel-centred-tile-replaces", TILE_1,
-     [{"type": "tile", "key": "possibles", "i": 0, "centred": True}]),
-    ("spin-that-wheel-collapses", TILE_1, [{"type": "spin", "key": "staged"}]),
-    ("spin-another-wheel-keeps", TILE_1, [{"type": "spin", "key": "documents"}]),
+     [{"type": "tile", "key": "candidate", "i": 0, "centred": True}]),
+    ("spin-that-wheel-collapses", TILE_1, [{"type": "spin", "key": "selection"}]),
+    ("spin-another-wheel-keeps", TILE_1, [{"type": "spin", "key": "source"}]),
     ("unknown-event-keeps", TILE_1, [{"type": "resize"}]),
     ("collapse-is-idempotent", None, [{"type": "collapse"}, {"type": "collapse"}]),
     ("reopen-after-collapse", TILE_1,
      [{"type": "collapse"},
-      {"type": "tile", "key": "staged", "i": 1, "centred": True}]),
+      {"type": "tile", "key": "selection", "i": 1, "centred": True}]),
 ]
 
 
@@ -1234,7 +1300,7 @@ def test_only_one_tile_is_ever_expanded(tmp_path):
     r = _run_expand(EXPAND_CASES, ACTION_CASES, tmp_path)["expand"]
     # focus TRANSFERS across wheels; the new wheel's centred tile takes over
     # rather than adding a second open tile
-    assert r["other-wheel-centred-tile-replaces"]["final"] == {"key": "possibles", "i": 0}
+    assert r["other-wheel-centred-tile-replaces"]["final"] == {"key": "candidate", "i": 0}
     for case in r.values():
         for state in case["trail"]:
             assert state is None or set(state) == {"key", "i"}
@@ -1252,88 +1318,90 @@ def test_expanded_scale_exceeds_the_focus_magnification(tmp_path):
 # (id, wheel key, item, env). The table is the extension point Brett grows: one
 # row per verb, gated by a PURE predicate over the item and the session env
 # (gate capability live, already commissioned this session, applied verdict).
+# The wheel key is a stage ROLE since slice S7 (see `_copy_wheel_model`). The
+# case ids keep the wheel names they were written under.
 ACTION_CASES = [
-    ("staged-gated", "staged", {"id": "st-a"}, {"gate": True, "commissioned": False}),
-    ("staged-ungated", "staged", {"id": "st-a"}, {"gate": False, "commissioned": False}),
-    ("staged-commissioned", "staged", {"id": "st-a"}, {"gate": True, "commissioned": True}),
-    ("staged-no-env", "staged", {"id": "st-a"}, None),
-    ("staged-no-item", "staged", None, {"gate": True}),
-    ("possibles-gated", "possibles", {"id": "pos-a"}, {"gate": True}),
-    ("documents-gated", "documents", {"id": "d.md"}, {"gate": True}),
-    ("clusters-gated", "clusters", {"id": "cl-a"}, {"gate": True}),
-    ("active-gated", "active", {"id": "add-x"}, {"gate": True}),
-    ("archived-gated", "archived", {"id": "add-y"}, {"gate": True}),
+    ("staged-gated", "selection", {"id": "st-a"}, {"gate": True, "commissioned": False}),
+    ("staged-ungated", "selection", {"id": "st-a"}, {"gate": False, "commissioned": False}),
+    ("staged-commissioned", "selection", {"id": "st-a"}, {"gate": True, "commissioned": True}),
+    ("staged-no-env", "selection", {"id": "st-a"}, None),
+    ("staged-no-item", "selection", None, {"gate": True}),
+    ("possibles-gated", "candidate", {"id": "pos-a"}, {"gate": True}),
+    ("documents-gated", "source", {"id": "d.md"}, {"gate": True}),
+    ("clusters-gated", "grouping", {"id": "cl-a"}, {"gate": True}),
+    ("active-gated", "submission", {"id": "add-x"}, {"gate": True}),
+    ("archived-gated", "completion", {"id": "add-y"}, {"gate": True}),
     # the read-only verbs on the DEPLOYED image's env: no gate capability, no
     # actor, nothing commissioned — they must still be offered.
-    ("documents-ungated", "documents", {"id": "d.md"}, {"gate": False}),
-    ("clusters-ungated", "clusters", {"id": "cl-a"}, {"gate": False}),
-    ("archived-ungated", "archived", {"id": "add-y"}, {"gate": False}),
-    ("documents-no-env", "documents", {"id": "d.md"}, None),
-    ("clusters-no-item", "clusters", None, {"gate": False}),
-    ("active-ungated", "active", {"id": "add-x"}, {"gate": False}),
-    ("possibles-ungated", "possibles", {"id": "pos-a"}, {"gate": False}),
+    ("documents-ungated", "source", {"id": "d.md"}, {"gate": False}),
+    ("clusters-ungated", "grouping", {"id": "cl-a"}, {"gate": False}),
+    ("archived-ungated", "completion", {"id": "add-y"}, {"gate": False}),
+    ("documents-no-env", "source", {"id": "d.md"}, None),
+    ("clusters-no-item", "grouping", None, {"gate": False}),
+    ("active-ungated", "submission", {"id": "add-x"}, {"gate": False}),
+    ("possibles-ungated", "candidate", {"id": "pos-a"}, {"gate": False}),
     # the SET-level NotebookLM verb: its OWN capability flag (`notebook`), on
     # exactly the three set-bearing wheels. The gate capability is orthogonal —
     # a notebook-capable session offers it whether or not the gate is live.
-    ("clusters-notebook", "clusters", {"id": "cl-a"}, {"gate": False, "notebook": True}),
-    ("staged-notebook", "staged", {"id": "st-a"},
+    ("clusters-notebook", "grouping", {"id": "cl-a"}, {"gate": False, "notebook": True}),
+    ("staged-notebook", "selection", {"id": "st-a"},
      {"gate": True, "commissioned": False, "notebook": True}),
-    ("staged-notebook-ungated", "staged", {"id": "st-a"}, {"gate": False, "notebook": True}),
-    ("staged-notebook-commissioned", "staged", {"id": "st-a"},
+    ("staged-notebook-ungated", "selection", {"id": "st-a"}, {"gate": False, "notebook": True}),
+    ("staged-notebook-commissioned", "selection", {"id": "st-a"},
      {"gate": True, "commissioned": True, "notebook": True}),
-    ("active-notebook", "active", {"id": "add-x"}, {"gate": False, "notebook": True}),
+    ("active-notebook", "submission", {"id": "add-x"}, {"gate": False, "notebook": True}),
     # ...and the wheels the action deliberately excludes (a single document is
     # not a set; realized changes are out of scope) stay unchanged.
-    ("documents-notebook", "documents", {"id": "d.md"}, {"gate": False, "notebook": True}),
-    ("archived-notebook", "archived", {"id": "add-y"}, {"gate": False, "notebook": True}),
-    ("possibles-notebook", "possibles", {"id": "pos-a"}, {"gate": False, "notebook": True}),
-    ("active-notebook-false", "active", {"id": "add-x"}, {"notebook": False}),
-    ("active-no-item-notebook", "active", None, {"notebook": True}),
+    ("documents-notebook", "source", {"id": "d.md"}, {"gate": False, "notebook": True}),
+    ("archived-notebook", "completion", {"id": "add-y"}, {"gate": False, "notebook": True}),
+    ("possibles-notebook", "candidate", {"id": "pos-a"}, {"gate": False, "notebook": True}),
+    ("active-notebook-false", "submission", {"id": "add-x"}, {"notebook": False}),
+    ("active-no-item-notebook", "submission", None, {"notebook": True}),
     # ---- 011 add-wheel-action-verbs: the four action-row verbs ----------
     # possibles promotability is computed from facts the snapshot ALREADY
     # projects onto a tile (state / derivedPending / demo) — no new field.
-    ("w-promotable", "possibles",
+    ("w-promotable", "candidate",
      {"id": "pos-a", "demo": False, "derivedPending": False,
       "ref": {"id": "pos-a", "state": "latent"}}, {"gate": True}),
-    ("w-derived-pending", "possibles",
+    ("w-derived-pending", "candidate",
      {"id": "pos-b", "demo": False, "derivedPending": True,
       "ref": {"id": "pos-b", "state": "latent"}}, {"gate": True}),
-    ("w-derived-deferred", "possibles",
+    ("w-derived-deferred", "candidate",
      {"id": "pos-c", "demo": False, "derivedPending": True,
       "ref": {"id": "pos-c", "state": "latent"}}, {"gate": True}),
-    ("w-rejected", "possibles",
+    ("w-rejected", "candidate",
      {"id": "pos-d", "demo": False, "derivedPending": False,
       "ref": {"id": "pos-d", "state": "rejected"}}, {"gate": True}),
-    ("w-superseded", "possibles",
+    ("w-superseded", "candidate",
      {"id": "pos-e", "demo": False, "derivedPending": False,
       "ref": {"id": "pos-e", "state": "superseded"}}, {"gate": True}),
-    ("w-picked", "possibles",
+    ("w-picked", "candidate",
      {"id": "pos-f", "demo": False, "derivedPending": False,
       "ref": {"id": "pos-f", "state": "picked"}}, {"gate": True}),
-    ("w-demo", "possibles",
+    ("w-demo", "candidate",
      {"id": "demo-cl-a", "demo": True, "derivedPending": False,
       "ref": {"id": "demo-cl-a", "state": "latent"}}, {"gate": True}),
-    ("w-cluster", "clusters", {"id": "cl-a"}, {"gate": True}),
-    ("w-active", "active", {"id": "add-x"}, {"gate": True}),
-    ("w-archived", "archived", {"id": "add-y"}, {"gate": True}),
-    ("w-possibles-gateoff", "possibles",
+    ("w-cluster", "grouping", {"id": "cl-a"}, {"gate": True}),
+    ("w-active", "submission", {"id": "add-x"}, {"gate": True}),
+    ("w-archived", "completion", {"id": "add-y"}, {"gate": True}),
+    ("w-possibles-gateoff", "candidate",
      {"id": "pos-a", "demo": False, "derivedPending": False,
       "ref": {"id": "pos-a", "state": "latent"}}, {"gate": False}),
-    ("w-cluster-gateoff", "clusters", {"id": "cl-a"}, {"gate": False}),
-    ("w-active-gateoff", "active", {"id": "add-x"}, {"gate": False}),
+    ("w-cluster-gateoff", "grouping", {"id": "cl-a"}, {"gate": False}),
+    ("w-active-gateoff", "submission", {"id": "add-x"}, {"gate": False}),
     # per-(verb, target) session retirement: commissioning ONE possibles verb
     # must not retire the other (FR-027/FR-033).
-    ("w-brief-commissioned", "possibles",
+    ("w-brief-commissioned", "candidate",
      {"id": "pos-a", "demo": False, "derivedPending": False,
       "ref": {"id": "pos-a", "state": "latent"}},
      {"gate": True, "commissioned": {"research-brief": True}}),
-    ("w-promote-commissioned", "possibles",
+    ("w-promote-commissioned", "candidate",
      {"id": "pos-a", "demo": False, "derivedPending": False,
       "ref": {"id": "pos-a", "state": "latent"}},
      {"gate": True, "commissioned": {"promote-to-staging": True}}),
-    ("w-demote-recorded", "active", {"id": "add-x"},
+    ("w-demote-recorded", "submission", {"id": "add-x"},
      {"gate": True, "commissioned": {"demote": True}}),
-    ("w-cluster-commissioned", "clusters", {"id": "cl-a"},
+    ("w-cluster-commissioned", "grouping", {"id": "cl-a"},
      {"gate": True, "commissioned": {"derive-possibles": True}}),
     # the legacy tile-wide boolean still means "everything on this tile"
     # CAPTURED LIVE (2026-08-02) from the served wheel model in a real browser,
@@ -1341,7 +1409,7 @@ ACTION_CASES = [
     # The register state lives under `ref`; there is NO top-level `state`. An
     # authored flat fixture hid a defect in which `promote-to-staging` never
     # rendered on the real dashboard at all.
-    ("w-real-projection-accepted", "possibles",
+    ("w-real-projection-accepted", "candidate",
      {"id": "pos-ok", "label": "Promotable", "sub": "latent",
       "demo": False, "derivedPending": False,
       "ref": {"id": "pos-ok", "title": "Promotable", "claim": "c",
@@ -1354,7 +1422,7 @@ ACTION_CASES = [
                              "human_disposition": {"outcome": "accepted",
                                                    "authority": "brett"}}}},
      {"gate": True}),
-    ("w-real-deferred", "possibles",
+    ("w-real-deferred", "candidate",
      {"id": "pos-def", "label": "Deferred", "sub": "pending review",
       "demo": False, "derivedPending": True,
       "ref": {"id": "pos-def", "title": "Deferred", "claim": "c",
@@ -1366,7 +1434,7 @@ ACTION_CASES = [
                              "human_disposition": {"outcome": "deferred",
                                                    "authority": "brett"}}}},
      {"gate": True}),
-    ("w-real-projection-pending", "possibles",
+    ("w-real-projection-pending", "candidate",
      {"id": "pos-pending", "label": "Awaiting verdict", "sub": "pending review",
       "demo": False, "derivedPending": True,
       "ref": {"id": "pos-pending", "title": "Awaiting verdict", "claim": "c",
@@ -1377,7 +1445,7 @@ ACTION_CASES = [
                                             "prompt_contract_version": "v1"},
                              "disposition": "pending_review"}}},
      {"gate": True}),
-    ("w-legacy-boolean", "possibles",
+    ("w-legacy-boolean", "candidate",
      {"id": "pos-a", "demo": False, "derivedPending": False,
       "ref": {"id": "pos-a", "state": "latent"}}, {"gate": True, "commissioned": True}),
 ]
@@ -1386,7 +1454,9 @@ ACTION_CASES = [
 def test_action_table_offers_draft_proposal_only_on_gated_staged_tiles(tmp_path):
     r = _run_expand(EXPAND_CASES, ACTION_CASES, tmp_path)["actions"]
     assert [a["id"] for a in r["staged-gated"]] == ["read", "propose", "workbench"]
-    assert r["staged-gated"][1]["label"] == "▶ draft proposal"
+    # the SERVED word (R9-R1 (a)): `display.act("propose")` under the governed
+    # host, which derives each act's word from its act id
+    assert r["staged-gated"][1]["label"] == "▶ Propose"
     # the capability gate is the same fail-closed rule as the dispose tray — the
     # read-only verbs are all that is left without it...
     assert [a["id"] for a in r["staged-ungated"]] == ["read", "workbench"]
@@ -1401,8 +1471,8 @@ def test_action_table_rows_sit_in_funnel_order(tmp_path):
     the possibles wheel's FIRST table verb is the read-only workbench
     (add-staging-workbench; its dispose verbs stay in the badge-rail tray)."""
     out = _run_expand(EXPAND_CASES, ACTION_CASES, tmp_path)
-    assert out["wheelsWithActions"] == ["documents", "clusters", "possibles",
-                                        "staged", "active", "archived"]
+    assert out["wheelsWithActions"] == ["source", "grouping", "candidate",
+                                        "selection", "submission", "completion"]
     # every wheel offers at least one read-only verb, capability or not
     for cid in ("documents-ungated", "clusters-ungated", "possibles-ungated",
                 "staged-ungated", "active-ungated", "active-gated",
@@ -1588,7 +1658,7 @@ def _run_health(cases, tmp_path):
     "blocks": {id: ...}}."""
     if NODE is None:
         pytest.skip("node not available for the JS derivation probe")
-    shutil.copy(WHEEL_MODEL_JS, tmp_path / "wheel-model.mjs")
+    _copy_wheel_model(tmp_path)
     (tmp_path / "health.mjs").write_text(_HEALTH_HARNESS, encoding="utf-8")
     cases_path = tmp_path / "health-cases.json"
     cases_path.write_text(json.dumps(cases), encoding="utf-8")
@@ -1973,7 +2043,9 @@ def test_packet_groups_read_in_review_order(tmp_path):
     in), then the spec deltas labelled by capability, then everything else."""
     r = _run_staged(FRAGMENT_CASES, SUMMARY_CASES, PACKET_CASES, tmp_path)["packets"]
     groups = r["full-packet"]
-    assert [g["label"] for g in groups] == ["packet", "spec deltas", "other files"]
+    # the SERVED words (R9-R1 (a)): the governed host's artifact axis labels
+    # the packet and the deltas, and orders the packet's front matter
+    assert [g["label"] for g in groups] == ["packet files", "Spec deltas", "other files"]
     assert [f["name"] for f in groups[0]["files"]] == \
         ["proposal.md", "design.md", "tasks.md"]
     # every spec delta is named `spec.md`, so the CAPABILITY is the useful label
@@ -1987,8 +2059,8 @@ def test_packet_groups_read_in_review_order(tmp_path):
 
 def test_packet_groups_drop_empty_groups_and_degrade_quietly(tmp_path):
     r = _run_staged(FRAGMENT_CASES, SUMMARY_CASES, PACKET_CASES, tmp_path)["packets"]
-    assert [g["label"] for g in r["proposal-only"]] == ["packet"]
-    assert [g["label"] for g in r["deltas-only"]] == ["spec deltas"]
+    assert [g["label"] for g in r["proposal-only"]] == ["packet files"]
+    assert [g["label"] for g in r["deltas-only"]] == ["Spec deltas"]
     # no files at all: no groups (the flyout then says so in one line)
     assert r["empty-files"] == []
     assert r["null-files"] == []
@@ -2001,8 +2073,8 @@ def test_packet_groups_drop_empty_groups_and_degrade_quietly(tmp_path):
 
 def test_wheel_model_derives_from_the_real_fixture_snapshot(tmp_path):
     r = _run_wheel_model(_snapshot(), tmp_path)
-    assert r["wheels"]["documents"]["count"] > 0
-    assert r["wheels"]["clusters"]["count"] > 0
+    assert r["wheels"]["source"]["count"] > 0
+    assert r["wheels"]["grouping"]["count"] > 0
     assert r["edges"], "the fixture snapshot must materialize edges"
     for e in r["edges"]:
         assert e["cls"] in ("indexed", "inferred", "synthesized")
@@ -2148,10 +2220,11 @@ def test_new_verb_labels_are_distinct_and_stable(tmp_path):
     r = _run_expand(EXPAND_CASES, ACTION_CASES, tmp_path)["actions"]
     labels = {a["id"]: a["label"] for cid in ("w-promotable", "w-cluster", "w-active")
               for a in r[cid]}
-    assert labels["promote-to-staging"] == "▲ promote to staging"
-    assert labels["research-brief"] == "✻ research brief"
-    assert labels["derive-possibles"] == "✦ derive possibles"
-    assert labels["demote"] == "◀ demote"
+    # the SERVED words (R9-R1 (a)): `display.act(role)` under the governed host
+    assert labels["promote-to-staging"] == "▲ Promote to staging"
+    assert labels["research-brief"] == "✻ Research brief"
+    assert labels["derive-possibles"] == "✦ Derive possibles"
+    assert labels["demote"] == "◀ Demote"
 
 
 # ---- the live-captured projection (regression, Playwright 2026-08-02) ------
