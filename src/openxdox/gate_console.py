@@ -2445,9 +2445,13 @@ def _schema_errors(document: Mapping[str, Any], schema_text: str, *,
     """`document`'s errors against the schema `schema_text` holds.
 
     The schema itself is checked first, and refused as `GateRefused` where it
-    is not YAML, where it is not a valid JSON Schema under the validator's own
-    meta-schema (an empty document, `required: 1`), and where applying it
-    raises (an unresolvable `$ref`). A host supplies the receipt schema, and
+    is not YAML the safe loader can read (a `YAMLError`, or the
+    `RecursionError` of a nesting deeper than the interpreter allows, or the
+    `ValueError` of an impossible date, which the loader raises past
+    `YAMLError`, as `openxdox.contracts` reads its record), where it is not a
+    valid JSON Schema under the validator's own meta-schema (an empty
+    document, `required: 1`), and where applying it raises (an unresolvable
+    `$ref`). A host supplies the receipt schema, and
     the demotion verb writes its receipt after it has moved files: it reports
     a `GateRefused` there as an executed demotion whose receipt was not
     written, where any other exception would end it with a traceback."""
@@ -2455,7 +2459,7 @@ def _schema_errors(document: Mapping[str, Any], schema_text: str, *,
 
     try:
         schema = yaml.safe_load(schema_text)
-    except yaml.YAMLError as exc:
+    except (yaml.YAMLError, RecursionError, ValueError) as exc:
         raise GateRefused(
             f"the {label} schema could not be parsed: {exc}") from exc
     try:
