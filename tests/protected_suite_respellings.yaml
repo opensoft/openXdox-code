@@ -19,7 +19,10 @@
 #
 # WHAT A RULING ADMITS. Nothing else is entered.
 #   * A RESPELLING of a reference to a seam the arc moved, with no assertion
-#     weakened (R1Q7 (a), batch C).
+#     weakened (R1Q7 (a), batch C). For 12.5's governed suites that includes
+#     the seventeen respellings of names the split-opendox CARVE moved before
+#     the arc (CF-4, H-2, confirmed with plan 038's ruling at `6013547504`;
+#     batch Q), and the 'cluster' node's in-test entry (R-1 (a)'s note).
 #   * The two edits F7.1 requires (R1Q14 (a), `5850003126`, batch F), in
 #     `tests/test_snapshot.py` and `tests/test_snapshot_validator_home.py`.
 #   * The two edits 5.3a's `values` block requires (R1Q26 (a), `5851950767`,
@@ -28,8 +31,11 @@
 #     K), nine in `tests/test_snapshot_validation_launch.py` and one in
 #     `tests/test_snapshot.py`: each one's walk premise becomes 7.3's answer,
 #     and its assertions stay.
-# The last three kinds are each entered with a reason, and none is entered as
-# a respelling.
+#   * An edit to a NAMED MODULE-LEVEL SPAN of one of 12.5's governed suites,
+#     such as a harness text several tests run, which lies inside no test
+#     (R-1 (a), RULED with plan 038 at `6013547504`; batch Q).
+# The F7.1, 5.3a, batch K and span kinds are each entered with a reason, and
+# none is entered as a respelling.
 #
 # WHO WRITES IT. The task that makes the first admitted edit creates it, in its
 # own pull request (plan 034 T019's rule). T067 amended that rule: T060
@@ -49,7 +55,9 @@
 #     `protected-suite-respellings`. No mapping gives a key twice.
 #   * `entries` are in landing order, one per edit. Each entry names:
 #     - `suite`, the protected file, written plainly (`tests/<name>`);
-#     - `test`, the one test the edit changes;
+#     - `test`, the one test the edit changes, or, for an admitted edit to a
+#       module-level constant (R-1 (a)), `span`, that constant's name, in
+#       its place;
 #     - `landing`, the pull request that lands the edit,
 #       `opensoft/openXdox-code#<n>`, because the landing's commit is not
 #       known inside it (T019's rule);
@@ -72,6 +80,12 @@
 #     fourth, from `test`: `old` lies inside the named test in the
 #     `before_blob` text, and `new` inside it in the `after_blob` text, so an
 #     entry cannot admit an edit to another test of the suite.
+#   * A SPAN (plan 038 T026; R-1 (a)). For an entry that names `span`, the
+#     fourth condition reads the span for the test: `old` lies inside that
+#     constant's statement in the `before_blob` text, and `new` inside it in
+#     the `after_blob` text. A span is one module-level assignment to one
+#     bare name that nothing else in module scope binds, it exists before the
+#     edit and after it, and only an admitted entry names one.
 #   * AN ADDED TEST (plan 034 T061; batch F admits one). Where `test` does not
 #     exist in the `before_blob` text, the fourth condition reads instead: `new`
 #     is `old` followed by that test's whole definition and blank lines, and
@@ -1083,3 +1097,710 @@ entries:
               httpd.shutdown()
               httpd.server_close()
               thread.join(timeout=2)
+  - suite: tests/test_session_gates.py
+    test: test_the_abandon_cli_verb_enforces_the_human_gate_itself
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The gate verb's home: `cli_mod.cmd_gate_abandon_session` to
+      `cli_gate.cmd_gate_abandon_session`, imported inside the test from
+      `openxdox.cli_gate`, where the split-opendox carve's section 2.4 moved
+      openDox's gate verbs (a commit with no `Arc:` trailer). `opendox.cli` no
+      longer carries the name, so the old spelling raised AttributeError. The
+      shared `_session_identity_gate` stays openDox's.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. Both assertions stay: the verb's own source still
+      calls the shared helper, and the helper still requires the human gate.
+      No assertion is weakened.
+    before_blob: d3f427ec36ba65f8035a532b46218abdefb16d1e
+    after_blob: a4e4864823e8d47ff846f3d81935eace2115c5fe
+    old: |2
+          assert "_session_identity_gate" in inspect.getsource(
+              cli_mod.cmd_gate_abandon_session)
+    new: |2
+          # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+          # split-opendox carve (section 2.4) moved the gate verbs to
+          # `openxdox.cli_gate`, so the verb is read there; the shared helper
+          # stays openDox's `cli`.
+          from openxdox import cli_gate
+
+          assert "_session_identity_gate" in inspect.getsource(
+              cli_gate.cmd_gate_abandon_session)
+  - suite: tests/test_session_gates.py
+    test: test_the_cli_offers_no_bypass_flag_for_the_endings
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The functions the two parsed verbs dispatch to:
+      `cli_mod.cmd_gate_abandon_session` and
+      `cli_mod.cmd_gate_cleanup_abandoned_branch` to their `cli_gate`
+      spellings, imported inside the test from `openxdox.cli_gate`, where the
+      split-opendox carve's section 2.4 moved openDox's gate verbs (a commit
+      with no `Arc:` trailer). `opendox.cli` no longer carries the names, so
+      the old spellings raised AttributeError.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. The parser is still the real one, both verbs
+      still dispatch to exactly their functions (identity checks), and both
+      required flags still refuse. No assertion is weakened.
+    before_blob: a4e4864823e8d47ff846f3d81935eace2115c5fe
+    after_blob: f30ceeae6c123e183e19dbe684b4b103c43271bb
+    old: |2
+          parser = cli_mod.build_parser()
+          args = parser.parse_args(["gate", "abandon-session", "--repo-root", ".",
+                                    "--actor", "brett", "--scope-kind",
+                                    bs.STAGED_TOPIC, "--scope-id", TOPIC,
+                                    "--reason", "why"])
+          assert args.func is cli_mod.cmd_gate_abandon_session
+          assert args.records_dir == gc.DEFAULT_RECORDS_DIR       # _add_gate_identity_args
+          with pytest.raises(SystemExit):                         # --reason is required
+              parser.parse_args(["gate", "abandon-session", "--repo-root", ".",
+                                 "--actor", "brett", "--scope-kind", bs.STAGED_TOPIC,
+                                 "--scope-id", TOPIC])
+          cleanup = parser.parse_args(["gate", "cleanup-abandoned-branch",
+                                       "--repo-root", ".", "--actor", "brett",
+                                       "--scope-kind", bs.STAGED_TOPIC,
+                                       "--scope-id", TOPIC, "--ref", DRAFT])
+          assert cleanup.func is cli_mod.cmd_gate_cleanup_abandoned_branch
+    new: |2
+          # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+          # split-opendox carve (section 2.4) moved the gate verbs to
+          # `openxdox.cli_gate`, so the verb is read there; the shared helper
+          # stays openDox's `cli`.
+          from openxdox import cli_gate
+
+          parser = cli_mod.build_parser()
+          args = parser.parse_args(["gate", "abandon-session", "--repo-root", ".",
+                                    "--actor", "brett", "--scope-kind",
+                                    bs.STAGED_TOPIC, "--scope-id", TOPIC,
+                                    "--reason", "why"])
+          assert args.func is cli_gate.cmd_gate_abandon_session
+          assert args.records_dir == gc.DEFAULT_RECORDS_DIR       # _add_gate_identity_args
+          with pytest.raises(SystemExit):                         # --reason is required
+              parser.parse_args(["gate", "abandon-session", "--repo-root", ".",
+                                 "--actor", "brett", "--scope-kind", bs.STAGED_TOPIC,
+                                 "--scope-id", TOPIC])
+          cleanup = parser.parse_args(["gate", "cleanup-abandoned-branch",
+                                       "--repo-root", ".", "--actor", "brett",
+                                       "--scope-kind", bs.STAGED_TOPIC,
+                                       "--scope-id", TOPIC, "--ref", DRAFT])
+          assert cleanup.func is cli_gate.cmd_gate_cleanup_abandoned_branch
+  - suite: tests/test_session_gates.py
+    test: test_the_cleanup_cli_verb_enforces_the_human_gate_and_deletes_the_branch
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The gate verb's home: `cli_mod.cmd_gate_cleanup_abandoned_branch` to
+      `cli_gate.cmd_gate_cleanup_abandoned_branch`, imported inside the test
+      from `openxdox.cli_gate`, where the split-opendox carve's section 2.4
+      moved openDox's gate verbs (a commit with no `Arc:` trailer).
+      `opendox.cli` no longer carries the name, so the old spelling raised
+      AttributeError. The shared `_session_identity_gate` stays openDox's.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. Both assertions stay, and every refusal and the
+      deletion the test drives through the CLI stay. No assertion is weakened.
+    before_blob: f30ceeae6c123e183e19dbe684b4b103c43271bb
+    after_blob: 034dcea538f6044658237fe81de39f55fc46367e
+    old: |2
+          assert "_session_identity_gate" in inspect.getsource(
+              cli_mod.cmd_gate_cleanup_abandoned_branch)
+    new: |2
+          # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+          # split-opendox carve (section 2.4) moved the gate verbs to
+          # `openxdox.cli_gate`, so the verb is read there; the shared helper
+          # stays openDox's `cli`.
+          from openxdox import cli_gate
+
+          assert "_session_identity_gate" in inspect.getsource(
+              cli_gate.cmd_gate_cleanup_abandoned_branch)
+  - suite: tests/test_session_verbs.py
+    test: test_the_cli_verb_enforces_the_human_gate_itself
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The gate verb's home: `cli_mod.cmd_gate_edit_document` to
+      `cli_gate.cmd_gate_edit_document`, imported inside the test from
+      `openxdox.cli_gate`, where the split-opendox carve's section 2.4 moved
+      openDox's gate verbs (a commit with no `Arc:` trailer). `opendox.cli` no
+      longer carries the name, so the old spelling raised AttributeError. The
+      shared `_session_identity_gate` stays openDox's.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. The verb's own source still calls the shared
+      helper, which still requires the human gate and console presence. No
+      assertion is weakened.
+    before_blob: 33f3626ca6973a8ea69e925c8baaf02256fd4b68
+    after_blob: 7d946d390f5caec4985930d3046de3546561ed08
+    old: |2
+          source = inspect.getsource(cli_mod.cmd_gate_edit_document)
+    new: |2
+          # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+          # split-opendox carve (section 2.4) moved the gate verbs to
+          # `openxdox.cli_gate`, so the verb is read there; the shared helper
+          # stays openDox's `cli`.
+          from openxdox import cli_gate
+
+          source = inspect.getsource(cli_gate.cmd_gate_edit_document)
+  - suite: tests/test_session_verbs.py
+    test: test_the_cli_offers_no_inline_content_and_no_bypass_flag
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The function the parsed verb dispatches to:
+      `cli_mod.cmd_gate_edit_document` to `cli_gate.cmd_gate_edit_document`,
+      imported inside the test from `openxdox.cli_gate`, where the
+      split-opendox carve's section 2.4 moved openDox's gate verbs (a commit
+      with no `Arc:` trailer). `opendox.cli` no longer carries the name, so
+      the old spelling raised AttributeError. The shared
+      `_session_identity_gate` stays openDox's.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. The flag sweep, the identity check on the
+      dispatched function and both required-flag refusals stay. No assertion
+      is weakened.
+    before_blob: 7d946d390f5caec4985930d3046de3546561ed08
+    after_blob: 0190d38dcd57f3a5fe0ffd210bb7123f286cdf14
+    old: |2
+          assert args.func is cli_mod.cmd_gate_edit_document
+    new: |2
+          # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+          # split-opendox carve (section 2.4) moved the gate verbs to
+          # `openxdox.cli_gate`, so the verb is read there; the shared helper
+          # stays openDox's `cli`.
+          from openxdox import cli_gate
+
+          assert args.func is cli_gate.cmd_gate_edit_document
+  - suite: tests/test_session_verbs.py
+    test: test_the_save_cli_verb_enforces_the_human_gate_itself
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The gate verb's home: `cli_mod.cmd_gate_open_pr` to
+      `cli_gate.cmd_gate_open_pr`, imported inside the test from
+      `openxdox.cli_gate`, where the split-opendox carve's section 2.4 moved
+      openDox's gate verbs (a commit with no `Arc:` trailer). `opendox.cli` no
+      longer carries the name, so the old spelling raised AttributeError. The
+      shared `_session_identity_gate` stays openDox's.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. Both assertions stay, and every refusal the test
+      drives through the CLI stays. No assertion is weakened.
+    before_blob: 0190d38dcd57f3a5fe0ffd210bb7123f286cdf14
+    after_blob: e03b4aab422f429ec9c2565207ee900c929235db
+    old: |2
+          assert "_session_identity_gate" in inspect.getsource(cli_mod.cmd_gate_open_pr)
+    new: |2
+          # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+          # split-opendox carve (section 2.4) moved the gate verbs to
+          # `openxdox.cli_gate`, so the verb is read there; the shared helper
+          # stays openDox's `cli`.
+          from openxdox import cli_gate
+
+          assert "_session_identity_gate" in inspect.getsource(cli_gate.cmd_gate_open_pr)
+  - suite: tests/test_session_verbs.py
+    test: test_the_save_cli_offers_no_token_and_no_bypass_flag
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The function the parsed verb dispatches to: `cli_mod.cmd_gate_open_pr`
+      to `cli_gate.cmd_gate_open_pr`, imported inside the test from
+      `openxdox.cli_gate`, where the split-opendox carve's section 2.4 moved
+      openDox's gate verbs (a commit with no `Arc:` trailer). `opendox.cli` no
+      longer carries the name, so the old spelling raised AttributeError. The
+      shared `_session_identity_gate` stays openDox's.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. The identity check on the dispatched function,
+      the optional title and body, the token and merge-flag sweep and the
+      required-flag refusal stay. No assertion is weakened.
+    before_blob: e03b4aab422f429ec9c2565207ee900c929235db
+    after_blob: 311df394b623d1f9698d938c3c60cadc356a9f5e
+    old: |2
+          assert args.func is cli_mod.cmd_gate_open_pr
+    new: |2
+          # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+          # split-opendox carve (section 2.4) moved the gate verbs to
+          # `openxdox.cli_gate`, so the verb is read there; the shared helper
+          # stays openDox's `cli`.
+          from openxdox import cli_gate
+
+          assert args.func is cli_gate.cmd_gate_open_pr
+  - suite: tests/test_session_verbs.py
+    test: test_open_pr_proceeds_on_an_unready_topic_without_reaching_require_ready
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The patched function's dotted home:
+      `ideation_dashboard.generator.live_topic_health` to
+      `openxdox.generator.live_topic_health`. The carve manifest moved
+      `generator` to openXdox-code's `src/openxdox/generator.py` with a
+      declared edit, and this suite already imports `live_topic_health` from
+      there. Composed, `ideation_dashboard` is openxFactory's lane remainder,
+      which has no `generator`, so monkeypatch raised ImportError resolving
+      the old target.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. The spy still raises if the save consults live
+      topic health, now on the module the save would actually reach, and every
+      assertion on the saved pull request stays. No assertion is weakened.
+    before_blob: 311df394b623d1f9698d938c3c60cadc356a9f5e
+    after_blob: 00b5b96c3f20171385d37bca490d2f3861db058f
+    old: |2
+          monkeypatch.setattr(
+              "ideation_dashboard.generator.live_topic_health",
+    new: |2
+          monkeypatch.setattr(
+              # THE MODULE'S OWN HOME (plan 038 T026, under batch Q's CF-4): the carve
+              # moved `generator` to `openxdox.generator`, where this suite already
+              # imports `live_topic_health` from.
+              "openxdox.generator.live_topic_health",
+  - suite: tests/test_session_confinement.py
+    test: test_a_hosted_response_never_names_a_session_ref_in_its_headers
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The projection's home: `serve_mod.hosted_index` to
+      `serve_projection.hosted_index`, imported inside the test from
+      `openxdox.serve_projection`, where it lives since the split-opendox
+      carve's section 2.4. openDox-code#10 (BUILD slice 2b, `0f1f2e5`, no
+      `Arc:` trailer) dropped openDox's re-export, so the old spelling raised
+      AttributeError. Both of the test's calls.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. Both calls are respelled and nothing else: the
+      hosted entries are still main-only with no `active`, and the local
+      projection still keeps its document. No assertion is weakened.
+    before_blob: d135117fb4e54cfadb22e9f288ba7e5049b72168
+    after_blob: 9ae7cc227958812bb4a220fb1a690ccda8cb3f9b
+    old: |2
+          projected = serve_mod.hosted_index(document)
+
+          assert [e["ref"] for e in projected["entries"]] == [reg.DEFAULT_REF]
+          assert "active" not in projected
+          # the LOCAL plane's projection is the document itself, untouched
+          assert serve_mod.hosted_index({"entries": [{"repository": REPO,
+    new: |2
+          # THE PROJECTION'S OWN HOME (plan 038 T026, under batch Q's CF-4):
+          # `hosted_index` is openXdox's projection column's, and openDox no longer
+          # re-exports it (BUILD slice 2b).
+          from openxdox import serve_projection
+
+          projected = serve_projection.hosted_index(document)
+
+          assert [e["ref"] for e in projected["entries"]] == [reg.DEFAULT_REF]
+          assert "active" not in projected
+          # the LOCAL plane's projection is the document itself, untouched
+          assert serve_projection.hosted_index({"entries": [{"repository": REPO,
+  - suite: tests/test_session_confinement.py
+    test: test_the_hosted_index_never_names_a_session_ref_as_an_aggregate_member
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The projection's home: `serve_mod.hosted_index` to
+      `serve_projection.hosted_index`, imported inside the test from
+      `openxdox.serve_projection`, where it lives since the split-opendox
+      carve's section 2.4. openDox-code#10 (BUILD slice 2b, `0f1f2e5`, no
+      `Arc:` trailer) dropped openDox's re-export, so the old spelling raised
+      AttributeError.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. Every assertion on the projected refs and the
+      narrowed aggregate stays. No assertion is weakened.
+    before_blob: 9ae7cc227958812bb4a220fb1a690ccda8cb3f9b
+    after_blob: 46b238e7702adb0ead34d7b199935a14c5e0178f
+    old: |2
+          assert DRAFT in json.dumps(document)          # the LOCAL document names it
+          projected = serve_mod.hosted_index(document)
+    new: |2
+          assert DRAFT in json.dumps(document)          # the LOCAL document names it
+          # THE PROJECTION'S OWN HOME (plan 038 T026, under batch Q's CF-4):
+          # `hosted_index` is openXdox's projection column's, and openDox no longer
+          # re-exports it (BUILD slice 2b).
+          from openxdox import serve_projection
+
+          projected = serve_projection.hosted_index(document)
+  - suite: tests/test_session_confinement.py
+    test: test_an_aggregate_of_only_session_refs_is_dropped_from_a_hosted_index
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The projection's home: `serve_mod.hosted_index` to
+      `serve_projection.hosted_index`, imported inside the test from
+      `openxdox.serve_projection`, where it lives since the split-opendox
+      carve's section 2.4. openDox-code#10 (BUILD slice 2b, `0f1f2e5`, no
+      `Arc:` trailer) dropped openDox's re-export, so the old spelling raised
+      AttributeError.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. Both assertions stay: the aggregate is dropped
+      whole and only main remains. No assertion is weakened.
+    before_blob: 46b238e7702adb0ead34d7b199935a14c5e0178f
+    after_blob: 986482e36e35331a4ad1282dcdc5eeeb09a4c4a9
+    old: |2
+                                      "members": [{"repository": REPO, "ref": DRAFT}]}]}
+
+          projected = serve_mod.hosted_index(document)
+    new: |2
+                                      "members": [{"repository": REPO, "ref": DRAFT}]}]}
+
+          # THE PROJECTION'S OWN HOME (plan 038 T026, under batch Q's CF-4):
+          # `hosted_index` is openXdox's projection column's, and openDox no longer
+          # re-exports it (BUILD slice 2b).
+          from openxdox import serve_projection
+
+          projected = serve_projection.hosted_index(document)
+  - suite: tests/test_doxbench_share.py
+    test: test_no_implicit_path_reaches_a_push
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      Where each swept module is read: `REPO_ROOT / "scripts" /
+      "ideation_dashboard" / module`, the pre-carve home above the checkout,
+      to the one home each module has now. The carve split
+      `scripts/ideation_dashboard/` three ways: openDox's modules to the
+      pinned `opendox` package, `serve_gate.py` and `serve_projection.py` to
+      this leg's `openxdox`, and openxFactory's own lane modules
+      (`nightly_lane.py`, `doxbench_status_exemption.py`,
+      `serve_openxfactory_lanes.py`) stayed in its
+      `scripts/ideation_dashboard/`, which the composed run puts on the path
+      (R1Q23 (a)). The old path raised FileNotFoundError.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. The sweep still reads every module
+      `NO_IMPLICIT_PUSH_MODULES` names, each whole, against every forbidden
+      token, and a module found in none of the three homes, or in more than
+      one, now FAILS rather than shrinking the sweep. No assertion is
+      weakened.
+    before_blob: 10fe26d6ad5b2527930325775417234fb2eb15e0
+    after_blob: e8f98bc82c931c1fc407445a43c55de9d6d9d46f
+    old: |2
+          for module in NO_IMPLICIT_PUSH_MODULES:
+              source = (REPO_ROOT / "scripts" / "ideation_dashboard"
+                        / module).read_text(encoding="utf-8")
+    new: |2
+          import importlib.util
+
+          for module in NO_IMPLICIT_PUSH_MODULES:
+              # WHERE EACH MODULE LIVES NOW (plan 038 T026, under batch Q's CF-4). The
+              # carve split `scripts/ideation_dashboard/` three ways: openDox's modules
+              # to the pinned `opendox` package, `serve_gate.py` and `serve_projection.py`
+              # to this leg's `openxdox`, and openxFactory's own lane modules stayed in
+              # its `scripts/ideation_dashboard/`, which the composed run puts on the
+              # path (R1Q23 (a)). Each is read at the one home it has: a module found in
+              # none of the three, or in more than one, fails rather than shrinking the
+              # sweep. Locating a module imports only its package, never the module.
+              homes = [spec.origin for spec in (
+                           importlib.util.find_spec(f"{package}.{module.removesuffix('.py')}")
+                           for package in ("opendox", "openxdox", "ideation_dashboard"))
+                       if spec is not None]
+              assert len(homes) == 1, (module, homes)
+              source = Path(homes[0]).read_text(encoding="utf-8")
+  - suite: tests/test_doxbench_share.py
+    test: test_the_action_is_in_the_pinned_schema_enum
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      Where the pinned record schema is read: `REPO_ROOT / "contracts" /
+      "schemas"`, above the checkout, where nothing is since the carve, to
+      openXdox-code's own packaged copy beside `gate_console`
+      (`src/openxdox/contracts/schemas/gate-action-record.schema.yaml`), which
+      the copy record `src/openxdox/contracts/copies.yaml` holds to
+      openXdox-spec at its pinned commit. The old path raised
+      FileNotFoundError.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. The assertion is unchanged: the share action is
+      in the pinned schema's action enum, read from the schema itself. No
+      assertion is weakened.
+    before_blob: e8f98bc82c931c1fc407445a43c55de9d6d9d46f
+    after_blob: 68ad73431785b849da162efbd7adc3fa780ec42e
+    old: |2
+          schema = yaml.safe_load(
+              (REPO_ROOT / "contracts" / "schemas"
+               / "gate-action-record.schema.yaml").read_text(encoding="utf-8"))
+    new: |2
+          # THE SCHEMA'S PACKAGED HOME (plan 038 T026, under batch Q's CF-4): no
+          # `contracts/` sits above this checkout since the carve. openXdox-code
+          # carries the record schema in its own package, held to openXdox-spec at its
+          # pinned commit by `src/openxdox/contracts/copies.yaml`, so it is read there.
+          schema = yaml.safe_load(
+              (Path(gc.__file__).resolve().parent / "contracts" / "schemas"
+               / "gate-action-record.schema.yaml").read_text(encoding="utf-8"))
+  - suite: tests/test_staging_workbench.py
+    test: test_staged_scope_adds_cluster_neighbourhood_section
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The neighbourhood section's label word: 'cluster neighbourhood' to
+      'group neighbourhood', the neutral grouping word. Since section 3.4
+      slice S7 (openDox-code `1e46971`) the model spells its labels in the
+      registered domain's vocabulary, set at mount, and this probe sets none,
+      so it reads openDox's own words.
+    ruled: >-
+      R-1 (a), RULED by Brett Heap with plan 038 at opensoft/openxFactory#656
+      comment 6013547504 ("Admitted edit kind (Recommended)"), whose note at
+      #1144's 12.5 falsifier (plan 038's T005, batch Q) gives this node an
+      ordinary in-test entry, H-2's form, on R1Q7 (a), comment 5817152735.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. The section is still the third and last, still
+      flagged inherited, still labelled by its stage's word with '
+      neighbourhood', and its documents and their order are unchanged. No
+      assertion is weakened.
+    before_blob: 655afc8b57224bbf4f515c50243b3ae4d5407ebc
+    after_blob: 201b5b1aafb70035147410e57eebb98fa5d0af60
+    old: |2
+          assert neighbourhood["label"] == "cluster neighbourhood"
+    new: |2
+          # THE NEUTRAL GROUPING WORD (plan 038 T026, R-1 (a)'s in-test entry): since
+          # section 3.4 slice S7 the model spells its labels in the registered domain's
+          # vocabulary, set at mount, and this probe sets none.
+          assert neighbourhood["label"] == "group neighbourhood"
+  - suite: tests/test_staging_workbench.py
+    test: test_create_transport_uses_the_injected_fetcher_spelling
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      How the create transport reaches openDox's model: the import `from
+      "./staging-workbench-model.js"` to the shell-handed `ctx.model` (`MODEL
+      = (ctx && ctx.model) || null;`), under RULED counterpart Q6
+      (opensoft/openxFactory#656 comment 5649094228): a contributed binding
+      imports nothing of openDox's bundle but `helpers.js`. Its route is still
+      the one `CREATE_ROUTE` constant, which RULED Q3 moved into the module.
+      Carved at openXdox-code#18 (`c1ad341`) and openDox-code#20 (`8efb3cf`),
+      section 3.4 slice S5, with no `Arc:` trailer.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. The transport still takes the one model, never a
+      copy, still names its route through the one constant, and the fetch,
+      XHR, single-POST and innerHTML pins stay. No assertion is weakened.
+    before_blob: 201b5b1aafb70035147410e57eebb98fa5d0af60
+    after_blob: cc46b03553e3c222d59222daefc9032a70e0d61c
+    old: |2
+          # the route the browser calls is the model's single constant, not a literal
+          assert 'from "./staging-workbench-model.js"' in body
+    new: |2
+          # the route the browser calls is one constant, not a literal (swb-create.js's
+          # own since RULED Q3), and the model is openDox's own, reached through the
+          # shell's `ctx.model` since section 3.4 slice S5 (RULED counterpart Q6) rather
+          # than imported (plan 038 T026, under batch Q's CF-4)
+          assert "MODEL = (ctx && ctx.model) || null;" in body
+  - suite: tests/test_staging_workbench.py
+    test: test_no_session_write_is_reachable_from_a_gate_off_page
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The early-return's argument name: `renderSessionDescriptors(host, ctx,
+      o)` to `renderSessionDescriptors(host, session, o)`. RULED Q3's
+      `mount(host, snapshot, ctx)` took the name `ctx`, so the session the
+      descriptors render is named `session`. Carved at openXdox-code#18
+      (`c1ad341`) and openDox-code#20 (`8efb3cf`), section 3.4 slice S5, with
+      no `Arc:` trailer.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. The gate-off early return still comes before any
+      live control, the capability is still asked once, and the descriptor
+      renderer still cannot reach the transport. No assertion is weakened.
+    before_blob: cc46b03553e3c222d59222daefc9032a70e0d61c
+    after_blob: 2c297f6c727d79a96b2d708bff1d9730ddbc0144
+    old: |2
+          assert ("if (!sessionActionsLive(o.caps)) "
+                  "return renderSessionDescriptors(host, ctx, o);") in body
+    new: |2
+          # `ctx` is the mount's own argument since RULED Q3's `mount(host, snapshot,
+          # ctx)`, so the session the descriptors render is named `session` (section
+          # 3.4 slice S5; plan 038 T026, under batch Q's CF-4)
+          assert ("if (!sessionActionsLive(o.caps)) "
+                  "return renderSessionDescriptors(host, session, o);") in body
+  - suite: tests/test_staging_workbench.py
+    test: test_the_create_outcome_tells_the_shell_a_session_opened
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The two overlays' spelling at the view's draw call: `opened:
+      openedSessions(), ended: endedSessions()` to `opened:
+      sessionColumn.openedSessions(),` and `ended:
+      sessionColumn.endedSessions()`, adjacent across a line break. The view
+      reaches the session column through `sessionColumn` since slice S5.
+      Carved at openXdox-code#18 (`c1ad341`) and openDox-code#20 (`8efb3cf`),
+      section 3.4 slice S5, with no `Arc:` trailer.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. The pair is still asserted together and in order,
+      and the ordered wiring and the four session-module exports stay. No
+      assertion is weakened.
+    before_blob: 2c297f6c727d79a96b2d708bff1d9730ddbc0144
+    after_blob: 3822ac818505660f9b834778f94c6133b1689748
+    old: |2
+          assert "opened: openedSessions(), ended: endedSessions()" in view
+    new: |2
+          # the overlays are the session column's since section 3.4 slice S5
+          # (`sessionColumn`), and the pair now spans a line (plan 038 T026, under
+          # batch Q's CF-4)
+          assert re.search(r"opened: sessionColumn\.openedSessions\(\),\s*"
+                           r"ended: sessionColumn\.endedSessions\(\)", view)
+  - suite: tests/test_staging_workbench.py
+    test: test_the_posture_pill_tooltips_name_the_product
+    landing: opensoft/openXdox-code#43
+    edit: respelling
+    respelled: >-
+      The pill's split anchor: `const gateOn = createGateLive(caps);` to
+      `const gateOn = createColumn.createGateLive(caps);`. The view reaches
+      the create column's predicate through `createColumn` since slice S5, so
+      the old anchor was absent and the split raised IndexError. Carved at
+      openXdox-code#18 (`c1ad341`) and openDox-code#20 (`8efb3cf`), section
+      3.4 slice S5, with no `Arc:` trailer.
+    ruled: >-
+      R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
+      pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
+      at comment 6013547504, on the precedent of comment 5962785556 item 1.
+      Recorded at #1144's 12.5 falsifier by plan 038's T005 (batch Q).
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. The pill is still the text between the same two
+      statements, and both assertions on it stay: it names the product and not
+      the predecessor. No assertion is weakened.
+    before_blob: 3822ac818505660f9b834778f94c6133b1689748
+    after_blob: d4b46a8270306a3aa40335f15cbf590144b03ebd
+    old: |2
+          pill = view.split("const gateOn = createGateLive(caps);", 1)[1].split(
+    new: |2
+          # the create column's own predicate since section 3.4 slice S5
+          # (`createColumn`; plan 038 T026, under batch Q's CF-4)
+          pill = view.split("const gateOn = createColumn.createGateLive(caps);", 1)[1].split(

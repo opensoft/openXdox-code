@@ -270,9 +270,23 @@ def test_no_implicit_path_reaches_a_push(tmp_path):
     assert {"serve.py", "doxbench_threads.py", "doxbench_bridge.py",
             "doxbench_mcp.py"} <= set(NO_IMPLICIT_PUSH_MODULES), (
         "§12 may widen §11's sweep, never narrow it")
+    import importlib.util
+
     for module in NO_IMPLICIT_PUSH_MODULES:
-        source = (REPO_ROOT / "scripts" / "ideation_dashboard"
-                  / module).read_text(encoding="utf-8")
+        # WHERE EACH MODULE LIVES NOW (plan 038 T026, under batch Q's CF-4). The
+        # carve split `scripts/ideation_dashboard/` three ways: openDox's modules
+        # to the pinned `opendox` package, `serve_gate.py` and `serve_projection.py`
+        # to this leg's `openxdox`, and openxFactory's own lane modules stayed in
+        # its `scripts/ideation_dashboard/`, which the composed run puts on the
+        # path (R1Q23 (a)). Each is read at the one home it has: a module found in
+        # none of the three, or in more than one, fails rather than shrinking the
+        # sweep. Locating a module imports only its package, never the module.
+        homes = [spec.origin for spec in (
+                     importlib.util.find_spec(f"{package}.{module.removesuffix('.py')}")
+                     for package in ("opendox", "openxdox", "ideation_dashboard"))
+                 if spec is not None]
+        assert len(homes) == 1, (module, homes)
+        source = Path(homes[0]).read_text(encoding="utf-8")
         for forbidden in FORBIDDEN_PUSH_TOKENS:
             assert forbidden not in source, (module, forbidden)
 
@@ -743,8 +757,12 @@ def test_the_record_names_the_branch_and_the_pushed_ref(tmp_path):
 def test_the_action_is_in_the_pinned_schema_enum():
     """The contract-v1.36 growth this verb needed. Read from the schema itself,
     so a revert of that cut fails HERE rather than at record-write time."""
+    # THE SCHEMA'S PACKAGED HOME (plan 038 T026, under batch Q's CF-4): no
+    # `contracts/` sits above this checkout since the carve. openXdox-code
+    # carries the record schema in its own package, held to openXdox-spec at its
+    # pinned commit by `src/openxdox/contracts/copies.yaml`, so it is read there.
     schema = yaml.safe_load(
-        (REPO_ROOT / "contracts" / "schemas"
+        (Path(gc.__file__).resolve().parent / "contracts" / "schemas"
          / "gate-action-record.schema.yaml").read_text(encoding="utf-8"))
     assert gc.ACTION_SHARE_SESSION in schema["properties"]["action"]["enum"]
 

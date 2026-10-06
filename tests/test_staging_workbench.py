@@ -441,7 +441,10 @@ def test_staged_scope_adds_cluster_neighbourhood_section(tmp_path):
     assert [s["key"] for s in r["sections"]] == ["folder", "declaring", "neighbourhood"]
     folder, declaring, neighbourhood = r["sections"]
     assert neighbourhood["inherited"] is True
-    assert neighbourhood["label"] == "cluster neighbourhood"
+    # THE NEUTRAL GROUPING WORD (plan 038 T026, R-1 (a)'s in-test entry): since
+    # section 3.4 slice S7 the model spells its labels in the registered domain's
+    # vocabulary, set at mount, and this probe sets none.
+    assert neighbourhood["label"] == "group neighbourhood"
     # folder = the one own doc; declaring = the one inbound doc (own deduped out)
     assert [d["id"] for d in folder["documents"]] == \
         ["ideation/staging/github-administration-plane/github-administration-plane.md"]
@@ -817,8 +820,11 @@ def test_create_transport_uses_the_injected_fetcher_spelling():
     assert "fetch(" not in body          # the case-sensitive bundle pin
     assert "XMLHttpRequest" not in body
     assert body.count("method: \"POST\"") == 1   # exactly ONE write, not a family
-    # the route the browser calls is the model's single constant, not a literal
-    assert 'from "./staging-workbench-model.js"' in body
+    # the route the browser calls is one constant, not a literal (swb-create.js's
+    # own since RULED Q3), and the model is openDox's own, reached through the
+    # shell's `ctx.model` since section 3.4 slice S5 (RULED counterpart Q6) rather
+    # than imported (plan 038 T026, under batch Q's CF-4)
+    assert "MODEL = (ctx && ctx.model) || null;" in body
     assert "CREATE_ROUTE" in body
     # every dynamic value binds through helpers.el's textContent; innerHTML is
     # only ever cleared
@@ -1715,8 +1721,11 @@ def test_no_session_write_is_reachable_from_a_gate_off_page():
     and the capability is asked exactly once, through the pure model's one
     derivation, so no branch of this file can reach a different verdict."""
     body = SESSION_JS.read_text(encoding="utf-8")
+    # `ctx` is the mount's own argument since RULED Q3's `mount(host, snapshot,
+    # ctx)`, so the session the descriptors render is named `session` (section
+    # 3.4 slice S5; plan 038 T026, under batch Q's CF-4)
     assert ("if (!sessionActionsLive(o.caps)) "
-            "return renderSessionDescriptors(host, ctx, o);") in body
+            "return renderSessionDescriptors(host, session, o);") in body
     # ONE capability question, asked through the model — never re-derived here
     assert body.count("sessionActionsLive(") == 1
     assert "caps.actions" not in body
@@ -1765,7 +1774,11 @@ def test_the_create_outcome_tells_the_shell_a_session_opened():
     # the jump is keyed to the SESSION ref and `main` is never widened — the
     # main-keyed 404 on a draft document is correct session isolation
     assert "onSessionRekey" in view
-    assert "opened: openedSessions(), ended: endedSessions()" in view
+    # the overlays are the session column's since section 3.4 slice S5
+    # (`sessionColumn`), and the pair now spans a line (plan 038 T026, under
+    # batch Q's CF-4)
+    assert re.search(r"opened: sessionColumn\.openedSessions\(\),\s*"
+                     r"ended: sessionColumn\.endedSessions\(\)", view)
     # both overlays live in the session module, beside the one that consumes them
     assert "export function sessionOpened(" in session
     assert "export function openedSessions(" in session
@@ -2229,7 +2242,9 @@ def test_the_posture_pill_tooltips_name_the_product():
     """The pill's `title` is the sentence that states what authority the plane
     has (design D9). It is human-visible text and it named the predecessor."""
     view = VIEW_JS.read_text(encoding="utf-8")
-    pill = view.split("const gateOn = createGateLive(caps);", 1)[1].split(
+    # the create column's own predicate since section 3.4 slice S5
+    # (`createColumn`; plan 038 T026, under batch Q's CF-4)
+    pill = view.split("const gateOn = createColumn.createGateLive(caps);", 1)[1].split(
         "const closeBtn", 1)[0]
     assert DOXBENCH_NAME in pill
     assert "workbench" not in pill.replace("createGateLive", "")
