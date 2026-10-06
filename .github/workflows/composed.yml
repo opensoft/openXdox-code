@@ -28,9 +28,9 @@ name: composed
 #   5. 12.5's governed suites, computed the way its falsifier computes them
 #      (16 is the floor). Each suite runs alone, with
 #      `PYTHONPATH="$OPENXFACTORY/scripts"` (R1Q23 (a)'s form).
-#   6. The oracle, `scripts/protected_suites.py`, in 12.5's call: no landing
-#      of the arc touched a governed suite outside an allow-list entry that
-#      holds.
+#   6. The oracle, `scripts/protected_suites.py`, in 12.5's call as batch Q
+#      amends it (`--chains`): no landing of the arc touched a governed suite
+#      outside allow-list entries that hold.
 #   7. The assembled `--help` tree, against the golden it records (R2Q3 (a):
 #      the hosts' help goldens are unchanged). `validate.yml` leaves that test
 #      out (`LEFT_OUT`), because building the tree needs `doc_health`. Composed,
@@ -284,7 +284,12 @@ jobs:
           PY
           exit "$red"
 
-      # 12.5's call: one entry per suite per landing, so no `--chains`.
+      # 12.5's call, with `--chains`: Brett Heap ruled "Amend F12.1 with
+      # --chains (Recommended)" (openxFactory#656 comment 6016648451), which
+      # batch Q (T005) records at 12.5's falsifier. So several entries, chained
+      # by blob, may together admit one landing's edits to one governed suite,
+      # each still one edit inside its own named test or span, under batch K's
+      # rule unchanged.
       #
       # ON A PULL REQUEST, THE LANDING IT WOULD BE. GitHub checks out a merge
       # commit whose first parent is the base, so the walk below finds only
@@ -321,7 +326,7 @@ jobs:
               echo "the pull request's body carries no arc trailer line, so its change is not an arc landing"
             fi
           fi
-          python scripts/protected_suites.py --landings="$(cat "$COMPOSED/x-arc.txt")" --suites="$(cat "$COMPOSED/governed.txt")"
+          python scripts/protected_suites.py --chains --landings="$(cat "$COMPOSED/x-arc.txt")" --suites="$(cat "$COMPOSED/governed.txt")"
 
       # The test builds the tree in a child process. It hands the child this
       # run's environment LESS `PYTHONPATH` (its `SCRUBBED_ENVIRONMENT`), so
