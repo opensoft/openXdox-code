@@ -638,11 +638,19 @@ def _a_hosts_plane_for_the_token_reading_suites(request):
 # facets are read once with `sys.path` saved, `sys.path` is put back, and an
 # `openxdox` module imported from anywhere else refuses the case, by name.
 #
+# AND THE STAGING WORKBENCH'S SUITE (plan 038 T026; R-1 (a), its spans widened
+# by Brett Heap at openxFactory#656 comment 6016648451). `test_staging_workbench.py`
+# parses its gate-off CLI descriptors (`gate create-document …`) with the real
+# parser, and its node harnesses run in the display `/capabilities` serves,
+# which openDox reads off the registered host. With no host registered, the
+# descriptors read `invalid choice: 'gate'` and every harness helper refuses
+# `ProfileNotRegistered`, so it runs under the governed host too.
+#
 # THE LIST IS THE SCAN'S, as HOST_PLANE_SUITES is. `tests/test_host_plane.py`
 # holds it equal to the governed suites, computed as 12.5 computes them
 # (`governed_suites()` below), that name a `gate` verb of openXdox's command
-# line. A module on both lists runs under the governed host, which is a host's
-# plane too (`plane_host_for`).
+# line, as an argument vector or as a command line. A module on both lists runs
+# under the governed host, which is a host's plane too (`plane_host_for`).
 # ---------------------------------------------------------------------------
 
 GOVERNED_HOST_SUITES = frozenset({
@@ -654,6 +662,7 @@ GOVERNED_HOST_SUITES = frozenset({
     "test_session_notebook.py",
     "test_session_transaction.py",
     "test_session_verbs.py",
+    "test_staging_workbench.py",
 })
 
 #: 12.5's governed set is every `tests/test_*.py` that names one of these
