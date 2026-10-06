@@ -722,34 +722,93 @@ _RULED_DYNAMIC_IMPORTS = {
 
 _DYNAMIC_IMPORT_RE = re.compile(r"(?<![\w$.])import\s*\(")
 
+# A `/` that is not a comment opens a regular-expression literal, not a
+# division, at the start of the source, after one of these characters, or
+# after one of these keywords: the usual lexer rule.
+_REGEX_AFTER = frozenset("(,=:[!&|?{};+-*%~^<>")
+_REGEX_KEYWORDS = frozenset({
+    "return", "typeof", "case", "do", "else", "in", "of", "void", "yield",
+    "await", "delete", "new", "throw", "instanceof"})
 
-def _code_of(line: str) -> str:
-    """The code on one line: a `//` line comment is prose, and so is a block
-    comment's line, up to the `*/` that closes it."""
-    stripped = line.lstrip()
-    if stripped.startswith("//"):
-        return ""
-    if stripped.startswith(("/*", "*")):
-        return stripped.rsplit("*/", 1)[1] if "*/" in stripped else ""
-    return line
+
+def _without_comments(src: str) -> str:
+    """`src` with each comment replaced by one space, read as a JavaScript
+    lexer reads it.
+
+    A comment marker inside a string, a template or a regular-expression
+    literal is that literal's text, not a comment. Those literals are KEPT, so
+    an `import(` spelled inside one still counts: the scan may over-count, but
+    it never hides a call. The whole source is read at once, so a newline
+    between `import` and `(`, a comment between them, or a generator method's
+    line that opens with `*` hides nothing (Copilot's finding on #47)."""
+    out: list[str] = []
+    i, n = 0, len(src)
+
+    def regex_may_start() -> bool:
+        k = len(out) - 1
+        while k >= 0 and out[k].isspace():
+            k -= 1
+        if k < 0 or out[k] in _REGEX_AFTER:
+            return True
+        j = k
+        while j >= 0 and (out[j].isalnum() or out[j] in "_$"):
+            j -= 1
+        return "".join(out[j + 1:k + 1]) in _REGEX_KEYWORDS
+
+    while i < n:
+        c = src[i]
+        if c in "'\"`":
+            # a quoted string ends at its quote (or, unterminated, at the line's
+            # end); a template may span lines
+            j = i + 1
+            while j < n and src[j] != c and (c == "`" or src[j] != "\n"):
+                j += 2 if src[j] == "\\" else 1
+            out.extend(src[i:j + 1])
+            i = j + 1
+        elif src.startswith("//", i):
+            j = src.find("\n", i)
+            out.append(" ")
+            i = n if j < 0 else j
+        elif src.startswith("/*", i):
+            j = src.find("*/", i + 2)
+            out.append(" ")
+            i = n if j < 0 else j + 2
+        elif c == "/" and regex_may_start():
+            j, in_class = i + 1, False
+            while j < n and src[j] != "\n":
+                if src[j] == "\\":
+                    j += 2
+                    continue
+                if src[j] == "[":
+                    in_class = True
+                elif src[j] == "]":
+                    in_class = False
+                elif src[j] == "/" and not in_class:
+                    break
+                j += 1
+            out.extend(src[i:j + 1])
+            i = j + 1
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
 
 
 def _dynamic_import_sites(root: Path) -> dict[str, list[str]]:
     """Every dynamic `import(` in the CODE of the bundle under `root`, as
     {bundle-relative file: [argument, ...]}, each argument read up to its
-    balancing parenthesis."""
+    balancing parenthesis, with its whitespace runs collapsed to one space."""
     sites: dict[str, list[str]] = {}
     for path in sorted(p for p in root.rglob("*")
                        if p.is_file() and p.suffix in {".js", ".html", ".css"}):
-        for line in path.read_text(encoding="utf-8").splitlines():
-            code = _code_of(line)
-            for m in _DYNAMIC_IMPORT_RE.finditer(code):
-                depth, end = 1, m.end()
-                while end < len(code) and depth:
-                    depth += {"(": 1, ")": -1}.get(code[end], 0)
-                    end += 1
-                sites.setdefault(path.relative_to(root).as_posix(), []).append(
-                    code[m.end():end - 1].strip())
+        code = _without_comments(path.read_text(encoding="utf-8"))
+        for m in _DYNAMIC_IMPORT_RE.finditer(code):
+            depth, end = 1, m.end()
+            while end < len(code) and depth:
+                depth += {"(": 1, ")": -1}.get(code[end], 0)
+                end += 1
+            sites.setdefault(path.relative_to(root).as_posix(), []).append(
+                " ".join(code[m.end():end - 1].split()))
     return sites
 
 
@@ -768,8 +827,9 @@ def test_dynamic_import_is_absent():
 
     The name is kept, so the node T094's map and T073's declared run account
     for keeps its identity, and it still holds: a dynamic import is ABSENT from
-    every file and every line of code but these three, and these three are
-    PRESENT, each exactly as written. None can pull a URL. Two name a
+    every file's code but these three, and these three are PRESENT, each
+    exactly as written. Comments are not code, and the scan reads them as a
+    lexer does (`_without_comments`). None can pull a URL. Two name a
     bundle-relative sibling literally. The registry's loader resolves
     `binding.module` against the bundle's own root, and openDox's
     `viewBinding()` admits only a bundle-relative './...js' module that does
