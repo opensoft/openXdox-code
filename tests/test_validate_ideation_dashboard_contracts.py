@@ -385,17 +385,18 @@ def test_every_schema_the_consumer_validates_is_on_disk():
     schema THIS INSTALL validates is on disk, its own three always, and another
     kind's only where the running tree supplies it.
 
-    THE VALIDATOR IS THE INSTALLED DISTRIBUTION'S, never this module's own
-    `SCRIPT`, which a lone checkout looks for at the carve's `parents[2]`,
-    above the checkout (V2-10), and a composed run takes from this leg to read
-    the farm CONTRACTS_DIR names: it is the one
+    THE VALIDATOR IS THE INSTALLED DISTRIBUTION'S, the one
     `openxdox.snapshot.find_validator` answers, and its sources are the ones it
-    reports (`schema_sources`). In a lone install its tree carries no
-    `contracts/`, so the three come from the distribution's packaged copies,
-    each held to `copies.yaml`'s digest. This module's fixtures are not used:
-    in a lone checkout they read openxFactory's tree, which is why the file is
-    declared under `openxfactory-contracts`, and F7.1 runs this case by node
-    id."""
+    reports (`schema_sources`). Run from this source tree, it is this
+    checkout's `scripts/validate-ideation-dashboard-contracts.py`. Where the
+    run is composed that is this module's `SCRIPT` too. In a lone checkout it
+    is not, because there `SCRIPT` is looked for at the carve's `parents[2]`,
+    above the checkout (V2-10). Run from an install, it is the packaged
+    validator. In a lone install its tree carries no `contracts/`, so the three
+    come from the distribution's packaged copies, each held to `copies.yaml`'s
+    digest. This module's fixtures are not used: in a lone checkout they read
+    openxFactory's tree, which is why the file is declared under
+    `openxfactory-contracts`, and F7.1 runs this case by node id."""
     from openxdox import contracts, snapshot
 
     validator = snapshot.find_validator()
