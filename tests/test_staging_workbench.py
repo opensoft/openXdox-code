@@ -1330,9 +1330,10 @@ def test_the_session_surface_added_no_transport_to_the_view_or_the_model():
     Deliberately STRICTER than the pre-existing pin above
     (`test_staging_workbench_view_has_no_write_path`, which must still pass
     UNMODIFIED): the write method is banned from the MODEL too, and `import(`
-    from both. The session ROUTES live in the pure model as constants — one
-    definition the node harness and the Python route tests both read — while the
-    only module that calls one is the sibling transport.
+    from both. The session ROUTES are constants of the session column,
+    `swb-session.js`, the binding that POSTs them (RULED Q3; plan 038 T026,
+    R-1 (a)) — one definition the node harness reads — and neither the view
+    nor the model names one.
 
     The method ban is a WORD-boundary match here rather than the substring the
     older pin uses, because the model legitimately contains the word POSTURE (the
@@ -1383,7 +1384,8 @@ def test_session_transport_uses_the_injected_fetcher_spelling():
 
     THREE routes, ONE `method: "POST"`: the pin allows exactly one write literal
     per transport file, so the three session verbs share ONE request helper and
-    select their route from the pure model's constants. That is the pin's design,
+    select their route from this module's own constants, each declared once
+    (RULED Q3; plan 038 T026, R-1 (a)). That is the pin's design,
     not a way around it — a second POST literal here would mean a second,
     unreviewed write site."""
     body = SESSION_JS.read_text(encoding="utf-8")

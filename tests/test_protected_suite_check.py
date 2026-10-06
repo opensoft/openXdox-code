@@ -18,15 +18,19 @@ commit carrying the `Arc:` line. Each case holds one rule of the check:
 * an ADDED test (plan 034 T061) is admitted only where the edit adds it and
   nothing else;
 * SEVERAL EDITS IN ONE LANDING (plan 034 T061; T007's batch K) are admitted by
-  a chain of entries, one per edit, applied in order: only in F5.2's call
-  (`--chains`), and only where every step holds on its own texts, the steps
-  in between record the blob of the text they leave, and the chain's texts are
-  the landing's diff and nothing else. 12.5's call refuses a chain.
+  a chain of entries, one per edit, applied in order: only in a call that
+  passes `--chains` (F5.2's, and 12.5's from batch Q, RULED at openxFactory#656
+  comment 6016648451), and only where every step holds on its own texts, the
+  steps in between record the blob of the text they leave, and the chain's
+  texts are the landing's diff and nothing else. A call without it refuses a
+  chain.
 * an edit to a NAMED MODULE-LEVEL SPAN (plan 038 T026; R-1 (a), its spans
   widened at openxFactory#656 comment 6016648451) is admitted only where it
   lies inside that one module-level constant or helper function, before the
   landing and at it, and only an admitted entry names one. No span is added,
-  and a class, an import, a test or a name bound twice is never one.
+  and a class, an import, a test, a name bound twice (in any binding form or
+  scope, counted fail-closed) or a statement that shares a line with another
+  is never one.
 
 The last cases hold this repository's own allow-list to those rules. Which
 landing each entry holds at is the falsifier's to show, at the head it runs
@@ -347,11 +351,12 @@ def test_one_landing_with_two_edits_is_admitted_by_a_chain_of_two_entries(repo) 
     assert finding.chain == (1, 2)
 
 
-def test_a_chain_is_refused_in_12_5s_call(repo, monkeypatch) -> None:
-    """Chains are F5.2's alone (Brett's ruling admits T061's ten under F5.2;
-    batch K). 12.5's call passes no `--chains`, so its rule stays one entry per
-    suite per landing: each entry of the chain is tried alone, and neither
-    turns the suite before the landing into the suite at it."""
+def test_a_chain_is_refused_in_a_call_without_chains(repo, monkeypatch) -> None:
+    """Chains are admitted only in a call that passes `--chains`: F5.2's since
+    batch K (Brett's ruling admits T061's ten under F5.2), and 12.5's from batch
+    Q (RULED at openxFactory#656 comment 6016648451). Without it the rule stays
+    one entry per suite per landing: each entry of the chain is tried alone,
+    and neither turns the suite before the landing into the suite at it."""
     repo.commit({SUITE: BOTH}, f"two edits\n\n{ARC}")
     chain = _two_step_chain(repo)
     [finding] = _check(repo, chain)
@@ -364,8 +369,8 @@ def test_a_chain_is_refused_in_12_5s_call(repo, monkeypatch) -> None:
     allow.parent.mkdir(parents=True, exist_ok=True)
     allow.write_text(yaml.safe_dump({"schema_version": 1, "kind": ps.KIND, "entries": chain}),
                      encoding="utf-8")
-    assert ps.main(_command(repo)) == 1                   # 12.5's call
-    assert ps.main(["--chains", *_command(repo)]) == 0    # F5.2's call
+    assert ps.main(_command(repo)) == 1                   # a call without --chains
+    assert ps.main(["--chains", *_command(repo)]) == 0    # F5.2's, and 12.5's from batch Q
 
 
 def test_a_chain_is_spent_whole_by_its_landing(repo) -> None:
@@ -560,6 +565,9 @@ SPAN_BEFORE = textwrap.dedent('''\
     else:
         GUARDED = "h"
 
+    CHAINED = ALSO = "c"
+    DECLARED: str
+
 
     class Harness:
         TEXT = "c"
@@ -580,19 +588,21 @@ console.log(a);
 '''
 
 
-def _span_entry(repo: Repo, old: str, new: str, *, span: str = "HARNESS") -> tuple[dict, str]:
-    """An admitted entry naming `span` for one edit of SPAN_BEFORE, and the
+def _span_entry(repo: Repo, old: str, new: str, *, span: str = "HARNESS",
+                before: str = SPAN_BEFORE) -> tuple[dict, str]:
+    """An admitted entry naming `span` for one edit of `before`, and the
     suite's text after it. The base is committed first, as no landing."""
-    repo.commit({SUITE: SPAN_BEFORE}, "the span fixture, no landing")
-    after = SPAN_BEFORE.replace(old, new, 1)
-    entry = _entry(repo, before=SPAN_BEFORE, after=after, old=old, new=new)
+    repo.commit({SUITE: before}, "the span fixture, no landing")
+    after = before.replace(old, new, 1)
+    entry = _entry(repo, before=before, after=after, old=old, new=new)
     del entry["test"]
     entry["span"] = span
     return entry, after
 
 
-def _span_check(repo: Repo, old: str, new: str, *, span: str = "HARNESS") -> ps.Finding:
-    entry, after = _span_entry(repo, old, new, span=span)
+def _span_check(repo: Repo, old: str, new: str, *, span: str = "HARNESS",
+                before: str = SPAN_BEFORE) -> ps.Finding:
+    entry, after = _span_entry(repo, old, new, span=span, before=before)
     repo.commit({SUITE: after}, f"edit\n\n{ARC}")
     [finding] = _check(repo, [entry])
     return finding
@@ -654,15 +664,58 @@ def test_a_helper_renamed_at_the_landing_is_refused(repo) -> None:
     ("NESTED", '    NESTED = "n"\n', '    NESTED = "m"\n'),            # only in a block
     ("SHADOWED", 'SHADOWED = "s"\n', 'SHADOWED = "S"\n'),              # and in a block
     ("ADDED", "import json\n", 'import json\n\nADDED = "x"\n'),          # added
-], ids=["class", "import", "twice", "twice-in-blocks", "block-only", "shadowed", "added"])
+    ("CHAINED", 'CHAINED = ALSO = "c"\n', 'CHAINED = ALSO = "d"\n'),      # two targets
+    ("DECLARED", "DECLARED: str\n", "DECLARED: bytes\n"),               # no value
+], ids=["class", "import", "twice", "twice-in-blocks", "block-only", "shadowed", "added",
+        "two-targets", "annotation-only"])
 def test_what_is_never_a_span_is_refused(repo, span, old, new) -> None:
     finding = _span_check(repo, old, new, span=span)
     assert finding.admitted_by is None
     assert f"{span} is not one module-level constant or function before" in finding.why
 
 
+@pytest.mark.parametrize("rebinding", [
+    'print((REBOUND := "s"))\n',
+    'try:\n    pass\nexcept ValueError as REBOUND:\n    pass\n',
+    'match 1:\n    case REBOUND:\n        pass\n',
+    '\n\ndef rebind():\n    global REBOUND\n    REBOUND = "s"\n',
+    "from json import *\n",
+    "del REBOUND\n",
+    "for REBOUND in ():\n    pass\n",
+    "\n\ndef shadow(REBOUND):\n    return REBOUND\n",
+], ids=["walrus", "except-alias", "match-capture", "global", "star-import", "del", "for",
+        "parameter"])
+def test_a_second_binding_in_any_form_or_scope_is_never_a_span(repo, rebinding) -> None:
+    """Counted fail-closed (Copilot on #43): a name the module binds again, in
+    any binding form and in any scope, is never taken for one binding."""
+    before = SPAN_BEFORE + '\nREBOUND = "r"\n' + rebinding
+    finding = _span_check(repo, 'REBOUND = "r"\n', 'REBOUND = "R"\n', span="REBOUND",
+                          before=before)
+    assert finding.admitted_by is None
+    assert "REBOUND is not one module-level constant or function before" in finding.why
+
+
+def test_a_span_that_shares_a_line_with_another_statement_is_refused(repo) -> None:
+    """An entry's text is whole lines, so a statement on the span's line would
+    change with it (Copilot on #43)."""
+    before = SPAN_BEFORE + '\nSHARED = "r"; OTHER = 1\n'
+    finding = _span_check(repo, 'SHARED = "r"; OTHER = 1\n', 'SHARED = "s"; OTHER = 2\n',
+                          span="SHARED", before=before)
+    assert finding.admitted_by is None
+    assert "SHARED is not one module-level constant or function before" in finding.why
+
+
+def test_the_same_name_bound_once_alone_on_its_lines_is_a_span(repo) -> None:
+    """The control for the two cases above: one binding, alone on its line."""
+    before = SPAN_BEFORE + '\nREBOUND = "r"\nOTHER = 1\n'
+    finding = _span_check(repo, 'REBOUND = "r"\n', 'REBOUND = "R"\n', span="REBOUND",
+                          before=before)
+    assert finding.admitted_by == 1, finding.why
+
+
 def test_a_chain_of_a_test_entry_and_a_span_entry_is_admitted(repo) -> None:
-    """One landing, an edit in a test and one in a span: a chain, F5.2's call."""
+    """One landing, an edit in a test and one in a span: a chain, admitted in a
+    call that passes `--chains`."""
     span_step, middle = _span_entry(repo, "console.log(a);\n", "console.log(a, a);\n")
     both = middle.replace("assert HARNESS and helper()", "assert HARNESS or helper()")
     test_step = _entry(repo, before=middle, after=both, test="test_first",

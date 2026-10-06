@@ -91,9 +91,10 @@
 #     constant's or function's statement in the `before_blob` text, and `new`
 #     inside it in the `after_blob` text. A span is one module-level
 #     assignment to one bare name, or one module-level function of that name,
-#     that nothing else in module scope binds; it is never a test or a class,
-#     it exists before the edit and after it, and only an admitted entry names
-#     one.
+#     that nothing else in the module binds, in any scope or binding form, and
+#     that shares no line with another statement; it is never a test or a
+#     class, it exists before the edit and after it, and only an admitted entry
+#     names one.
 #   * AN ADDED TEST (plan 034 T061; batch F admits one). Where `test` does not
 #     exist in the `before_blob` text, the fourth condition reads instead: `new`
 #     is `old` followed by that test's whole definition and blank lines, and
@@ -2469,3 +2470,77 @@ entries:
           cases.write_text(json.dumps({"snapshot": SNAP, "values": _HOSTILE_VALUES,
                                        "display": display}),
                            encoding="utf-8")
+  - suite: tests/test_staging_workbench.py
+    test: test_the_session_surface_added_no_transport_to_the_view_or_the_model
+    landing: opensoft/openXdox-code#43
+    edit: admitted
+    reason: >-
+      The docstring's statement of where the session routes live, relocated
+      with the claim it describes (this test's other entry): RULED Q3
+      (opensoft/openxFactory#656 comment 5642758731) moved them from the pure
+      model to the session column, `swb-session.js`, the binding that POSTs
+      them. Copilot's finding on openXdox-code#43 (review comment 4195507364)
+      is that the docstring still said the opposite.
+    ruled: >-
+      R-1 (a), RULED by Brett Heap with plan 038 at opensoft/openxFactory#656
+      comment 6013547504 ("Admitted edit kind (Recommended)"), which names
+      this claim's relocation (`:1291`, `:1333` at openXdox-code 56e1c238)
+      among the admitted edits; recorded at #1144's 12.5 falsifier by plan
+      038's T005 (batch Q). The respelling beside it is CF-4's (H-2), on R1Q7
+      (a), comment 5817152735.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. Documentation only: the docstring now states the
+      invariant the test's assertions hold. No assertion is touched, and none
+      is weakened.
+    before_blob: 5a32a265ffac872c886a34a4d7a29e42c48f8bc9
+    after_blob: 54852fa5250b2c4d0630088154aa4bac6517bffe
+    old: |2
+          UNMODIFIED): the write method is banned from the MODEL too, and `import(`
+          from both. The session ROUTES live in the pure model as constants — one
+          definition the node harness and the Python route tests both read — while the
+          only module that calls one is the sibling transport.
+    new: |2
+          UNMODIFIED): the write method is banned from the MODEL too, and `import(`
+          from both. The session ROUTES are constants of the session column,
+          `swb-session.js`, the binding that POSTs them (RULED Q3; plan 038 T026,
+          R-1 (a)) — one definition the node harness reads — and neither the view
+          nor the model names one.
+  - suite: tests/test_staging_workbench.py
+    test: test_session_transport_uses_the_injected_fetcher_spelling
+    landing: opensoft/openXdox-code#43
+    edit: admitted
+    reason: >-
+      The docstring's statement of where the transport selects its route from,
+      relocated with the claim it describes (this test's other entry): since
+      RULED Q3 (opensoft/openxFactory#656 comment 5642758731) the routes are
+      this module's own constants, each declared once. Copilot's finding on
+      openXdox-code#43 (review comment 4195507428) is that the docstring still
+      named the pure model's constants.
+    ruled: >-
+      R-1 (a), RULED by Brett Heap with plan 038 at opensoft/openxFactory#656
+      comment 6013547504 ("Admitted edit kind (Recommended)"), which names
+      this claim's relocation (`:1291`, `:1333` at openXdox-code 56e1c238)
+      among the admitted edits; recorded at #1144's 12.5 falsifier by plan
+      038's T005 (batch Q). The respelling beside it is CF-4's (H-2), on R1Q7
+      (a), comment 5817152735.
+    review: >-
+      Reviewed in the landing pull request on batch C's basis. It is one step
+      of the chain this landing's entries for the suite make, in order: the
+      landing's diff for this suite is exactly the chain's recorded texts,
+      each inside its own named test, and this step's is `old` to `new`,
+      inside the test named. Documentation only: the docstring now states the
+      invariant the test's assertions hold. No assertion is touched, and none
+      is weakened.
+    before_blob: 54852fa5250b2c4d0630088154aa4bac6517bffe
+    after_blob: 66d16b72080ccbaece5be1aef81446aaa01500bc
+    old: |2
+          per transport file, so the three session verbs share ONE request helper and
+          select their route from the pure model's constants. That is the pin's design,
+    new: |2
+          per transport file, so the three session verbs share ONE request helper and
+          select their route from this module's own constants, each declared once
+          (RULED Q3; plan 038 T026, R-1 (a)). That is the pin's design,
