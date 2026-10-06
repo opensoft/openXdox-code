@@ -71,7 +71,8 @@ import subprocess
 
 import pytest
 
-from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit, governed_host  # noqa: F401
+from conftest import (  # noqa: F401
+    BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit, governed_host, openxfactory_root)
 
 from opendox.fixtures import project_possibles
 from openxdox.generator import generate_snapshot
@@ -1880,8 +1881,15 @@ def test_spec_delta_paths_select_only_change_folder_deltas(tmp_path):
 
 def test_landed_parses_a_real_archived_change_delta(tmp_path):
     """End-to-end against the REAL corpus: the first archived change in the
-    pinned openxFactory checkout whose deltas the parser can read."""
-    archive = REPO_ROOT.parent.parent / "openxFactory" / "openspec" / "changes" / "archive"
+    composed openxFactory tree whose deltas the parser can read.
+
+    The tree is the composed one, `openxfactory_root()` (T095, OQ-R9-4), and
+    no longer `REPO_ROOT.parent.parent / "openxFactory"`, which a runner's
+    layout never holds, so the case skipped there (OQ-R9-3)."""
+    root = openxfactory_root()
+    if root is None:
+        pytest.skip("not composed: no openxFactory tree to read archived deltas from")
+    archive = root / "openspec" / "changes" / "archive"
     deltas = sorted(archive.glob("*/specs/*/spec.md"))
     if not deltas:
         pytest.skip("no archived spec deltas in the sibling openxFactory checkout")
