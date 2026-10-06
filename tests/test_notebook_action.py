@@ -35,10 +35,13 @@ from conftest import (  # noqa: F401
     BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit, find_openxfactory_validator,
 )
 
+from opendox import display_profile
 from opendox import notebook_action as na
 from opendox import serve as serve_mod
+from opendox import view_extension
 from opendox import workbench as wb
 from openxdox.generator import generate_snapshot
+from openxdox.serve_gate import GateRoutesExtension
 
 from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
 
@@ -153,10 +156,22 @@ def test_compute_capabilities_requires_nlm_checkout_and_loopback():
     # The session leg carries the SAME three conditions — a session write IS a
     # gate write — and is stated separately so a hosted probe says "no session"
     # outright (FR-048).
+    #
+    # SINCE T084 (openDox-code `e49b17c`, ruled openxFactory#656 `5920216845`)
+    # THE GATE FLAG IS TRUE ONLY WHERE A ROUTE BINDING ANSWERS A GATE VERB: the
+    # route is a HOST's to contribute, so a plane that was handed none offers no
+    # gate whatever its checkout says. openXdox's own column is that binding.
+    # The session leg governs a core route and keeps its three conditions.
+    gate_routes = GateRoutesExtension().routes()
     gated = serve_mod.compute_capabilities(
-        nlm_present=False, checkout_real=True, loopback=True, actor="brett")
+        nlm_present=False, checkout_real=True, loopback=True, actor="brett",
+        route_bindings=gate_routes)
     assert gated["actions"]["gate"] is True and gated["actor"] == "brett"
     assert gated["actions"]["session"] is True
+    unrouted = serve_mod.compute_capabilities(
+        nlm_present=False, checkout_real=True, loopback=True, actor="brett")
+    assert unrouted["actions"]["gate"] is False
+    assert unrouted["actions"]["session"] is True
 
 
 def test_is_loopback():
@@ -455,6 +470,14 @@ def test_capabilities_route_reports_available_when_nlm_present(checkout):
     # (no gateway in front of this loopback probe). Popped so the rest of the
     # payload stays EXACT dict equality; the pin is not relaxed.
     assert caps.pop("hosted_actor") is None
+    # `views` (the view manifest, § 3.4 S5) and `display` (the stage vocabulary,
+    # § 3.4 S7) grew onto the payload the same additive way: one fetch, one
+    # payload, so a client reads each beside the capabilities. Each is the
+    # registered host's own declared facet, with its own tests; it is popped,
+    # and its kind checked, so the rest of the payload stays EXACT dict equality
+    # and the pin is not relaxed.
+    assert caps.pop("views")["kind"] == view_extension.MANIFEST_KIND
+    assert caps.pop("display")["kind"] == display_profile.DISPLAY_KIND
     assert caps == {
         "actions": {"notebook": True, "gate": True, "refresh": True,
                     "session": True, "edit": True, "intent": False},

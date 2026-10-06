@@ -39,6 +39,7 @@ from conftest import (  # noqa: F401  (sys.path side effect)
 )
 
 from opendox import cli
+from openxdox import cli_gate
 from openxdox import completeness as C
 from openxdox import gate_console as gc
 from openxdox import kickoff as ko
@@ -236,7 +237,7 @@ def test_the_guard_sits_at_the_one_choke_point_every_surface_passes_through():
     from openxdox import gate_routes
     assert "propose" in gate_routes.EXECUTING_VERBS
     assert "kickoff_mod.propose" in inspect.getsource(gc.GateConsole.propose)
-    assert "console.propose" in inspect.getsource(cli.cmd_gate_propose)
+    assert "console.propose" in inspect.getsource(cli_gate.cmd_gate_propose)
     assert "_require_ready" in inspect.getsource(ko.propose)
 
 
