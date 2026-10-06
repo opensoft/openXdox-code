@@ -784,3 +784,19 @@ def _the_governed_host_for_the_governed_suites(request):
         return
     with a_hosts_plane(governed_host):
         yield
+
+
+# THE GATE CONSOLE'S CONTRACT SCHEMA SOURCE, REGISTERED AS A HOST REGISTERS IT
+# (plan 038 T021, U-2; P4F-4). A demotion execution receipt's schema is
+# openxFactory's contract, and the gate console reads it only from a source a
+# host registers (`gate_console.register_contract_schema_source`). Where the
+# run is composed, this registers openxFactory's `contracts/schemas/` from the
+# composed tree, at process start, as openxFactory's own host wiring does from
+# T030. A lone checkout registers none, and there a receipt refuses by name
+# (R1Q27 (a)).
+_OPENXFACTORY_HOST = openxfactory_host()
+if _OPENXFACTORY_HOST is not None:
+    from openxdox import gate_console as _gate_console  # noqa: E402
+
+    _gate_console.register_contract_schema_source(
+        Path(_OPENXFACTORY_HOST.__file__).resolve().parents[1] / "contracts" / "schemas")
