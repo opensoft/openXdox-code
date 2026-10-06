@@ -42,7 +42,10 @@ from pathlib import Path
 import pytest
 import yaml
 
-from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit, find_openxfactory_validator
+from conftest import (
+    BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit, find_openxfactory_validator,
+    openxfactory_root,
+)
 
 from doc_health import families
 from openxdox import gate_console as gc
@@ -903,7 +906,9 @@ def test_the_cli_tells_the_human_the_snapshot_was_preserved(tmp_path, capsys):
 # demote that returned it.
 
 _SUPPORT_SPEC = importlib.util.spec_from_file_location(
-    "proposal_support_for_round_trip", REPO_ROOT / "scripts" / "proposal-support.py")
+    "proposal_support_for_round_trip",
+    # openxFactory's own forward gate, read from the composed tree (plan 038 T103).
+    openxfactory_root() / "scripts" / "proposal-support.py")
 support = importlib.util.module_from_spec(_SUPPORT_SPEC)
 sys.modules[_SUPPORT_SPEC.name] = support
 _SUPPORT_SPEC.loader.exec_module(support)
@@ -2251,20 +2256,32 @@ def test_new_verb_constants_are_the_contract_spellings():
 import subprocess as _subprocess
 import sys as _sys
 
+from conftest import CONTRACTS_DIR as _CONTRACTS_DIR
 from conftest import find_openxfactory_validator as _find_validator
+from openxdox import contracts as _packaged_contracts
 
 _VALIDATOR = _find_validator()
 _NEW_VERBS = ("promote-to-staging", "derive-possibles", "research-brief")
 
 
 def _contract_carries_the_new_verbs() -> bool:
-    """True once the reachable openxFactory contract enumerates the new verbs."""
-    if _VALIDATOR is None:
+    """True once the reachable openxFactory contract enumerates the new verbs.
+
+    Each schema is read where the pinned validator reads it (plan 038 T103,
+    OQ-R9-3). Before the carve both sat beside the validator; this leg carries
+    no `contracts/schemas/` there, so that read found nothing and the group
+    never ran. `gate-action-record`, one of the validator's own three, is the
+    installed distribution's packaged copy. `gate-intent`, one of the family's
+    other seven, is in the contracts directory `CONTRACTS_DIR` names, which
+    only a composed run supplies; a lone checkout has none, and there the
+    group still skips."""
+    if _VALIDATOR is None or _CONTRACTS_DIR is None:
         return False
-    schemas = _VALIDATOR.parent.parent / "contracts" / "schemas"
     try:
-        intent = (schemas / "gate-intent.schema.yaml").read_text(encoding="utf-8")
-        record = (schemas / "gate-action-record.schema.yaml").read_text(encoding="utf-8")
+        intent = (_CONTRACTS_DIR / "schemas" / "gate-intent.schema.yaml").read_text(
+            encoding="utf-8")
+        record = _packaged_contracts.verified_path("gate-action-record").read_text(
+            encoding="utf-8")
     except OSError:
         return False
     return all(v in intent and v in record for v in _NEW_VERBS)

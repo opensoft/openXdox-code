@@ -26,7 +26,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from conftest import REPO_ROOT, carved_module_path
+from conftest import carved_module_path, openxfactory_root
 
 from doc_health import families
 from openxdox import gate_console as gc
@@ -461,7 +461,9 @@ def test_round_trip_and_doc_health_agree_about_every_fence(name):
 # fenced-flag vector each module computes, which is the thing all four actually
 # share.
 
-_MOVER = REPO_ROOT / "scripts" / "proposal-support.py"
+# openxFactory's own forward gate, which the carve left in openxFactory: read
+# from the composed tree (plan 038 T103).
+_MOVER = openxfactory_root() / "scripts" / "proposal-support.py"
 
 
 def _mover_module():
