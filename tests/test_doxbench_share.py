@@ -760,10 +760,12 @@ def test_the_action_is_in_the_pinned_schema_enum():
     # THE SCHEMA'S PACKAGED HOME (plan 038 T026, under batch Q's CF-4): no
     # `contracts/` sits above this checkout since the carve. openXdox-code
     # carries the record schema in its own package, held to openXdox-spec at its
-    # pinned commit by `src/openxdox/contracts/copies.yaml`, so it is read there.
-    schema = yaml.safe_load(
-        (Path(gc.__file__).resolve().parent / "contracts" / "schemas"
-         / "gate-action-record.schema.yaml").read_text(encoding="utf-8"))
+    # pinned commit by `src/openxdox/contracts/copies.yaml`, so it is read there,
+    # through `verified_bytes`, which refuses a copy whose sha256 is not the
+    # record's before a byte of it is parsed.
+    from openxdox import contracts
+
+    schema = yaml.safe_load(contracts.verified_bytes("gate-action-record"))
     assert gc.ACTION_SHARE_SESSION in schema["properties"]["action"]["enum"]
 
 

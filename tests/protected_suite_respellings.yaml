@@ -1610,11 +1610,13 @@ entries:
     respelled: >-
       Where the pinned record schema is read: `REPO_ROOT / "contracts" /
       "schemas"`, above the checkout, where nothing is since the carve, to
-      openXdox-code's own packaged copy beside `gate_console`
+      openXdox-code's own packaged copy
       (`src/openxdox/contracts/schemas/gate-action-record.schema.yaml`), which
       the copy record `src/openxdox/contracts/copies.yaml` holds to
-      openXdox-spec at its pinned commit. The old path raised
-      FileNotFoundError.
+      openXdox-spec at its pinned commit, read through
+      `openxdox.contracts.verified_bytes`, which refuses a copy whose sha256
+      is not the record's before it is parsed (Copilot on openXdox-code#43).
+      The old path raised FileNotFoundError.
     ruled: >-
       R1Q7 (a), opensoft/openxFactory#656 comment 5817152735 (batch C), for
       pre-arc carve residue as CF-4 (H-2) confirms it with plan 038's ruling
@@ -1626,10 +1628,11 @@ entries:
       landing's diff for this suite is exactly the chain's recorded texts,
       each inside its own named test, and this step's is `old` to `new`,
       inside the test named. The assertion is unchanged: the share action is
-      in the pinned schema's action enum, read from the schema itself. No
-      assertion is weakened.
+      in the pinned schema's action enum, read from the schema itself, and the
+      copy read is now held to its pinned digest first. No assertion is
+      weakened.
     before_blob: e8f98bc82c931c1fc407445a43c55de9d6d9d46f
-    after_blob: 68ad73431785b849da162efbd7adc3fa780ec42e
+    after_blob: 17a356f6a2835fc3739d65897b808a0e9b4919fb
     old: |2
           schema = yaml.safe_load(
               (REPO_ROOT / "contracts" / "schemas"
@@ -1638,10 +1641,12 @@ entries:
           # THE SCHEMA'S PACKAGED HOME (plan 038 T026, under batch Q's CF-4): no
           # `contracts/` sits above this checkout since the carve. openXdox-code
           # carries the record schema in its own package, held to openXdox-spec at its
-          # pinned commit by `src/openxdox/contracts/copies.yaml`, so it is read there.
-          schema = yaml.safe_load(
-              (Path(gc.__file__).resolve().parent / "contracts" / "schemas"
-               / "gate-action-record.schema.yaml").read_text(encoding="utf-8"))
+          # pinned commit by `src/openxdox/contracts/copies.yaml`, so it is read there,
+          # through `verified_bytes`, which refuses a copy whose sha256 is not the
+          # record's before a byte of it is parsed.
+          from openxdox import contracts
+
+          schema = yaml.safe_load(contracts.verified_bytes("gate-action-record"))
   - suite: tests/test_staging_workbench.py
     test: test_staged_scope_adds_cluster_neighbourhood_section
     landing: opensoft/openXdox-code#43
