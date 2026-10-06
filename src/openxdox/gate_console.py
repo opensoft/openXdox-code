@@ -2444,26 +2444,38 @@ def _schema_errors(document: Mapping[str, Any], schema_text: str, *,
                    label: str, validator: Any, formats: Any) -> list:
     """`document`'s errors against the schema `schema_text` holds.
 
-    The schema itself is checked first, and refused as `GateRefused` where it
-    is not YAML, where it is not a valid JSON Schema under the validator's own
-    meta-schema (an empty document, `required: 1`), and where applying it
-    raises (an unresolvable `$ref`). A host supplies the receipt schema, and
-    the demotion verb writes its receipt after it has moved files: it reports
-    a `GateRefused` there as an executed demotion whose receipt was not
-    written, where any other exception would end it with a traceback."""
+    The schema itself is checked first. ANY failure at any of the three steps
+    refuses as `GateRefused`, naming the step:
+      * parsed: not YAML the safe loader can read (a `YAMLError`, and what it
+        raises past one: the `RecursionError` of a nesting deeper than the
+        interpreter allows, the `ValueError` of an impossible date);
+      * checked: not a valid JSON Schema under the validator's own
+        meta-schema (an empty document, `required: 1`), or a schema the check
+        cannot finish (the `RecursionError` of a cyclic YAML alias);
+      * applied: applying it raises (an unresolvable `$ref`).
+    A host supplies the receipt schema, and the demotion verb writes its
+    receipt after it has moved files: it reports a `GateRefused` there as an
+    executed demotion whose receipt was not written, where any other exception
+    would end it with a traceback (Copilot on #40: r4194497045, r4197914632,
+    r4198638746)."""
     from jsonschema.exceptions import SchemaError
 
     try:
         schema = yaml.safe_load(schema_text)
-    except yaml.YAMLError as exc:
+    except Exception as exc:  # noqa: BLE001 - any failure to read it refuses
         raise GateRefused(
-            f"the {label} schema could not be parsed: {exc}") from exc
+            f"the {label} schema could not be parsed: "
+            f"{type(exc).__name__}: {exc}") from exc
     try:
         validator.check_schema(schema)
     except SchemaError as exc:
         raise GateRefused(
             f"the {label} schema is not a valid JSON Schema: {exc.message}"
         ) from exc
+    except Exception as exc:  # noqa: BLE001 - any failure to check it refuses
+        raise GateRefused(
+            f"the {label} schema could not be checked: "
+            f"{type(exc).__name__}: {exc}") from exc
     try:
         return list(validator(schema, format_checker=formats()).iter_errors(
             dict(document)))
