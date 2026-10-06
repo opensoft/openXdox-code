@@ -44,6 +44,9 @@ name: composed
 
 on:
   pull_request:
+    # `edited` beside the default three: the oracle reads the pull request's
+    # body for the arc's trailer line, so an edited body is judged again.
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
   workflow_dispatch:
