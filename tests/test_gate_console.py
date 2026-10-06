@@ -2274,16 +2274,17 @@ def _contract_carries_the_new_verbs() -> bool:
     installed distribution's packaged copy. `gate-intent`, one of the family's
     other seven, is in the contracts directory `CONTRACTS_DIR` names, which
     only a composed run supplies; a lone checkout has none, and there the
-    group still skips."""
+    group still skips.
+
+    Once a run supplies that directory, a schema it cannot read is a broken
+    composed source, not an unreleased contract: the read error is left to
+    fail collection, so the five cases cannot skip green over it."""
     if _VALIDATOR is None or _CONTRACTS_DIR is None:
         return False
-    try:
-        intent = (_CONTRACTS_DIR / "schemas" / "gate-intent.schema.yaml").read_text(
-            encoding="utf-8")
-        record = _packaged_contracts.verified_path("gate-action-record").read_text(
-            encoding="utf-8")
-    except OSError:
-        return False
+    intent = (_CONTRACTS_DIR / "schemas" / "gate-intent.schema.yaml").read_text(
+        encoding="utf-8")
+    record = _packaged_contracts.verified_path("gate-action-record").read_text(
+        encoding="utf-8")
     return all(v in intent and v in record for v in _NEW_VERBS)
 
 
