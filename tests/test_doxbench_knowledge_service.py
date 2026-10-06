@@ -26,7 +26,7 @@ import shutil
 import pytest
 
 from conftest import (  # noqa: F401  (sys.path side effect)
-    BASE_REPO, REPO_ROOT, serve_surface_source,
+    BASE_REPO, CONTRACTS_DIR, carved_module_path, serve_surface_source,
 )
 
 from opendox import doxbench_knowledge as kn  # noqa: E402
@@ -86,11 +86,11 @@ def test_the_declared_local_embedded_backend_is_the_one_the_turn_uses(tmp_path):
 def test_the_production_entrypoints_declare_the_self_hosted_profile():
     """An operator must be able to read what their install talks to, so the
     ENTRYPOINTS declare it — the same discipline `real_notebook_adapter`
-    carries and asserted the same way, against the source that declares it."""
-    serve_source = (REPO_ROOT / "scripts" / "ideation_dashboard"
-                    / "serve.py").read_text(encoding="utf-8")
-    cli_source = (REPO_ROOT / "scripts" / "ideation_dashboard"
-                  / "cli.py").read_text(encoding="utf-8")
+    carries and asserted the same way, against the source that declares it.
+    Both entrypoints went to openDox and are read at their carved home, through
+    this leg's pin (plan 038 T101, R2-INV-R9's PP)."""
+    serve_source = carved_module_path("serve.py").read_text(encoding="utf-8")
+    cli_source = carved_module_path("cli.py").read_text(encoding="utf-8")
     assert 'build_kwargs.setdefault("knowledge_declaration",' in serve_source
     assert "SELF_HOSTED_LOCAL_EMBEDDED" in serve_source
     assert "SELF_HOSTED_LOCAL_EMBEDDED" in cli_source
@@ -170,7 +170,8 @@ def test_neither_entrypoint_passes_a_packet_assembler(tmp_path):
 
     calls = 0
     for module in ("serve.py", "cli.py"):
-        path = REPO_ROOT / "scripts" / "ideation_dashboard" / module
+        # at its carved home, openDox's through this leg's pin (plan 038 T101)
+        path = carved_module_path(module)
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
@@ -189,8 +190,7 @@ def test_neither_entrypoint_passes_a_packet_assembler(tmp_path):
     assert calls >= 2, "the entrypoint call sites moved; this guard found none"
 
     # and `build_server`'s own default is the real function, not an absence
-    serve_source = (REPO_ROOT / "scripts" / "ideation_dashboard"
-                    / "serve.py").read_text(encoding="utf-8")
+    serve_source = carved_module_path("serve.py").read_text(encoding="utf-8")
     assert "else doxbench_packet.assemble_packet)" in serve_source
 
 
@@ -465,7 +465,9 @@ def test_every_shipped_reduction_reason_fits_the_released_bound(tmp_path):
     import yaml
 
     schema = yaml.safe_load(
-        (REPO_ROOT / "contracts" / "schemas"
+        # the RELEASED schema, openDox-spec's, read from the contract family's
+        # composed source (plan 038 T095's farm, CONTRACTS_DIR; T101's CS)
+        (CONTRACTS_DIR / "schemas"
          / "xfactory-workbench-chat-turn.schema.yaml").read_text(
              encoding="utf-8"))
     bound = schema["$defs"]["context_packet"]["properties"][
@@ -536,7 +538,9 @@ def test_the_serve_side_ceiling_is_pinned_to_the_RELEASED_maxLength():
     import yaml
 
     schema = yaml.safe_load(
-        (REPO_ROOT / "contracts" / "schemas"
+        # the RELEASED schema, openDox-spec's, read from the contract family's
+        # composed source (plan 038 T095's farm, CONTRACTS_DIR; T101's CS)
+        (CONTRACTS_DIR / "schemas"
          / "xfactory-workbench-chat-turn.schema.yaml").read_text(
              encoding="utf-8"))
     assert serve_mod.CONTEXT_REDUCED_REASON_MAX_LENGTH == schema["$defs"][
