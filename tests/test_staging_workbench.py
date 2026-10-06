@@ -441,7 +441,10 @@ def test_staged_scope_adds_cluster_neighbourhood_section(tmp_path):
     assert [s["key"] for s in r["sections"]] == ["folder", "declaring", "neighbourhood"]
     folder, declaring, neighbourhood = r["sections"]
     assert neighbourhood["inherited"] is True
-    assert neighbourhood["label"] == "cluster neighbourhood"
+    # THE NEUTRAL GROUPING WORD (plan 038 T026, R-1 (a)'s in-test entry): since
+    # section 3.4 slice S7 the model spells its labels in the registered domain's
+    # vocabulary, set at mount, and this probe sets none.
+    assert neighbourhood["label"] == "group neighbourhood"
     # folder = the one own doc; declaring = the one inbound doc (own deduped out)
     assert [d["id"] for d in folder["documents"]] == \
         ["ideation/staging/github-administration-plane/github-administration-plane.md"]
@@ -493,11 +496,19 @@ _CREATE_HARNESS = """
 import {
   workbenchScope, lensScopeSnapshot, lensSessionSeed, scopeKey, toggleKeyword,
   createArea, createSeed, createOffered, createRequest,
-  createSource, createDocumentCommand, CREATE_ROUTE, CREATE_TABS,
-  BRAINSTORM_AREA, STAGING_AREA,
+  createSource, createDocumentCommand, CREATE_TABS,
+  capturedArea, organizedArea, setDisplay,
 } from './staging-workbench-model.mjs';
+// the create route is the create column's own since RULED Q3, and the display
+// reader is display.js's (plan 038 T026, R-1 (a))
+import { CREATE_ROUTE } from './swb-create.js';
+import { readDisplay } from './display.js';
 import { readFileSync } from 'node:fs';
 const cases = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+// THE SERVED DISPLAY, installed before anything derives, as the shell installs
+// it at mount (section 3.4 slice S7): the areas and statuses below are the
+// registered host's words, as the page reads them
+setDisplay(readDisplay({ display: cases.display }));
 
 const scopes = {};
 for (const [id, snapshot, kind, tileId] of cases.scopes) {
@@ -540,7 +551,7 @@ for (const [id, snapshot, kind, tileId] of cases.scopes) {
 }
 console.log(JSON.stringify({
   scopes, route: CREATE_ROUTE, tabs: CREATE_TABS,
-  areas: { brainstorm: BRAINSTORM_AREA, staging: STAGING_AREA },
+  areas: { brainstorm: capturedArea(), staging: organizedArea() },
   // the `Status:` a create into each of these areas seeds — `brainstorm`
   // everywhere, per the ruling; the area is never consulted
   statuses: cases.areas.map((a) => [a,
@@ -563,10 +574,32 @@ def _run_create(cases, tmp_path):
     if NODE is None:
         pytest.skip("node not available for the JS derivation probe")
     shutil.copy(MODEL_JS, tmp_path / "staging-workbench-model.mjs")
+    # THE MODEL'S SIBLINGS AND THE SERVED DISPLAY (plan 038 T026; R-1 (a), its
+    # spans widened at openxFactory#656 comment 6016648451). RULED Q3 moved
+    # `CREATE_ROUTE` into the create column, `swb-create.js`, and since section
+    # 3.4 slice S7 the model spells its areas and statuses in the vocabulary the
+    # shell installs (`setDisplay`). So the harness imports the route from
+    # `swb-create.js` and the display reader from `display.js`, copied beside
+    # the model under their own names with what they import, and
+    # `package.json` makes node read `.js` as a module, as
+    # `test_session_confinement.py`'s harness does. It is handed the display
+    # `/capabilities` serves: the statement `serve.build_server()` makes, under
+    # the host this run registers, replayed as `test_gate_loop_views.py`'s
+    # `_served_display` replays it.
+    for sibling in ("display.js", "helpers.js", "dispose.js", "swb-create.js"):
+        shutil.copy(WEB / "views" / sibling, tmp_path / sibling)
+    (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
+    from opendox import display_profile, view_extension
+    from opendox.profile_proxy import profile_openxfactory
+
+    display = display_profile.display_manifest(
+        display_profile.host_display(profile_openxfactory),
+        host_profile=view_extension.host_profile_name(profile_openxfactory))
     (tmp_path / "harness.mjs").write_text(_CREATE_HARNESS, encoding="utf-8")
     cases_path = tmp_path / "create-cases.json"
     cases_path.write_text(json.dumps({"scopes": cases, "areas": _STATUS_AREAS,
-                                      "toggles": _TOGGLES, "sources": _SOURCES}),
+                                      "toggles": _TOGGLES, "sources": _SOURCES,
+                                      "display": display}),
                           encoding="utf-8")
     proc = subprocess.run([NODE, str(tmp_path / "harness.mjs"), str(cases_path)],
                           capture_output=True, text=True, timeout=60)
@@ -772,7 +805,13 @@ def test_gate_off_descriptor_is_the_real_cli_invocation(tmp_path):
                               "gate create-document ")
     argv = shlex.split(command)[2:]          # drop `python3 <script>`
     args = cli.build_parser().parse_args(argv)
-    assert args.func is cli.cmd_gate_create_document
+    # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+    # split-opendox carve (section 2.4) moved the gate verbs to
+    # `openxdox.cli_gate`, so the verb is read there; the parser stays
+    # openDox's `cli`, carrying them under the registered host.
+    from openxdox import cli_gate
+
+    assert args.func is cli_gate.cmd_gate_create_document
     assert args.actor == "brett"
     assert args.area == "ideation/staging/topic-x/"
     assert args.status == "brainstorm"
@@ -817,8 +856,11 @@ def test_create_transport_uses_the_injected_fetcher_spelling():
     assert "fetch(" not in body          # the case-sensitive bundle pin
     assert "XMLHttpRequest" not in body
     assert body.count("method: \"POST\"") == 1   # exactly ONE write, not a family
-    # the route the browser calls is the model's single constant, not a literal
-    assert 'from "./staging-workbench-model.js"' in body
+    # the route the browser calls is one constant, not a literal (swb-create.js's
+    # own since RULED Q3), and the model is openDox's own, reached through the
+    # shell's `ctx.model` since section 3.4 slice S5 (RULED counterpart Q6) rather
+    # than imported (plan 038 T026, under batch Q's CF-4)
+    assert "MODEL = (ctx && ctx.model) || null;" in body
     assert "CREATE_ROUTE" in body
     # every dynamic value binds through helpers.el's textContent; innerHTML is
     # only ever cleared
@@ -1010,14 +1052,21 @@ import {
   workbenchScope, lensScopeSnapshot, lensSessionSeed,
   sessionPosture, sessionRequest, sessionCommand, notebookRefreshCommand,
   sessionBranchBase, sessionOrdinal, sessionRefs, tileSessionRefs,
-  sessionActionsLive, sessionSurfaceHidden, sessionRoute, createSeed, createRequest,
+  sessionActionsLive, sessionSurfaceHidden, createSeed, createRequest,
   createDocumentCommand, normalizeContinuation,
   advertisedTiles, otherTileBranches,
   SESSION_AFFORDANCES, LIVE_SESSION_AFFORDANCES, DESCRIPTOR_ONLY_AFFORDANCES,
-  SESSION_VERBS, SESSION_LABELS, CONTINUATIONS, MAIN_REF,
+  SESSION_VERBS, SESSION_LABELS, CONTINUATIONS, MAIN_REF, setDisplay,
 } from './staging-workbench-model.mjs';
+// the session routes are the session column's own since RULED Q3, and the
+// display reader is display.js's (plan 038 T026, R-1 (a))
+import { sessionRoute } from './swb-session.js';
+import { readDisplay } from './display.js';
 import { readFileSync } from 'node:fs';
 const cases = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+// THE SERVED DISPLAY, installed before anything derives, as the shell installs
+// it at mount (section 3.4 slice S7)
+setDisplay(readDisplay({ display: cases.display }));
 const snapshot = cases.snapshot;
 // one snapshot per posture case, so a case can grow the TILE INVENTORY the G12
 // question is asked against (finding 18) without changing every other case
@@ -1240,6 +1289,20 @@ def _run_session(tmp_path):
     if NODE is None:
         pytest.skip("node not available for the JS derivation probe")
     shutil.copy(MODEL_JS, tmp_path / "staging-workbench-model.mjs")
+    # THE MODEL'S SIBLINGS AND THE SERVED DISPLAY, as `_run_create` takes them
+    # (plan 038 T026; R-1 (a), its spans widened at openxFactory#656 comment
+    # 6016648451): RULED Q3 moved the session routes into the session column,
+    # `swb-session.js`, so the harness imports `sessionRoute` from there, and it
+    # installs the display `/capabilities` serves.
+    for sibling in ("display.js", "helpers.js", "dispose.js", "swb-session.js"):
+        shutil.copy(WEB / "views" / sibling, tmp_path / sibling)
+    (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
+    from opendox import display_profile, view_extension
+    from opendox.profile_proxy import profile_openxfactory
+
+    display = display_profile.display_manifest(
+        display_profile.host_display(profile_openxfactory),
+        host_profile=view_extension.host_profile_name(profile_openxfactory))
     (tmp_path / "harness.mjs").write_text(_SESSION_HARNESS, encoding="utf-8")
     cases_path = tmp_path / "session-cases.json"
     cases_path.write_text(json.dumps({
@@ -1250,6 +1313,7 @@ def _run_session(tmp_path):
         "continuations": _CONTINUATION_CASES,
         "inventories": ["main", "sibling"],
         "others": _OTHER_TILE_CASES,
+        "display": display,
     }), encoding="utf-8")
     proc = subprocess.run([NODE, str(tmp_path / "harness.mjs"), str(cases_path)],
                           capture_output=True, text=True, timeout=60)
@@ -1266,9 +1330,10 @@ def test_the_session_surface_added_no_transport_to_the_view_or_the_model():
     Deliberately STRICTER than the pre-existing pin above
     (`test_staging_workbench_view_has_no_write_path`, which must still pass
     UNMODIFIED): the write method is banned from the MODEL too, and `import(`
-    from both. The session ROUTES live in the pure model as constants — one
-    definition the node harness and the Python route tests both read — while the
-    only module that calls one is the sibling transport.
+    from both. The session ROUTES are constants of the session column,
+    `swb-session.js`, the binding that POSTs them (RULED Q3; plan 038 T026,
+    R-1 (a)) — one definition the node harness reads — and neither the view
+    nor the model names one.
 
     The method ban is a WORD-boundary match here rather than the substring the
     older pin uses, because the model legitimately contains the word POSTURE (the
@@ -1285,14 +1350,23 @@ def test_the_session_surface_added_no_transport_to_the_view_or_the_model():
         assert "import(" not in body, f"{name} carries a dynamic import"
     assert not re.findall(r"^\s*import\s", model, re.MULTILINE), \
         "the pure model module must stay import-free (node-harness standalone)"
-    # the three session routes are MODEL constants; the view names none of them
+    # THE ROUTES TRAVEL WITH THEIR BINDING (plan 038 T026; R-1 (a), RULED with
+    # plan 038 at openxFactory#656 comment 6013547504). RULED Q3 (comment
+    # 5642758731) moved the three session routes from the model to the session
+    # column, `swb-session.js`, the binding that POSTs them: each is still ONE
+    # constant there, and neither the view nor the model names any of them.
+    session = SESSION_JS.read_text(encoding="utf-8")
     for route in ("/actions/gate/edit-document", "/actions/gate/open-pr",
                   "/actions/gate/abandon-session"):
-        assert route in model, f"{route} is not a model constant"
+        assert len(re.findall(rf'^export const [A-Z_]+_ROUTE = "{re.escape(route)}";$',
+                              session, re.MULTILINE)) == 1, \
+            f"{route} is not one session-column constant"
+        assert route not in model, f"the model names the route {route}"
         assert route not in view, f"the view names the route {route}"
     assert "/actions/" not in view
-    # the view reaches the transport ONLY through the sibling module
-    assert 'from "./swb-session.js"' in view
+    # the view reaches the transport ONLY through the session column the gate
+    # column contributes (section 3.4 slice S5)
+    assert "const sessionColumn = gate?.session || NO_SESSION_COLUMN;" in view
     # and the pre-existing pin is still THE pin: a clobber cannot pass by
     # deleting the assertion it was supposed to satisfy
     own = Path(__file__).read_text(encoding="utf-8")
@@ -1310,7 +1384,8 @@ def test_session_transport_uses_the_injected_fetcher_spelling():
 
     THREE routes, ONE `method: "POST"`: the pin allows exactly one write literal
     per transport file, so the three session verbs share ONE request helper and
-    select their route from the pure model's constants. That is the pin's design,
+    select their route from this module's own constants, each declared once
+    (RULED Q3; plan 038 T026, R-1 (a)). That is the pin's design,
     not a way around it — a second POST literal here would mean a second,
     unreviewed write site."""
     body = SESSION_JS.read_text(encoding="utf-8")
@@ -1325,13 +1400,23 @@ def test_session_transport_uses_the_injected_fetcher_spelling():
     # session-bar affordances and the doxBench Save transport (T080, 2026-07-30);
     # both ride the same single write-method literal above
     assert body.count("submitSession(") == 3
-    # routes and payloads come from the pure model, never from a literal here
-    assert 'from "./staging-workbench-model.js"' in body
+    # THE ROUTES TRAVEL WITH THEIR BINDING (plan 038 T026; R-1 (a), RULED with
+    # plan 038 at openxFactory#656 comment 6013547504). Payloads still come from
+    # the pure model, now the shell's `ctx.model` (section 3.4 slice S5, RULED
+    # counterpart Q6, comment 5649094228) rather than an import; the routes are
+    # this module's own constants since RULED Q3 (comment 5642758731), each
+    # declared ONCE, and no other line of the transport spells one.
+    assert "MODEL = (ctx && ctx.model) || null;" in body
     for symbol in ("sessionRoute", "sessionRequest", "sessionCommand",
                    "sessionActionsLive"):
         assert symbol in body, f"{symbol} is not consulted by the transport"
-    assert "/actions/gate/" not in body, \
-        "a route literal in the transport would be a second definition"
+    literals = [line for line in body.splitlines() if "/actions/gate/" in line]
+    assert literals and all(
+        re.fullmatch(r'export const [A-Z_]+_ROUTE = "/actions/gate/[a-z-]+";', line)
+        for line in literals), \
+        "a route literal outside its one constant would be a second definition"
+    routes = [line.split('"')[1] for line in literals]
+    assert len(routes) == len(set(routes)), "a route is declared twice"
     # session refusals render in dispose.js's panel, identically to every other
     # refusal on the page (research R6)
     assert 'from "./dispose.js"' in body
@@ -1657,9 +1742,15 @@ def test_gate_off_session_affordances_are_the_real_cli_invocations(tmp_path):
 
     out = _run_session(tmp_path)
     parser = cli.build_parser()
-    expected = {"edit": cli.cmd_gate_edit_document,
-                "save": cli.cmd_gate_open_pr,
-                "abandon": cli.cmd_gate_abandon_session}
+    # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+    # split-opendox carve (section 2.4) moved the gate verbs to
+    # `openxdox.cli_gate`, so the verb is read there; the parser stays
+    # openDox's `cli`, carrying them under the registered host.
+    from openxdox import cli_gate
+
+    expected = {"edit": cli_gate.cmd_gate_edit_document,
+                "save": cli_gate.cmd_gate_open_pr,
+                "abandon": cli_gate.cmd_gate_abandon_session}
     for affordance, func in expected.items():
         command = out["commands"][affordance]
         assert command.startswith("python3 src/opendox/cli.py gate "
@@ -1696,7 +1787,18 @@ def test_the_notebook_refresh_is_a_descriptor_in_BOTH_gate_postures(tmp_path):
                    "--session-ref 'draft/topic-x'")
     assert out["notebookApply"] == dry + " --apply"
     # the flags are the sync script's real ones, and there is no route or verb
-    sync = (REPO_ROOT / "scripts" / "sync-notebooklm-books.py").read_text(encoding="utf-8")
+    # THE SCRIPT'S OWN HOME (plan 038 T026, under batch Q's CF-4). The carve
+    # left the sync script openxFactory's, in its `scripts/`, which the composed
+    # run puts on the import path (R1Q23 (a)); this leg's `scripts/` has none.
+    # It is read where it is found, and a run that finds it in none of the
+    # path's directories, or in more than one, fails.
+    import sys
+
+    homes = {path.resolve() for path in (Path(entry) / "sync-notebooklm-books.py"
+                                         for entry in sys.path if entry)
+             if path.is_file()}
+    assert len(homes) == 1, homes
+    sync = homes.pop().read_text(encoding="utf-8")
     assert '"--session-ref"' in sync and '"--apply"' in sync
     assert "refresh-notebook" not in gate_routes_mod.EXECUTING_VERBS
     for path in sorted(WEB.rglob("*.js")):
@@ -1715,8 +1817,11 @@ def test_no_session_write_is_reachable_from_a_gate_off_page():
     and the capability is asked exactly once, through the pure model's one
     derivation, so no branch of this file can reach a different verdict."""
     body = SESSION_JS.read_text(encoding="utf-8")
+    # `ctx` is the mount's own argument since RULED Q3's `mount(host, snapshot,
+    # ctx)`, so the session the descriptors render is named `session` (section
+    # 3.4 slice S5; plan 038 T026, under batch Q's CF-4)
     assert ("if (!sessionActionsLive(o.caps)) "
-            "return renderSessionDescriptors(host, ctx, o);") in body
+            "return renderSessionDescriptors(host, session, o);") in body
     # ONE capability question, asked through the model — never re-derived here
     assert body.count("sessionActionsLive(") == 1
     assert "caps.actions" not in body
@@ -1765,7 +1870,11 @@ def test_the_create_outcome_tells_the_shell_a_session_opened():
     # the jump is keyed to the SESSION ref and `main` is never widened — the
     # main-keyed 404 on a draft document is correct session isolation
     assert "onSessionRekey" in view
-    assert "opened: openedSessions(), ended: endedSessions()" in view
+    # the overlays are the session column's since section 3.4 slice S5
+    # (`sessionColumn`), and the pair now spans a line (plan 038 T026, under
+    # batch Q's CF-4)
+    assert re.search(r"opened: sessionColumn\.openedSessions\(\),\s*"
+                     r"ended: sessionColumn\.endedSessions\(\)", view)
     # both overlays live in the session module, beside the one that consumes them
     assert "export function sessionOpened(" in session
     assert "export function openedSessions(" in session
@@ -1950,10 +2059,15 @@ _HOSTILE_VALUES = {
 _HOSTILE_HARNESS = """
 import {
   workbenchScope, createSeed, createDocumentCommand, sessionCommand,
-  notebookRefreshCommand,
+  notebookRefreshCommand, setDisplay,
 } from './staging-workbench-model.mjs';
+// the display reader is display.js's (plan 038 T026, R-1 (a))
+import { readDisplay } from './display.js';
 import { readFileSync } from 'node:fs';
 const cases = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+// THE SERVED DISPLAY, installed before anything derives, as the shell installs
+// it at mount (section 3.4 slice S7)
+setDisplay(readDisplay({ display: cases.display }));
 const v = cases.values;
 const snapshot = cases.snapshot;
 const scope = workbenchScope(snapshot, 'staged', 'topic-x') || {
@@ -1998,9 +2112,23 @@ def _hostile_descriptors(tmp_path):
     if NODE is None:
         pytest.skip("node not available for the JS derivation probe")
     shutil.copy(MODEL_JS, tmp_path / "staging-workbench-model.mjs")
+    # THE SERVED DISPLAY, as `_run_create` takes it (plan 038 T026; R-1 (a), its
+    # spans widened at openxFactory#656 comment 6016648451): the create
+    # descriptor carries an area and a status, which the model spells in the
+    # vocabulary the shell installs since section 3.4 slice S7, so the harness
+    # installs the display `/capabilities` serves, through `display.js`.
+    shutil.copy(WEB / "views" / "display.js", tmp_path / "display.js")
+    (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
+    from opendox import display_profile, view_extension
+    from opendox.profile_proxy import profile_openxfactory
+
+    display = display_profile.display_manifest(
+        display_profile.host_display(profile_openxfactory),
+        host_profile=view_extension.host_profile_name(profile_openxfactory))
     (tmp_path / "hostile.mjs").write_text(_HOSTILE_HARNESS, encoding="utf-8")
     cases = tmp_path / "hostile-cases.json"
-    cases.write_text(json.dumps({"snapshot": SNAP, "values": _HOSTILE_VALUES}),
+    cases.write_text(json.dumps({"snapshot": SNAP, "values": _HOSTILE_VALUES,
+                                 "display": display}),
                      encoding="utf-8")
     proc = subprocess.run([NODE, str(tmp_path / "hostile.mjs"), str(cases)],
                           capture_output=True, text=True, timeout=60)
@@ -2229,7 +2357,9 @@ def test_the_posture_pill_tooltips_name_the_product():
     """The pill's `title` is the sentence that states what authority the plane
     has (design D9). It is human-visible text and it named the predecessor."""
     view = VIEW_JS.read_text(encoding="utf-8")
-    pill = view.split("const gateOn = createGateLive(caps);", 1)[1].split(
+    # the create column's own predicate since section 3.4 slice S5
+    # (`createColumn`; plan 038 T026, under batch Q's CF-4)
+    pill = view.split("const gateOn = createColumn.createGateLive(caps);", 1)[1].split(
         "const closeBtn", 1)[0]
     assert DOXBENCH_NAME in pill
     assert "workbench" not in pill.replace("createGateLive", "")
