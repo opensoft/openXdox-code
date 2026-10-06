@@ -28,7 +28,8 @@ remedy otherwise:
   * each source is a file openDox-spec TRACKS, UNMODIFIED, in a spec checkout
     whose HEAD is the commit the openDox root's `spec` gitlink names. So the
     run reads the pinned document, and not whatever a working tree holds;
-  * each destination is ignored by this checkout's `.gitignore`;
+  * each destination is ignored by this checkout's own `.gitignore`, not
+    only by a local exclude (`.git/info/exclude`, `core.excludesFile`);
   * a destination already present is this script's own link to that same
     source. Anything else there is refused, never overwritten.
 It places all or nothing: every check passes before the first link is made.
@@ -137,12 +138,25 @@ def _check(placement: Placement, spec: Path) -> tuple[Path, Path]:
             "read the pinned document; restore it with `git checkout -- "
             f"{placement.source}` in {spec}.")
     destination = CHECKOUT / placement.destination
-    ignored = _git("check-ignore", "-q", "--", str(placement.destination),
+    # Ignored by the repository-root `.gitignore` itself, never by a local
+    # exclude (`.git/info/exclude`, `core.excludesFile`), which no other
+    # checkout carries. `-v` prints the deciding pattern as
+    # `<source>:<line>:<pattern><TAB><path>`, its source relative to the
+    # repository root, and exits 0 for a negated (`!`) pattern too.
+    verdict = _git("check-ignore", "-v", "--", str(placement.destination),
                    cwd=CHECKOUT)
-    if ignored.returncode != 0:
+    ignored_by, _, rest = verdict.stdout.partition(":")
+    pattern = rest.partition(":")[2].partition("\t")[0]
+    if verdict.returncode != 0 or pattern.startswith("!"):
         raise PlacementRefused(
             f"{placement.destination} is not ignored by this checkout's "
             ".gitignore, so a placed file could be committed. Name it there.")
+    if ignored_by != ".gitignore":
+        raise PlacementRefused(
+            f"{placement.destination} is ignored only by {ignored_by}, a local "
+            "exclude that no other checkout carries, and not by this "
+            "checkout's .gitignore, so a placed file could be committed "
+            "elsewhere. Name it in .gitignore.")
     if os.path.lexists(destination):
         if not (destination.is_symlink()
                 and Path(os.readlink(destination)) == source):
