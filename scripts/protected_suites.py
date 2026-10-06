@@ -54,6 +54,18 @@ at L when all of these are true:
   test and changes no line it does not add. `old` is then the text the test is
   added after, and may lie in a neighbouring test, which it leaves as it was.
 
+* A NAMED MODULE-LEVEL SPAN (plan 038 T026; R-1 (a), RULED by Brett Heap at
+  openxFactory#656 comment 6013547504, "Admitted edit kind (Recommended)", and
+  recorded at 12.5's falsifier by T005's batch Q). An `admitted` entry may
+  name, in place of `test`, a `span`: one module-level constant of the suite,
+  such as a harness text several tests run, which lies inside no test. Its
+  `old` text must then lie inside that constant's statement in the before
+  text, and its `new` text inside it in the after text, so the entry admits
+  an edit to that one constant and to nothing else of the suite. A span is
+  one module-level assignment to that one name, and it must exist before the
+  landing and at it: no span is added, and a function or class is never one.
+  A respelling names its test, never a span.
+
 A landing that touches a protected suite is admitted for that suite only if one
 entry holds at it, or, in F5.2's call, a CHAIN of entries does. Every other
 protected path it touches is refused.
@@ -96,7 +108,8 @@ is found here, once.
 THE ALLOW-LIST'S OWN RULES are checked before anything is subtracted, and a
 file that breaks one refuses the whole check (exit 2) rather than subtracting
 less: `schema_version` 1, `kind` `protected-suite-respellings`, no key given
-twice, and each entry carrying exactly its declared keys, with blobs that are
+twice, and each entry carrying exactly its declared keys (an admitted entry
+names a `test` or a `span`, never both), with blobs that are
 full object ids, `old` and `new` that are whole lines ending in a newline, and
 entries for one suite that chain (each `before_blob` is the previous entry's
 `after_blob`).
@@ -130,6 +143,10 @@ COMMON_KEYS = frozenset({"suite", "test", "landing", "edit", "ruled", "review",
                          "before_blob", "after_blob", "old", "new"})
 EDIT_KEYS = {"respelling": frozenset({"respelled"}),
              "admitted": frozenset({"reason"})}
+#: R-1 (a) (plan 038 T026): the key an `admitted` entry names IN PLACE OF
+#: `test` when its edit lies in a module-level constant of the suite.
+SPAN_KEY = "span"
+SPAN_EDITS = frozenset({"admitted"})
 
 #: A full object id: a blob in an entry, or a landing's commit in the input.
 _BLOB = re.compile(r"[0-9a-f]{40}")
@@ -138,6 +155,8 @@ _COMMIT = _BLOB
 _SUITE = re.compile(r"tests/test_\w+\.py", re.ASCII)
 _LANDING = re.compile(r"opensoft/openXdox-code#[1-9]\d*", re.ASCII)
 _TEST = re.compile(r"test_\w+", re.ASCII)
+#: A span is a module-level name, and never a test's.
+_SPAN = re.compile(r"[A-Za-z_]\w*", re.ASCII)
 
 
 class AllowListInvalid(ValueError):
@@ -212,6 +231,14 @@ def _check_keys(entry: Any, where: str) -> None:
     if not isinstance(edit, str) or edit not in EDIT_KEYS:
         raise AllowListInvalid(f"{where}: edit is {edit!r}, not one of {sorted(EDIT_KEYS)}")
     wanted = COMMON_KEYS | EDIT_KEYS[edit]
+    if SPAN_KEY in entry:
+        # R-1 (a): a span stands IN PLACE OF the test, and only an admitted
+        # entry names one. Naming both still fails the key check below.
+        if edit not in SPAN_EDITS:
+            raise AllowListInvalid(
+                f"{where}: names a span, and only an admitted entry may (R-1 (a)); "
+                f"a {edit} entry names its test")
+        wanted = (wanted - {"test"}) | {SPAN_KEY}
     if set(entry) != wanted:
         raise AllowListInvalid(
             f"{where}: carries {sorted(map(str, entry))}, and a {edit} entry "
@@ -224,7 +251,12 @@ def _check_spellings(entry: dict, where: str) -> None:
     """The suite, test, landing and blobs are each spelled as the rules say."""
     if not _SUITE.fullmatch(entry["suite"]):
         raise AllowListInvalid(f"{where}: suite {entry['suite']!r} is not tests/test_<name>.py")
-    if not _TEST.fullmatch(entry["test"]):
+    if SPAN_KEY in entry:
+        span = entry[SPAN_KEY]
+        if not _SPAN.fullmatch(span) or _TEST.fullmatch(span):
+            raise AllowListInvalid(
+                f"{where}: span {span!r} is not a module-level name, or is a test's")
+    elif not _TEST.fullmatch(entry["test"]):
         raise AllowListInvalid(f"{where}: test {entry['test']!r} is not a test's name")
     if not _LANDING.fullmatch(entry["landing"]):
         raise AllowListInvalid(
@@ -291,13 +323,76 @@ def _test_lines(text: str, test: str) -> tuple[int, int] | None:
     return min([node.lineno, *(d.lineno for d in node.decorator_list)]), node.end_lineno
 
 
-def _inside_the_test(text: str, start: int, piece: str, test: str) -> bool:
-    span = _test_lines(text, test)
-    if span is None:
+def _span_lines(text: str, span: str) -> tuple[int, int] | None:
+    """The 1-based line span of the module-level constant `span`, or None.
+
+    R-1 (a) (plan 038 T026): a span is ONE module-level assignment whose one
+    target is the bare name `span`, and no other module-level statement binds
+    that name, so a function, a class, an import or a second assignment is
+    never a span."""
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return None
+    binders = [node for node in _module_scope(tree.body) if span in _module_names(node)]
+    if len(binders) != 1 or binders[0] not in tree.body:
+        return None
+    node = binders[0]
+    if isinstance(node, ast.Assign):
+        single = len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+    else:
+        single = (isinstance(node, ast.AnnAssign) and node.value is not None
+                  and isinstance(node.target, ast.Name))
+    return (node.lineno, node.end_lineno) if single else None
+
+
+def _module_scope(body: list[ast.stmt]):
+    """Every statement in module scope: the module's own, and those nested in
+    its compound statements (`if`, `try`, `with`, loops), but never those in a
+    function's or a class's body, which bind no module-level name."""
+    for node in body:
+        yield node
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            continue
+        for field in ("body", "orelse", "finalbody"):
+            yield from _module_scope(getattr(node, field, []) or [])
+        for handler in getattr(node, "handlers", []) or []:
+            yield from _module_scope(handler.body)
+
+
+def _module_names(node: ast.stmt) -> set[str]:
+    """Every name a module-scope statement binds itself (a compound statement's
+    nested statements are walked on their own)."""
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        return {node.name}
+    if isinstance(node, (ast.Import, ast.ImportFrom)):
+        return {(alias.asname or alias.name).split(".")[0] for alias in node.names}
+    targets = (node.targets if isinstance(node, ast.Assign)
+               else [node.target] if isinstance(node, (ast.AnnAssign, ast.AugAssign,
+                                                       ast.For, ast.AsyncFor))
+               else [item.optional_vars for item in node.items if item.optional_vars]
+               if isinstance(node, (ast.With, ast.AsyncWith))
+               else [])
+    return {name.id for target in targets for name in ast.walk(target)
+            if isinstance(name, ast.Name)}
+
+
+def _inside(lines: tuple[int, int] | None, text: str, start: int, piece: str) -> bool:
+    if lines is None:
         return False
     first_line = text.count("\n", 0, start) + 1
     last_line = first_line + piece.count("\n") - 1
-    return span[0] <= first_line and last_line <= span[1]
+    return lines[0] <= first_line and last_line <= lines[1]
+
+
+def _inside_the_test(text: str, start: int, piece: str, test: str) -> bool:
+    return _inside(_test_lines(text, test), text, start, piece)
+
+
+def _inside_the_span(text: str, start: int, piece: str, span: str) -> bool:
+    """`_inside_the_test`'s rule, amended by R-1 (a) to admit the new kind:
+    `piece` lies inside the one module-level constant `span` names."""
+    return _inside(_span_lines(text, span), text, start, piece)
 
 
 def _only_the_added_test(after_text: str, at: int, old: str, new: str, test: str) -> str | None:
@@ -411,6 +506,17 @@ def _edit_holds(before_text: str, after_text: str, entry: dict) -> str | None:
         return "the entry's old text does not start a line before the landing, so it is not whole lines"
     if before_text.replace(old, new, 1) != after_text:
         return "replacing the entry's old text with its new text does not give the suite at the landing"
+    if SPAN_KEY in entry:
+        # R-1 (a): the edit lies inside the one module-level constant the entry
+        # names, before the landing and at it. No span is ever added.
+        span = entry[SPAN_KEY]
+        if _span_lines(before_text, span) is None:
+            return f"{span} is not one module-level constant before the landing"
+        if not _inside_the_span(before_text, at, old, span):
+            return f"the entry's old text is not inside {span} before the landing"
+        if not _inside_the_span(after_text, at, new, span):
+            return f"the entry's new text is not inside {span} at the landing"
+        return None
     if _test_lines(before_text, entry["test"]) is None:
         # An ADDED test (plan 034 T061; T007 batch F admits one): it has no body
         # before the landing to lie inside, so the edit must add it and only it.
