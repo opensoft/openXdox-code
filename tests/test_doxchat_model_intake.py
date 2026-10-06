@@ -1550,10 +1550,10 @@ _RELEASED_SCHEMA_OWNERS = (("gate-action-record", "openXdox"),
 
 
 def test_the_bundle_release_names_both_schemas_and_recomputes_both_digests():
-    """The additive-release recipe, followed exactly: the manifest's bundle
-    version moves, both changed rows' `sha256` are recomputed from the bytes on
-    disk, both `consumption_rule`s name what arrived, and the CHANGELOG carries
-    one entry per release.
+    """The additive-release recipe contract-v1.45 followed, held where its
+    facts live now: each changed row is in its owner's manifest with its
+    `sha256` recomputed from the bytes on disk, and the release's CHANGELOG
+    entry and digest inventory name both schemas.
 
     OVER BOTH OWNERS, IN THE COMPOSED TREE (plan 038 T101; RULED W6,
     openxFactory#656 `6021830531`). contract-v1.45 was cut in openxFactory's
