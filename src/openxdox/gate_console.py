@@ -636,20 +636,20 @@ def _validate_contract_document(
     """Validate one document against a released schema's text, which its
     caller reads where the schema's owner keeps it: `_packaged_schema_text`
     or `_host_schema_text`, under "THE CONTRACT SCHEMAS THE CONSOLE VALIDATES
-    AGAINST" near the end of this module (plan 038 T021)."""
+    AGAINST" near the end of this module (plan 038 T021).
+
+    A schema that is not YAML, is not a valid JSON Schema, or cannot be
+    applied is refused there too, by `_schema_errors`, as `GateRefused`. So
+    a host's broken schema reaches a caller as a failing document does, and
+    never as another exception."""
     try:
         from jsonschema import Draft202012Validator, FormatChecker
     except ImportError as exc:  # pragma: no cover - release dependency guard
         raise GateRefused(
             f"jsonschema is required to validate {label}") from exc
-    try:
-        schema = yaml.safe_load(schema_text)
-    except yaml.YAMLError as exc:
-        raise GateRefused(
-            f"the {label} schema could not be parsed: {exc}") from exc
     errors = sorted(
-        Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(
-            dict(document)),
+        _schema_errors(document, schema_text, label=label,
+                       validator=Draft202012Validator, formats=FormatChecker),
         key=lambda error: tuple(str(part) for part in error.absolute_path))
     if errors:
         detail = "; ".join(
@@ -2438,6 +2438,39 @@ def _packaged_schema_text(copy_id: str, *, label: str) -> str:
         raise GateRefused(
             f"the {label} schema could not be read from openXdox's packaged "
             f"copy: {exc}") from exc
+
+
+def _schema_errors(document: Mapping[str, Any], schema_text: str, *,
+                   label: str, validator: Any, formats: Any) -> list:
+    """`document`'s errors against the schema `schema_text` holds.
+
+    The schema itself is checked first, and refused as `GateRefused` where it
+    is not YAML, where it is not a valid JSON Schema under the validator's own
+    meta-schema (an empty document, `required: 1`), and where applying it
+    raises (an unresolvable `$ref`). A host supplies the receipt schema, and
+    the demotion verb writes its receipt after it has moved files: it reports
+    a `GateRefused` there as an executed demotion whose receipt was not
+    written, where any other exception would end it with a traceback."""
+    from jsonschema.exceptions import SchemaError
+
+    try:
+        schema = yaml.safe_load(schema_text)
+    except yaml.YAMLError as exc:
+        raise GateRefused(
+            f"the {label} schema could not be parsed: {exc}") from exc
+    try:
+        validator.check_schema(schema)
+    except SchemaError as exc:
+        raise GateRefused(
+            f"the {label} schema is not a valid JSON Schema: {exc.message}"
+        ) from exc
+    try:
+        return list(validator(schema, format_checker=formats()).iter_errors(
+            dict(document)))
+    except Exception as exc:  # noqa: BLE001 - any failure to apply it refuses
+        raise GateRefused(
+            f"the {label} schema could not be applied: "
+            f"{type(exc).__name__}: {exc}") from exc
 
 
 def _host_schema_text(filename: str, *, label: str) -> str:

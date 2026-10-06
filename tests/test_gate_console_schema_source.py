@@ -205,6 +205,41 @@ def test_the_seam_holds_one_source_and_refuses_a_second(tmp_path) -> None:
     assert out["after_no_schema"] is False
 
 
+def test_a_host_schema_the_console_cannot_apply_refuses_as_gate_refused(tmp_path) -> None:
+    """A registered source whose receipt schema is empty, is not a valid JSON
+    Schema, or cannot be applied refuses as `GateRefused`, never as another
+    exception. The demotion verb writes its receipt after it has moved files,
+    and reports only a `GateRefused` there as a receipt not written (Copilot
+    on #40, r4194497045)."""
+    sources = {}
+    for name, text in {"empty": "", "not_a_schema": "required: 1\n",
+                       "unresolvable": json.dumps({"$ref": "#/$defs/absent"})}.items():
+        directory = tmp_path / name
+        directory.mkdir()
+        (directory / "demotion-execution-receipt.schema.yaml").write_text(
+            text, encoding="utf-8")
+        sources[name] = str(directory)
+    out = _in_a_child(tmp_path, f'''
+        for name, source in {sources!r}.items():
+            gc.unregister_contract_schema_source()
+            gc.register_contract_schema_source(source)
+            try:
+                gc.validate_demotion_execution_receipt(RECEIPT)
+                out[name] = None
+            except gc.GateRefused as exc:
+                out[name] = f"GateRefused: {{exc}}"
+            except Exception as exc:
+                out[name] = f"ESCAPED {{type(exc).__name__}}: {{exc}}"
+    ''')
+    for name in ("empty", "not_a_schema"):
+        assert out[name].startswith(
+            "GateRefused: the demotion execution receipt schema is not a valid "
+            "JSON Schema"), out[name]
+    assert out["unresolvable"].startswith(
+        "GateRefused: the demotion execution receipt schema could not be "
+        "applied"), out["unresolvable"]
+
+
 def test_the_console_reads_no_schema_from_beside_the_checkout() -> None:
     """Before T021 both schemas were read from `parents[2]` of the module,
     which in this leg is the checkout root. No `parents` index is read in the
