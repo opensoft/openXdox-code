@@ -17,6 +17,9 @@ reached the real `nlm` (FR-043, PR #49 finding 17).
 
 from __future__ import annotations
 
+import contextlib
+import functools
+import importlib
 import sys
 from pathlib import Path
 
@@ -557,22 +560,218 @@ class StandInHost:
     SUBCOMMAND_EXTENSIONS: tuple = ()
 
 
-@_pytest.fixture(autouse=True)
-def _a_hosts_plane_for_the_token_reading_suites(request):
-    if request.node.path.name not in HOST_PLANE_SUITES:
-        yield
-        return
+@contextlib.contextmanager
+def a_hosts_plane(host_factory):
+    """Register the host `host_factory()` builds with openDox's registry for
+    the length of the block, then put back what was registered before.
+
+    The registration is dropped first, so the host's is made on a clean slate,
+    and the host is built only then. Whatever the block does, the registry is
+    emptied again afterwards and the earlier registration restored."""
     from opendox import default_profile as _default_profile
     from opendox import domain_profile as _registry
 
     previous = _registry.current() if _registry.is_registered() else None
     _registry.unregister()
-    _registry.register(StandInHost())
     try:
-        yield
+        yield _registry.register(host_factory())
     finally:
         _registry.unregister()
         # The entry point's default is not put back as a registration: the
         # next entry point registers it again, as it does in any process.
         if previous is not None and previous is not _default_profile:
             _registry.register(previous)
+
+
+@_pytest.fixture(autouse=True)
+def _a_hosts_plane_for_the_token_reading_suites(request):
+    if plane_host_for(request.node.path.name) != "stand-in":
+        yield
+        return
+    with a_hosts_plane(StandInHost):
+        yield
+
+
+# ---------------------------------------------------------------------------
+# THE GOVERNED HOST FOR THE GOVERNED SUITES THAT DRIVE THE GATE VERBS (plan 038
+# T020, U-1; R2Q8 (a), openxFactory#656 comment 6003486656; P4F-5, ruled with
+# plan 038 on comment 6013547504).
+#
+# #1144's 12.5 runs openxFactory's governed suites, each alone, "with the
+# host's implementation registered". Eight of them drive openXdox's `gate`
+# verbs, and with them its gate and projection routes. Those columns reach
+# openDox only through a registered host: openDox's default profile
+# contributes none, and `StandInHost` above contributes none either. So their
+# cases read `invalid choice: 'gate'` or `unknown_action` (R2-INV-P4F's
+# host-reg bucket and its one-off groups H and T).
+#
+# For the length of each test of the modules GOVERNED_HOST_SUITES names, this
+# registers THE GOVERNED HOST, and puts the registry back afterwards, as the
+# stand-in's fixture above does. Which host that is depends on the run:
+#   * Where the run is composed, with openxFactory's `scripts/` on the path
+#     (R1Q23 (a)), it is openxFactory's own composite, `opendox_host.profile()`:
+#     the object openxFactory's process-start call registers. It carries
+#     openXdox's gate and projection columns and openxFactory's own lane
+#     column, whose `POST /actions/refresh` two cases request. It is found as
+#     the home corpus's registration above finds its adapter: only a missing
+#     `opendox_host` itself means "absent".
+#   * Elsewhere it is `GovernedStandInHost`: openXdox's three columns and
+#     nothing else, as `tests/test_hermeticity_gate_verbs.py`'s `_GateHost`
+#     carries the gate verbs. Today these suites reach `doc_health`, so they
+#     run composed or not at all; this is the host they get wherever else they
+#     come to run.
+#
+# THE COMPOSITE ALONE, NOT openxFactory'S WHOLE START. `register_openxfactory()`
+# also fills openxFactory's process-wide seams, and openxFactory's host has no
+# call that takes them back, so they would outlive the test into every later
+# module of the run. And it refuses while openXdox's own registry holds the
+# profile the root `conftest.py` registers. This harness makes a host's other registrations
+# itself (the profile, the home corpus), so only the composite is registered,
+# with openDox's registry, as the stand-in is.
+#
+# AND openxFactory'S REACH STAYS OUT OF THIS PROCESS. Importing openxFactory's
+# lane column runs `carved_reach.install()`, which puts openxFactory's pinned
+# `openXdox/code/src` at the head of `sys.path`. `openxdox` is a namespace
+# package, so every later `openxdox.*` import would come from that pinned copy
+# and not from this checkout, and the run would measure another commit. So
+# openXdox's columns are imported from this checkout first, the composite's
+# facets are read once with `sys.path` saved, `sys.path` is put back, and an
+# `openxdox` module imported from anywhere else refuses the case, by name.
+#
+# THE LIST IS THE SCAN'S, as HOST_PLANE_SUITES is. `tests/test_host_plane.py`
+# holds it equal to the governed suites, computed as 12.5 computes them
+# (`governed_suites()` below), that name a `gate` verb of openXdox's command
+# line. A module on both lists runs under the governed host, which is a host's
+# plane too (`plane_host_for`).
+# ---------------------------------------------------------------------------
+
+GOVERNED_HOST_SUITES = frozenset({
+    "test_branch_session.py",
+    "test_gateway_provenance.py",
+    "test_session_confinement.py",
+    "test_session_gates.py",
+    "test_session_lifecycle.py",
+    "test_session_notebook.py",
+    "test_session_transaction.py",
+    "test_session_verbs.py",
+})
+
+#: 12.5's governed set is every `tests/test_*.py` that names one of these
+#: (its falsifier's `git grep -l -e … -- 'tests/test_*.py'`). They are spelled
+#: here, in a file that pathspec does not match, so the check that holds the
+#: list to its scan does not join the set it scans.
+GOVERNED_SUITE_MARKERS: tuple[str, ...] = ("open-pr", "open_pr", "FakePullRequests")
+
+
+def governed_suites(tests: Path = HERE) -> frozenset[str]:
+    """12.5's governed set: the `test_*.py` modules directly in `tests` that
+    name one of GOVERNED_SUITE_MARKERS."""
+    return frozenset(
+        path.name for path in tests.glob("test_*.py")
+        if any(marker in path.read_text(encoding="utf-8")
+               for marker in GOVERNED_SUITE_MARKERS))
+
+
+def plane_host_for(suite: str) -> str | None:
+    """The host a test module's cases run under: "governed" for
+    GOVERNED_HOST_SUITES, "stand-in" for the rest of HOST_PLANE_SUITES, and
+    None for every other module. The governed host wins where a module is on
+    both lists, because it is a host's plane as well."""
+    if suite in GOVERNED_HOST_SUITES:
+        return "governed"
+    if suite in HOST_PLANE_SUITES:
+        return "stand-in"
+    return None
+
+
+#: openXdox's governed columns, as openxFactory's profile contributes them:
+#: (the facet, the module, the class). Named rather than imported, because
+#: each of the three modules reaches `doc_health`.
+GOVERNED_COLUMNS: tuple[tuple[str, str, str], ...] = (
+    ("SUBCOMMAND_EXTENSIONS", "openxdox.cli_gate", "GateSubcommands"),
+    ("ROUTE_EXTENSIONS", "openxdox.serve_gate", "GateRoutesExtension"),
+    ("ROUTE_EXTENSIONS", "openxdox.serve_projection", "ProjectionRoutesExtension"),
+)
+
+
+def _governed_columns(facet: str) -> tuple:
+    return tuple(getattr(importlib.import_module(module), name)()
+                 for each, module, name in GOVERNED_COLUMNS if each == facet)
+
+
+class GovernedStandInHost:
+    """A host's profile that carries openXdox's governed columns and nothing
+    else. Each facet is built on first read, so the host itself can be made
+    where `doc_health` cannot be imported."""
+
+    @functools.cached_property
+    def SUBCOMMAND_EXTENSIONS(self) -> tuple:  # noqa: N802 (the facet's name)
+        return _governed_columns("SUBCOMMAND_EXTENSIONS")
+
+    @functools.cached_property
+    def ROUTE_EXTENSIONS(self) -> tuple:  # noqa: N802 (the facet's name)
+        return _governed_columns("ROUTE_EXTENSIONS")
+
+
+def openxfactory_host():
+    """openxFactory's host module (`scripts/opendox_host.py`) where the run is
+    composed, and None where it is not. Only a missing `opendox_host` itself
+    means "absent": a present one that cannot be imported fails here, loudly."""
+    try:
+        return importlib.import_module("opendox_host")
+    except ModuleNotFoundError as absent:
+        if absent.name != "opendox_host":
+            raise
+        return None
+
+
+#: The facets openDox's parser and server builders read off a host's profile.
+#: Reading them is what imports a composite's columns.
+BUILT_FACETS: tuple[str, ...] = (
+    "SUBCOMMAND_EXTENSIONS", "ROUTE_EXTENSIONS", "HANDLER_CONTRIBUTIONS")
+
+
+def _refuse_an_openxdox_from_elsewhere() -> None:
+    """Every `openxdox` module this process holds is this checkout's, or the
+    case is refused, naming each module that is not."""
+    home = Path(_domain_profile.__file__).resolve().parent
+    elsewhere = sorted(
+        name for name, module in list(sys.modules.items())
+        if name.startswith("openxdox.")
+        and getattr(module, "__file__", None)
+        and not Path(module.__file__).resolve().is_relative_to(home))
+    if elsewhere:
+        raise RuntimeError(
+            f"{elsewhere} were imported from outside this checkout's openxdox "
+            f"({home}), so the run would measure another copy of them. "
+            "openxFactory's reach puts its pinned openXdox leg ahead of this "
+            "checkout when its lane column is imported; import the module "
+            "from this checkout before the composite's facets are read.")
+
+
+def governed_host():
+    """THE GOVERNED HOST for one case: openxFactory's composite where the run
+    is composed, and `GovernedStandInHost` where it is not."""
+    host_module = openxfactory_host()
+    if host_module is None:
+        return GovernedStandInHost()
+    for _, module, _ in GOVERNED_COLUMNS:
+        importlib.import_module(module)
+    saved = list(sys.path)
+    try:
+        composite = host_module.profile()
+        for facet in BUILT_FACETS:
+            getattr(composite, facet)
+    finally:
+        sys.path[:] = saved
+    _refuse_an_openxdox_from_elsewhere()
+    return composite
+
+
+@_pytest.fixture(autouse=True)
+def _the_governed_host_for_the_governed_suites(request):
+    if plane_host_for(request.node.path.name) != "governed":
+        yield
+        return
+    with a_hosts_plane(governed_host):
+        yield
