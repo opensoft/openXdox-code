@@ -282,9 +282,23 @@ jobs:
           exit "$red"
 
       # 12.5's call: one entry per suite per landing, so no `--chains`.
+      #
+      # ON A PULL REQUEST, THE LANDING IT WOULD BE. GitHub checks out a merge
+      # commit whose first parent is the base, so the walk below finds only
+      # what has landed already, and an edit the pull request makes to a
+      # governed suite would be judged only once it is on `main`. The oracle
+      # judges a landing by its diff against its first parent and by the
+      # blobs on either side, so the merge commit IS the landing as it would
+      # be. It joins the landings where the pull request's body carries the
+      # arc's trailer line, which the lander copies into the landing's
+      # message. A body with no such line makes no arc landing, so 12.5 does
+      # not judge it.
       - name: the oracle, protected_suites.py
         id: oracle
         if: ${{ !cancelled() && steps.governed.outcome == 'success' }}
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           git log --first-parent --format=%H --grep='^Arc: neutral-product-standalone-operability$' "$ARC_BASE..HEAD" > "$COMPOSED/x-arc.txt"
           if [ ! -s "$COMPOSED/x-arc.txt" ]; then
@@ -292,6 +306,18 @@ jobs:
             exit 1
           fi
           echo "the arc's landings since ARC_BASE: $(wc -l < "$COMPOSED/x-arc.txt")"
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            if [ "$(git rev-parse --verify --quiet 'HEAD^2')" != "$PR_HEAD" ]; then
+              echo "::error::HEAD is not this pull request's merge commit (its second parent is not the head $PR_HEAD), so the change cannot be judged as the landing it would be"
+              exit 1
+            fi
+            if python -c 'import os, sys; sys.exit("Arc: neutral-product-standalone-operability" not in os.environ.get("PR_BODY", "").replace("\r", "").split("\n"))'; then
+              git rev-parse HEAD >> "$COMPOSED/x-arc.txt"
+              echo "the pull request's body carries the arc's trailer, so its merge commit $(git rev-parse HEAD) is judged as the landing it would be"
+            else
+              echo "the pull request's body carries no arc trailer line, so its change is not an arc landing"
+            fi
+          fi
           python scripts/protected_suites.py --landings="$(cat "$COMPOSED/x-arc.txt")" --suites="$(cat "$COMPOSED/governed.txt")"
 
       # The test builds the tree in a child process. It hands the child this
