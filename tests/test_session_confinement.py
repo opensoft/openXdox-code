@@ -1567,12 +1567,17 @@ def test_a_hosted_response_never_names_a_session_ref_in_its_headers(scratch_repo
                             {"repository": REPO, "ref": "cluster/cl-x"}],
                 "active": {"repository": REPO, "ref": DRAFT}}
 
-    projected = serve_mod.hosted_index(document)
+    # THE PROJECTION'S OWN HOME (plan 038 T026, under batch Q's CF-4):
+    # `hosted_index` is openXdox's projection column's, and openDox no longer
+    # re-exports it (BUILD slice 2b).
+    from openxdox import serve_projection
+
+    projected = serve_projection.hosted_index(document)
 
     assert [e["ref"] for e in projected["entries"]] == [reg.DEFAULT_REF]
     assert "active" not in projected
     # the LOCAL plane's projection is the document itself, untouched
-    assert serve_mod.hosted_index({"entries": [{"repository": REPO,
+    assert serve_projection.hosted_index({"entries": [{"repository": REPO,
                                                 "ref": reg.DEFAULT_REF}],
                                    "active": {"repository": REPO,
                                               "ref": reg.DEFAULT_REF}})["active"]
@@ -1631,7 +1636,12 @@ def test_the_hosted_index_never_names_a_session_ref_as_an_aggregate_member(
     document = registry.index_document()
 
     assert DRAFT in json.dumps(document)          # the LOCAL document names it
-    projected = serve_mod.hosted_index(document)
+    # THE PROJECTION'S OWN HOME (plan 038 T026, under batch Q's CF-4):
+    # `hosted_index` is openXdox's projection column's, and openDox no longer
+    # re-exports it (BUILD slice 2b).
+    from openxdox import serve_projection
+
+    projected = serve_projection.hosted_index(document)
 
     assert set(_every_ref_in(projected)) == {reg.DEFAULT_REF}
     assert DRAFT not in json.dumps(projected)
@@ -1652,7 +1662,12 @@ def test_an_aggregate_of_only_session_refs_is_dropped_from_a_hosted_index():
                 "aggregates": [{"id": "drafts",
                                 "members": [{"repository": REPO, "ref": DRAFT}]}]}
 
-    projected = serve_mod.hosted_index(document)
+    # THE PROJECTION'S OWN HOME (plan 038 T026, under batch Q's CF-4):
+    # `hosted_index` is openXdox's projection column's, and openDox no longer
+    # re-exports it (BUILD slice 2b).
+    from openxdox import serve_projection
+
+    projected = serve_projection.hosted_index(document)
 
     assert "aggregates" not in projected
     assert _every_ref_in(projected) == (reg.DEFAULT_REF,)
