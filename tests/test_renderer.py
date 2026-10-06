@@ -720,7 +720,15 @@ _RULED_DYNAMIC_IMPORTS = {
     "views/intent-binding.js": ['"./intent-feed.js"'],
 }
 
-_DYNAMIC_IMPORT_RE = re.compile(r"(?<![\w$.])import\s*\(")
+# `import`, then any JavaScript whitespace (U+FEFF too, which Python's `\s`
+# does not cover), then `(`. A member call (`a.import(`) is not a dynamic
+# import and is skipped where it is found; a spread (`...import(`) is one.
+_DYNAMIC_IMPORT_RE = re.compile(r"(?<![\w$])import[\s﻿]*\(")
+
+# JavaScript's four line terminators: each ends a `//` comment and a regular-
+# expression literal, and CR and LF end an unterminated quoted string (U+2028
+# and U+2029 are legal inside one).
+_LINE_END_RE = re.compile("[\n\r  ]")
 
 # A `/` that is not a comment opens a regular-expression literal, not a
 # division, at the start of the source, after one of these characters, or
@@ -738,9 +746,10 @@ def _without_comments(src: str) -> str:
     A comment marker inside a string, a template or a regular-expression
     literal is that literal's text, not a comment. Those literals are KEPT, so
     an `import(` spelled inside one still counts: the scan may over-count, but
-    it never hides a call. The whole source is read at once, so a newline
-    between `import` and `(`, a comment between them, or a generator method's
-    line that opens with `*` hides nothing (Copilot's finding on #47)."""
+    it never hides a call. The whole source is read at once, so a line break
+    or a comment between `import` and `(`, or a generator method's line that
+    opens with `*`, hides nothing; and a `//` comment ends at any of the four
+    line terminators (Copilot's two findings on #47)."""
     out: list[str] = []
     i, n = 0, len(src)
 
@@ -758,24 +767,28 @@ def _without_comments(src: str) -> str:
     while i < n:
         c = src[i]
         if c in "'\"`":
-            # a quoted string ends at its quote (or, unterminated, at the line's
-            # end); a template may span lines
+            # a quoted string ends at its quote, or, unterminated, at CR or LF;
+            # a template may span lines; an escape (a line continuation over
+            # CR LF included) is skipped whole
             j = i + 1
-            while j < n and src[j] != c and (c == "`" or src[j] != "\n"):
-                j += 2 if src[j] == "\\" else 1
+            while j < n and src[j] != c and (c == "`" or src[j] not in "\r\n"):
+                if src[j] == "\\":
+                    j += 3 if src.startswith("\r\n", j + 1) else 2
+                else:
+                    j += 1
             out.extend(src[i:j + 1])
             i = j + 1
         elif src.startswith("//", i):
-            j = src.find("\n", i)
+            m = _LINE_END_RE.search(src, i)
             out.append(" ")
-            i = n if j < 0 else j
+            i = n if m is None else m.start()
         elif src.startswith("/*", i):
             j = src.find("*/", i + 2)
             out.append(" ")
             i = n if j < 0 else j + 2
         elif c == "/" and regex_may_start():
             j, in_class = i + 1, False
-            while j < n and src[j] != "\n":
+            while j < n and src[j] not in "\n\r  ":
                 if src[j] == "\\":
                     j += 2
                     continue
@@ -797,12 +810,17 @@ def _without_comments(src: str) -> str:
 def _dynamic_import_sites(root: Path) -> dict[str, list[str]]:
     """Every dynamic `import(` in the CODE of the bundle under `root`, as
     {bundle-relative file: [argument, ...]}, each argument read up to its
-    balancing parenthesis, with its whitespace runs collapsed to one space."""
+    balancing parenthesis, with its whitespace runs collapsed to one space.
+    Every script and page the bundle can serve is read, `.mjs`, `.cjs` and
+    `.htm` beside `_bundle_files()`'s three suffixes."""
     sites: dict[str, list[str]] = {}
-    for path in sorted(p for p in root.rglob("*")
-                       if p.is_file() and p.suffix in {".js", ".html", ".css"}):
+    for path in sorted(p for p in root.rglob("*") if p.is_file() and p.suffix
+                       in {".js", ".mjs", ".cjs", ".html", ".htm", ".css"}):
         code = _without_comments(path.read_text(encoding="utf-8"))
         for m in _DYNAMIC_IMPORT_RE.finditer(code):
+            at = m.start()
+            if code[at - 1:at] == "." and code[at - 3:at] != "...":
+                continue
             depth, end = 1, m.end()
             while end < len(code) and depth:
                 depth += {"(": 1, ")": -1}.get(code[end], 0)
