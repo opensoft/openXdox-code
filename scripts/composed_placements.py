@@ -105,7 +105,10 @@ def _pinned_spec(openxfactory: Path) -> Path:
             f"{root} is not an openDox root checkout with a `spec` gitlink. "
             "Check openxFactory out with its submodules initialized "
             "recursively (`git submodule update --init --recursive`).")
-    head = _git("rev-parse", "--verify", "HEAD", cwd=spec) if spec.is_dir() else None
+    # Its own `.git`: an uninitialized leg is an empty directory, and git
+    # would answer for the openDox root above it.
+    head = _git("rev-parse", "--verify", "HEAD", cwd=spec) \
+        if (spec / ".git").exists() else None
     if head is None or head.returncode != 0:
         raise PlacementRefused(
             f"{spec} is not checked out. Initialize openxFactory's submodules "
