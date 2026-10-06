@@ -21,10 +21,11 @@ Python that intersected them, becomes this call, from the checkout's root:
 
     python3 scripts/protected_suites.py --chains --landings="$(cat "$W/x-arc.txt")" \
         --suites="$(cat "$W/gen-suites.txt")"                                   # F5.2
-    python3 scripts/protected_suites.py --landings="$(cat "$W/x-arc.txt")" \
+    python3 scripts/protected_suites.py --chains --landings="$(cat "$W/x-arc.txt")" \
         --suites="$(cat "$W/governed.txt")"                                     # 12.5
 
-(`--chains` is F5.2's alone, since T061; see SEVERAL EDITS IN ONE LANDING.)
+(`--chains` is F5.2's since T061, and 12.5's from T005's batch Q, RULED by Brett
+Heap at openxFactory#656 comment 6016648451; see SEVERAL EDITS IN ONE LANDING.)
 
 Each option carries its LIST, one item per line, and never a path to one: the
 landings, each a full commit id as `git log --format=%H` prints it, and the
@@ -54,9 +55,27 @@ at L when all of these are true:
   test and changes no line it does not add. `old` is then the text the test is
   added after, and may lie in a neighbouring test, which it leaves as it was.
 
+* A NAMED MODULE-LEVEL SPAN (plan 038 T026; R-1 (a), RULED by Brett Heap at
+  openxFactory#656 comment 6013547504, "Admitted edit kind (Recommended)", and
+  recorded at 12.5's falsifier by T005's batch Q). An `admitted` entry may
+  name, in place of `test`, a `span`: one module-level constant or helper
+  function of the suite, such as a harness text several tests run or the
+  helper that runs it, which lies inside no test. Comment 6016648451 ("Widen
+  the spans, served display (Recommended)") names three helpers among the six
+  spans, so a function may be one. Its `old` text must then lie inside that
+  constant's or function's statement in the before text, and its `new` text
+  inside it in the after text, so the entry admits an edit to that one
+  statement and to nothing else of the suite. A span is one module-level
+  assignment to that one name, or one module-level function of that name,
+  that nothing else in the module binds, in any scope and in any binding
+  form, and that shares no line with another statement. It must exist before
+  the landing and at it: no span is added, and a class, an import or a second
+  binding of the name is never one. A respelling names its test, never a
+  span, and a test is never a span.
+
 A landing that touches a protected suite is admitted for that suite only if one
-entry holds at it, or, in F5.2's call, a CHAIN of entries does. Every other
-protected path it touches is refused.
+entry holds at it, or, in a call that passes `--chains`, a CHAIN of entries
+does. Every other protected path it touches is refused.
 
 SEVERAL EDITS IN ONE LANDING (plan 034 T061; T007's batch K, on Brett's ruling
 at openxFactory#656 comment 5916000030). A landing may edit one suite in more
@@ -80,11 +99,13 @@ So the landing's diff for that suite is exactly those entries' recorded texts,
 each inside its own test, and nothing else. Every entry of the chain is spent by
 that landing.
 
-F5.2'S CALL ALONE. Brett's ruling admits T061's ten under F5.2, whose protected
-set they are in, and 12.5's governed set holds neither of their suites. So a
-chain is admitted only when the call passes `--chains`, which F5.2's does and
-12.5's does not. Without it, a landing's edits to one suite are admitted by one
-entry or not at all, as T059 wired the check, and a chain is refused.
+ONLY IN A CALL THAT PASSES `--chains`. F5.2's has since T061: Brett's ruling
+admits T061's ten under F5.2, whose protected set they are in. 12.5's passes it
+from T005's batch Q, RULED by Brett Heap at openxFactory#656 comment 6016648451,
+because plan 038's T026 lands in one pull request several edits to each of five
+of 12.5's governed suites. Without `--chains`, a landing's edits to one suite
+are admitted by one entry or not at all, as T059 wired the check, and a chain is
+refused.
 
 AN ENTRY ADMITS ONE LANDING (Copilot on openXdox-code#35). The landings are
 taken oldest first, and an entry that has admitted one is spent: a later
@@ -96,7 +117,8 @@ is found here, once.
 THE ALLOW-LIST'S OWN RULES are checked before anything is subtracted, and a
 file that breaks one refuses the whole check (exit 2) rather than subtracting
 less: `schema_version` 1, `kind` `protected-suite-respellings`, no key given
-twice, and each entry carrying exactly its declared keys, with blobs that are
+twice, and each entry carrying exactly its declared keys (an admitted entry
+names a `test` or a `span`, never both), with blobs that are
 full object ids, `old` and `new` that are whole lines ending in a newline, and
 entries for one suite that chain (each `before_blob` is the previous entry's
 `after_blob`).
@@ -130,6 +152,11 @@ COMMON_KEYS = frozenset({"suite", "test", "landing", "edit", "ruled", "review",
                          "before_blob", "after_blob", "old", "new"})
 EDIT_KEYS = {"respelling": frozenset({"respelled"}),
              "admitted": frozenset({"reason"})}
+#: R-1 (a) (plan 038 T026): the key an `admitted` entry names IN PLACE OF
+#: `test` when its edit lies in a module-level constant or helper function of
+#: the suite.
+SPAN_KEY = "span"
+SPAN_EDITS = frozenset({"admitted"})
 
 #: A full object id: a blob in an entry, or a landing's commit in the input.
 _BLOB = re.compile(r"[0-9a-f]{40}")
@@ -138,6 +165,8 @@ _COMMIT = _BLOB
 _SUITE = re.compile(r"tests/test_\w+\.py", re.ASCII)
 _LANDING = re.compile(r"opensoft/openXdox-code#[1-9]\d*", re.ASCII)
 _TEST = re.compile(r"test_\w+", re.ASCII)
+#: A span is a module-level name, and never a test's.
+_SPAN = re.compile(r"[A-Za-z_]\w*", re.ASCII)
 
 
 class AllowListInvalid(ValueError):
@@ -212,6 +241,14 @@ def _check_keys(entry: Any, where: str) -> None:
     if not isinstance(edit, str) or edit not in EDIT_KEYS:
         raise AllowListInvalid(f"{where}: edit is {edit!r}, not one of {sorted(EDIT_KEYS)}")
     wanted = COMMON_KEYS | EDIT_KEYS[edit]
+    if SPAN_KEY in entry:
+        # R-1 (a): a span stands IN PLACE OF the test, and only an admitted
+        # entry names one. Naming both still fails the key check below.
+        if edit not in SPAN_EDITS:
+            raise AllowListInvalid(
+                f"{where}: names a span, and only an admitted entry may (R-1 (a)); "
+                f"a {edit} entry names its test")
+        wanted = (wanted - {"test"}) | {SPAN_KEY}
     if set(entry) != wanted:
         raise AllowListInvalid(
             f"{where}: carries {sorted(map(str, entry))}, and a {edit} entry "
@@ -224,7 +261,12 @@ def _check_spellings(entry: dict, where: str) -> None:
     """The suite, test, landing and blobs are each spelled as the rules say."""
     if not _SUITE.fullmatch(entry["suite"]):
         raise AllowListInvalid(f"{where}: suite {entry['suite']!r} is not tests/test_<name>.py")
-    if not _TEST.fullmatch(entry["test"]):
+    if SPAN_KEY in entry:
+        span = entry[SPAN_KEY]
+        if not _SPAN.fullmatch(span) or _TEST.fullmatch(span):
+            raise AllowListInvalid(
+                f"{where}: span {span!r} is not a module-level name, or is a test's")
+    elif not _TEST.fullmatch(entry["test"]):
         raise AllowListInvalid(f"{where}: test {entry['test']!r} is not a test's name")
     if not _LANDING.fullmatch(entry["landing"]):
         raise AllowListInvalid(
@@ -291,13 +333,104 @@ def _test_lines(text: str, test: str) -> tuple[int, int] | None:
     return min([node.lineno, *(d.lineno for d in node.decorator_list)]), node.end_lineno
 
 
-def _inside_the_test(text: str, start: int, piece: str, test: str) -> bool:
-    span = _test_lines(text, test)
-    if span is None:
+def _span_lines(text: str, span: str) -> tuple[int, int] | None:
+    """The 1-based line span of the module-level constant or function `span`,
+    or None.
+
+    R-1 (a) (plan 038 T026): a span is ONE module-level assignment whose one
+    target is the bare name `span`, or ONE module-level function named `span`
+    (comment 6016648451 names three helpers among the spans), and nothing else
+    in the module binds that name (`_bindings`). So a class, an import or a
+    second binding is never a span. A function's span starts at its first
+    decorator, as a test's does.
+
+    A SPAN HOLDS ITS LINES ALONE (Copilot on openXdox-code#43). An entry's text
+    is whole lines, so a statement that shares a line with the span
+    (`HARNESS = "..."; OTHER = 1`) would let an edit inside the span's lines
+    change it too. Where another module-level statement starts or ends on the
+    span's lines, the name is not a span."""
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return None
+    if _bindings(tree, span) != 1:
+        return None
+    found = [node for node in tree.body if _binds_only(node, span)]
+    if len(found) != 1:
+        return None
+    node = found[0]
+    first = min([node.lineno, *(d.lineno for d in getattr(node, "decorator_list", []))])
+    if any(other is not node and other.lineno <= node.end_lineno and first <= other.end_lineno
+           for other in tree.body):
+        return None
+    return first, node.end_lineno
+
+
+def _binds_only(node: ast.stmt, name: str) -> bool:
+    """`node` is a module-level function named `name`, or an assignment whose
+    one target is the bare name `name`."""
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return node.name == name
+    if isinstance(node, ast.Assign):
+        return (len(node.targets) == 1 and isinstance(node.targets[0], ast.Name)
+                and node.targets[0].id == name)
+    return (isinstance(node, ast.AnnAssign) and node.value is not None
+            and isinstance(node.target, ast.Name) and node.target.id == name)
+
+
+#: The binding forms that carry their name as a string field, where the
+#: running Python has them (`match` captures; PEP 695 type parameters).
+_NAMED_BINDERS = tuple(getattr(ast, kind) for kind in (
+    "MatchAs", "MatchStar", "TypeVar", "ParamSpec", "TypeVarTuple") if hasattr(ast, kind))
+
+
+def _bindings(tree: ast.Module, name: str) -> int:
+    """How many times the module binds `name`, counted FAIL-CLOSED (Copilot on
+    openXdox-code#43): every binding form, in every scope of the module. An
+    assignment, augmented or annotated assignment, `for` or `with` target, a
+    walrus, or a `del` (each a stored or deleted `Name`); a function or class;
+    an import, and a star import, which may bind any name; an `except ... as`
+    alias; a `match` capture; a type parameter; and a parameter. Every scope
+    counts, so a function that rebinds the module's name through `global`
+    counts by the binding it makes, and a function's own local of the same
+    name counts too: a name bound twice anywhere is never taken for one."""
+    count = 0
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name):
+            count += isinstance(node.ctx, (ast.Store, ast.Del)) and node.id == name
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            count += node.name == name
+        elif isinstance(node, (ast.Import, ast.ImportFrom)):
+            count += sum(alias.name == "*" or (alias.asname or alias.name).split(".")[0] == name
+                         for alias in node.names)
+        elif isinstance(node, ast.ExceptHandler):
+            count += node.name == name
+        elif isinstance(node, _NAMED_BINDERS):
+            count += node.name == name
+        elif isinstance(node, ast.MatchMapping):
+            count += node.rest == name
+        elif isinstance(node, ast.arg):
+            count += node.arg == name
+    return count
+
+
+def _inside(lines: tuple[int, int] | None, text: str, start: int, piece: str) -> bool:
+    if lines is None:
         return False
     first_line = text.count("\n", 0, start) + 1
     last_line = first_line + piece.count("\n") - 1
-    return span[0] <= first_line and last_line <= span[1]
+    return lines[0] <= first_line and last_line <= lines[1]
+
+
+def _inside_the_test(text: str, start: int, piece: str, test: str) -> bool:
+    return _inside(_test_lines(text, test), text, start, piece)
+
+
+def _inside_the_span(text: str, start: int, piece: str, span: str) -> bool:
+    """`_inside_the_test`'s rule, amended by R-1 (a) to admit the new kind:
+    `piece` lies inside the one module-level constant or function `span`
+    names."""
+    return _inside(_span_lines(text, span), text, start, piece)
 
 
 def _only_the_added_test(after_text: str, at: int, old: str, new: str, test: str) -> str | None:
@@ -411,6 +544,19 @@ def _edit_holds(before_text: str, after_text: str, entry: dict) -> str | None:
         return "the entry's old text does not start a line before the landing, so it is not whole lines"
     if before_text.replace(old, new, 1) != after_text:
         return "replacing the entry's old text with its new text does not give the suite at the landing"
+    if SPAN_KEY in entry:
+        # R-1 (a): the edit lies inside the one module-level constant or
+        # function the entry names, before the landing and at it. No span is
+        # ever added.
+        span = entry[SPAN_KEY]
+        if _span_lines(before_text, span) is None:
+            return (f"{span} is not one module-level constant or function "
+                    "before the landing")
+        if not _inside_the_span(before_text, at, old, span):
+            return f"the entry's old text is not inside {span} before the landing"
+        if not _inside_the_span(after_text, at, new, span):
+            return f"the entry's new text is not inside {span} at the landing"
+        return None
     if _test_lines(before_text, entry["test"]) is None:
         # An ADDED test (plan 034 T061; T007 batch F admits one): it has no body
         # before the landing to lie inside, so the edit must add it and only it.
@@ -465,7 +611,8 @@ def _admitting(repo: Path, landing: str, path: str, entries: list[dict],
 def check(repo: Path, landings: list[str], protected: set[str],
           entries: list[dict], *, chains: bool = False) -> list[Finding]:
     """One finding per protected path each landing touched: admitted by the
-    entry (1-based) that holds there, or, with `chains` (F5.2's call), by the
+    entry (1-based) that holds there, or, with `chains` (F5.2's call, and
+    12.5's from batch Q), by the
     chain of entries that does, or refused with every candidate's reason. The
     landings are taken oldest first, whatever order they come in, and each
     entry admits one of them at most."""
@@ -513,7 +660,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="the protected suites, one tests/test_<name>.py per line")
     parser.add_argument("--chains", action="store_true",
                         help="admit a chain of entries for one landing's several edits "
-                             "to a suite (F5.2's call alone; plan 034 T061, batch K)")
+                             "to a suite (F5.2's call since plan 034 T061, batch K; 12.5's "
+                             "from batch Q, RULED at openxFactory#656 comment 6016648451)")
     try:
         args = parser.parse_args(sys.argv[1:] if argv is None else argv)
     except SystemExit as exc:

@@ -585,8 +585,14 @@ def test_the_abandon_cli_verb_enforces_the_human_gate_itself(scratch_repo,
     registry, created, worktree = _session(scratch_repo, tmp_path)
     # the obligation is PER VERB, and it is discharged through one shared helper
     # the verb calls FIRST — before the session is resolved and before any write
+    # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+    # split-opendox carve (section 2.4) moved the gate verbs to
+    # `openxdox.cli_gate`, so the verb is read there; the shared helper
+    # stays openDox's `cli`.
+    from openxdox import cli_gate
+
     assert "_session_identity_gate" in inspect.getsource(
-        cli_mod.cmd_gate_abandon_session)
+        cli_gate.cmd_gate_abandon_session)
     assert "require_human_gate" in inspect.getsource(
         cli_mod._session_identity_gate)
 
@@ -646,12 +652,18 @@ def test_the_abandon_cli_verb_tears_the_session_down_and_reports_it(scratch_repo
 
 
 def test_the_cli_offers_no_bypass_flag_for_the_endings():
+    # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+    # split-opendox carve (section 2.4) moved the gate verbs to
+    # `openxdox.cli_gate`, so the verb is read there; the shared helper
+    # stays openDox's `cli`.
+    from openxdox import cli_gate
+
     parser = cli_mod.build_parser()
     args = parser.parse_args(["gate", "abandon-session", "--repo-root", ".",
                               "--actor", "brett", "--scope-kind",
                               bs.STAGED_TOPIC, "--scope-id", TOPIC,
                               "--reason", "why"])
-    assert args.func is cli_mod.cmd_gate_abandon_session
+    assert args.func is cli_gate.cmd_gate_abandon_session
     assert args.records_dir == gc.DEFAULT_RECORDS_DIR       # _add_gate_identity_args
     with pytest.raises(SystemExit):                         # --reason is required
         parser.parse_args(["gate", "abandon-session", "--repo-root", ".",
@@ -661,7 +673,7 @@ def test_the_cli_offers_no_bypass_flag_for_the_endings():
                                  "--repo-root", ".", "--actor", "brett",
                                  "--scope-kind", bs.STAGED_TOPIC,
                                  "--scope-id", TOPIC, "--ref", DRAFT])
-    assert cleanup.func is cli_mod.cmd_gate_cleanup_abandoned_branch
+    assert cleanup.func is cli_gate.cmd_gate_cleanup_abandoned_branch
     with pytest.raises(SystemExit):                         # --ref is required
         parser.parse_args(["gate", "cleanup-abandoned-branch", "--repo-root", ".",
                            "--actor", "brett", "--scope-kind", bs.STAGED_TOPIC,
@@ -2135,8 +2147,14 @@ def test_the_cleanup_cli_verb_enforces_the_human_gate_and_deletes_the_branch(
     _abandon(scratch_repo, registry, reason="parked")
     _land_proposal(scratch_repo)
     git = sg.SessionGit(scratch_repo.root)
+    # THE VERB'S OWN HOME (plan 038 T026, under batch Q's CF-4). The
+    # split-opendox carve (section 2.4) moved the gate verbs to
+    # `openxdox.cli_gate`, so the verb is read there; the shared helper
+    # stays openDox's `cli`.
+    from openxdox import cli_gate
+
     assert "_session_identity_gate" in inspect.getsource(
-        cli_mod.cmd_gate_cleanup_abandoned_branch)
+        cli_gate.cmd_gate_cleanup_abandoned_branch)
     assert "require_human_gate" in inspect.getsource(
         cli_mod._session_identity_gate)
 
