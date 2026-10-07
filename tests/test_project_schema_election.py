@@ -24,9 +24,19 @@ from pathlib import Path
 import pytest
 import yaml
 
-ROOT = Path(__file__).resolve().parents[2]
+from conftest import CONTRACTS_DIR
+
+# WHERE THE CONTRACT FAMILY IS READ (plan 038 T096; CS in T094's map,
+# R2-INV-R9). Where the run is composed, `tests/conftest.py` names the family's
+# composed farm CONTRACTS_DIR, and the validator is this leg's own, which reads
+# that farm. In a lone checkout CONTRACTS_DIR is None, and these are the paths
+# openxFactory's tree kept, above the checkout: this file's declared reason,
+# `openxfactory-contracts`, as `tests/test_declared_exclusion.py` reads it.
+_COMPOSED = CONTRACTS_DIR is not None
+ROOT = Path(__file__).resolve().parents[1 if _COMPOSED else 2]
 SCRIPT = ROOT / "scripts" / "validate-ideation-dashboard-contracts.py"
-REGISTER_SCHEMA = ROOT / "contracts" / "schemas" / "project-register.schema.yaml"
+CONTRACTS = CONTRACTS_DIR if _COMPOSED else ROOT / "contracts"
+REGISTER_SCHEMA = CONTRACTS / "schemas" / "project-register.schema.yaml"
 
 
 def _load_module():

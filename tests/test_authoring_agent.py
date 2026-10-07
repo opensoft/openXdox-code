@@ -42,7 +42,7 @@ from unittest.mock import patch
 
 import pytest
 
-from conftest import REPO_ROOT  # noqa: F401  (sys.path side effect)
+from conftest import openxfactory_host
 
 from opendox import authoring, workbench as wb
 from opendox.boundary import (
@@ -346,7 +346,13 @@ def test_agent_boundary_constructor_tags_the_agent_actor(tmp_path):
 # ----------------------------------------------------------------------------
 
 def _load_sync_notebooklm_books():
-    script = REPO_ROOT / "scripts" / "sync-notebooklm-books.py"
+    # openxFactory's own tool, which the carve never moved: it sits beside the
+    # host module in openxFactory's `scripts/`, so it is read where the run is
+    # composed. There is no such script in a lone checkout.
+    host = openxfactory_host()
+    assert host is not None, \
+        "sync-notebooklm-books.py is openxFactory's, and this run is not composed"
+    script = Path(host.__file__).resolve().with_name("sync-notebooklm-books.py")
     spec = importlib.util.spec_from_file_location("sync_notebooklm_books_authoring", script)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
