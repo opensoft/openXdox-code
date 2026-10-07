@@ -168,10 +168,14 @@ def _check(placement: Placement, spec: Path) -> tuple[Path, Path]:
             "does not fix (Copilot r4201424060).")
     # The bytes themselves against the pinned blob. `git diff` can call a file
     # clean without reading it, where the index marks it `assume-unchanged` or
-    # `skip-worktree` (Copilot r4201032934).
+    # `skip-worktree` (Copilot r4201032934). And `--no-filters`: by default
+    # `hash-object` applies the path's clean filters and EOL normalization,
+    # which can turn edited bytes back into the pinned blob (Copilot
+    # r4201850292). The raw bytes are what the placed link exposes.
     pinned_blob = _git("rev-parse", "--verify", f"HEAD:{placement.source}",
                        cwd=spec)
-    on_disk = _git("hash-object", "--", str(placement.source), cwd=spec)
+    on_disk = _git("hash-object", "--no-filters", "--", str(placement.source),
+                   cwd=spec)
     if (pinned_blob.returncode != 0 or on_disk.returncode != 0
             or pinned_blob.stdout.strip() != on_disk.stdout.strip()):
         raise PlacementRefused(

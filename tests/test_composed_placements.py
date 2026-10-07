@@ -324,6 +324,27 @@ def test_an_edit_the_index_is_told_to_overlook_is_refused(composed, flag):
     assert not os.path.lexists(composed.destination)
 
 
+@pytest.mark.parametrize("attribute", ["filter=hide", "text"],
+                         ids=["clean-filter", "eol-normalization"])
+def test_an_edit_a_clean_filter_would_hide_is_refused(composed, attribute):
+    # Copilot r4201850292: `git hash-object` applies the path's clean filters
+    # by default, which can turn edited bytes back into the pinned blob. The
+    # check hashes the raw bytes the placed link exposes.
+    attributes = composed.spec / ".git" / "info" / "attributes"
+    attributes.parent.mkdir(parents=True, exist_ok=True)
+    attributes.write_text(f"/{RUNBOOK} {attribute}\n", encoding="utf-8")
+    if attribute == "filter=hide":
+        _git("config", "filter.hide.clean", "printf 'runbook A\\n'",
+             cwd=composed.spec)
+        edited = b"edited in the working tree\n"
+    else:
+        edited = b"runbook A\r\n"
+    composed.source.write_bytes(edited)
+    said = composed.refused()
+    assert "differs from openDox-spec's pinned commit" in said
+    assert not os.path.lexists(composed.destination)
+
+
 def _pin(composed: Composed, commit: str) -> None:
     """Move the openDox root's `spec` gitlink to `commit`, and check it out."""
     _git("checkout", "-q", commit, cwd=composed.spec)
