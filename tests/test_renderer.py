@@ -739,9 +739,10 @@ _REGEX_KEYWORDS = frozenset({
     "await", "delete", "new", "throw", "instanceof"})
 
 
-def _without_comments(src: str) -> str:
+def _lex(src: str) -> tuple[str, list[bool]]:
     """`src` with each comment replaced by one space, read as a JavaScript
-    lexer reads it.
+    lexer reads it, and beside it, for each character of that text, whether
+    it sits inside a string, template or regular-expression literal.
 
     A comment marker inside a string, a template or a regular-expression
     literal is that literal's text, not a comment. Those literals are KEPT, so
@@ -751,6 +752,7 @@ def _without_comments(src: str) -> str:
     opens with `*`, hides nothing; and a `//` comment ends at any of the four
     line terminators (Copilot's two findings on #47)."""
     out: list[str] = []
+    lit: list[bool] = []
     i, n = 0, len(src)
 
     def regex_may_start() -> bool:
@@ -775,14 +777,17 @@ def _without_comments(src: str) -> str:
             while j < n and src[j] != c and (c == "`" or src[j] not in "\r\n"):
                 j += 2 if src[j] == "\\" else 1
             out.extend(src[i:j + 1])
+            lit.extend([True] * len(src[i:j + 1]))
             i = j + 1
         elif src.startswith("//", i):
             m = _LINE_END_RE.search(src, i)
             out.append(" ")
+            lit.append(False)
             i = n if m is None else m.start()
         elif src.startswith("/*", i):
             j = src.find("*/", i + 2)
             out.append(" ")
+            lit.append(False)
             i = n if j < 0 else j + 2
         elif c == "/" and regex_may_start():
             j, in_class = i + 1, False
@@ -798,26 +803,40 @@ def _without_comments(src: str) -> str:
                     break
                 j += 1
             out.extend(src[i:j + 1])
+            lit.extend([True] * len(src[i:j + 1]))
             i = j + 1
         else:
             out.append(c)
+            lit.append(False)
             i += 1
-    return "".join(out)
+    return "".join(out), lit
 
 
-def _dynamic_import_sites(root: Path) -> dict[str, list[str]]:
+def _dynamic_import_sites(root: Path, *, executable_only: bool = False
+                          ) -> dict[str, list[str]]:
     """Every dynamic `import(` in the CODE of the bundle under `root`, as
     {bundle-relative file: [argument, ...]}, each argument read up to its
     balancing parenthesis, with its whitespace runs collapsed to one space.
     Every script and page the bundle can serve is read, `.mjs`, `.cjs` and
-    `.htm` beside `_bundle_files()`'s three suffixes."""
+    `.htm` beside `_bundle_files()`'s three suffixes.
+
+    By default a spelling inside a literal counts too, so the scan may
+    over-count but never hides a call: that is the reading that REFUSES an
+    unknown import. With `executable_only`, a spelling inside a string,
+    template or regular-expression literal does not count, so only an
+    executable call does: that is the reading that proves a ruled loader is
+    PRESENT (Copilot's fifth finding on #47). A call inside a template's
+    `${...}` reads as literal here, so this reading can only under-count,
+    which fails the presence check rather than passing it."""
     sites: dict[str, list[str]] = {}
     for path in sorted(p for p in root.rglob("*") if p.is_file() and p.suffix
                        in {".js", ".mjs", ".cjs", ".html", ".htm", ".css"}):
-        code = _without_comments(path.read_text(encoding="utf-8"))
+        code, in_literal = _lex(path.read_text(encoding="utf-8"))
         for m in _DYNAMIC_IMPORT_RE.finditer(code):
             at = m.start()
             if code[at - 1:at] == "." and code[at - 3:at] != "...":
+                continue
+            if executable_only and in_literal[at]:
                 continue
             depth, end = 1, m.end()
             while end < len(code) and depth:
@@ -826,6 +845,27 @@ def _dynamic_import_sites(root: Path) -> dict[str, list[str]]:
             sites.setdefault(path.relative_to(root).as_posix(), []).append(
                 " ".join(code[m.end():end - 1].split()))
     return sites
+
+
+# The registry loader's base, as the one EXECUTABLE assignment to `bundleRoot`
+# in `views/view_extension.js` (Copilot's sixth finding on #47): every plain or
+# compound assignment, each read to the end of its statement.
+_BUNDLE_ROOT_STATEMENT = 'bundleRoot = new URL("../", import.meta.url)'
+_BUNDLE_ROOT_ASSIGNMENT_RE = re.compile(
+    r"(?<![\w$.])bundleRoot\s*(?:\*\*|<<|>>>?|&&|\|\||\?\?|[-+*/%&|^])?=(?![=>])")
+
+
+def _bundle_root_assignments(src: str) -> list[str]:
+    """Every executable assignment to `bundleRoot` in `src`: comments are not
+    read, and a spelling inside a literal does not count."""
+    code, in_literal = _lex(src)
+    found = []
+    for m in _BUNDLE_ROOT_ASSIGNMENT_RE.finditer(code):
+        if in_literal[m.start()]:
+            continue
+        end = code.find(";", m.start())
+        found.append(" ".join(code[m.start():len(code) if end < 0 else end].split()))
+    return found
 
 
 def test_dynamic_import_is_absent():
@@ -845,7 +885,7 @@ def test_dynamic_import_is_absent():
     for keeps its identity, and it still holds: a dynamic import is ABSENT from
     every file's code but these three, and these three are PRESENT, each
     exactly as written. Comments are not code, and the scan reads them as a
-    lexer does (`_without_comments`). None can pull a URL. Two name a
+    lexer does (`_lex`). None can pull a URL. Two name a
     bundle-relative sibling literally. The registry's loader resolves
     `binding.module` against the bundle's own root, and openDox's
     `viewBinding()` admits only a bundle-relative './...js' module that does
@@ -855,10 +895,15 @@ def test_dynamic_import_is_absent():
     assert sites == _RULED_DYNAMIC_IMPORTS, (
         "the bundle's dynamic imports are not the carve's ruled loaders of "
         f"contributed bindings: {sites}")
+    executable = _dynamic_import_sites(WEB, executable_only=True)
+    assert executable == _RULED_DYNAMIC_IMPORTS, (
+        "a ruled loader is no longer an executable call (a spelling inside a "
+        f"literal is not one): {executable}")
     loader = (WEB / "views" / "view_extension.js").read_text(encoding="utf-8")
-    assert 'const bundleRoot = new URL("../", import.meta.url);' in loader, (
+    assert _bundle_root_assignments(loader) == [_BUNDLE_ROOT_STATEMENT], (
         "the registry's loader no longer resolves a binding against the "
-        "bundle's own root")
+        "bundle's own root, in one executable assignment: "
+        f"{_bundle_root_assignments(loader)}")
 
 
 # The scan's own regression cases (Copilot's third finding on #47): each is a
@@ -915,6 +960,57 @@ def test_the_dynamic_import_scan_reads_every_script_suffix(tmp_path):
         (tmp_path / name).write_text(call, encoding="utf-8")
     assert sorted(_dynamic_import_sites(tmp_path)) == [
         "a.js", "b.mjs", "c.cjs", "d.html", "e.htm", "f.css"]
+
+
+# The executable reading: a call counts; a spelling inside a literal or a
+# comment does not (Copilot's fifth finding on #47).
+_EXECUTABLE_CASES = [
+    ("call", 'const m = import("./a.js");', ['"./a.js"']),
+    ("in-a-string", "const s = 'import(\"./a.js\")';", []),
+    ("in-a-template", 'const s = `import("./a.js")`;', []),
+    ("in-a-regex", "const r = /import(x)/;", []),
+    ("in-a-comment", '// import("./a.js")\nconst x = 1;', []),
+    ("call-beside-a-decoy", "const s = 'import(\"./b.js\")'; const m = import(\"./a.js\");",
+     ['"./a.js"']),
+]
+
+
+@pytest.mark.parametrize(("source", "expected"), [c[1:] for c in _EXECUTABLE_CASES],
+                         ids=[c[0] for c in _EXECUTABLE_CASES])
+def test_the_executable_reading_counts_only_calls(tmp_path, source, expected):
+    (tmp_path / "probe.js").write_bytes(source.encode("utf-8"))
+    assert _dynamic_import_sites(tmp_path, executable_only=True) == (
+        {"probe.js": expected} if expected else {})
+
+
+# The loader's base: only an executable assignment counts, and every one does
+# (Copilot's sixth finding on #47).
+_BUNDLE_ROOT_CASES = [
+    ("the-declaration", 'const bundleRoot = new URL("../", import.meta.url);',
+     [_BUNDLE_ROOT_STATEMENT]),
+    ("changed-with-the-old-line-in-a-comment",
+     '// const bundleRoot = new URL("../", import.meta.url);\n'
+     'const bundleRoot = new URL("../../", import.meta.url);',
+     ['bundleRoot = new URL("../../", import.meta.url)']),
+    ("changed-with-the-old-line-in-a-string",
+     "const s = 'const bundleRoot = new URL(\"../\", import.meta.url);';\n"
+     'const bundleRoot = new URL("../../", import.meta.url);',
+     ['bundleRoot = new URL("../../", import.meta.url)']),
+    ("a-later-compound-assignment",
+     'let bundleRoot = new URL("../", import.meta.url);\n'
+     'bundleRoot ??= new URL("../../", import.meta.url);',
+     [_BUNDLE_ROOT_STATEMENT, 'bundleRoot ??= new URL("../../", import.meta.url)']),
+    ("a-property-a-comparison-and-an-arrow-are-not-ones",
+     'o.bundleRoot = 1; if (bundleRoot == x) {} const f = bundleRoot => 1;\n'
+     'const bundleRoot = new URL("../", import.meta.url);',
+     [_BUNDLE_ROOT_STATEMENT]),
+]
+
+
+@pytest.mark.parametrize(("source", "expected"), [c[1:] for c in _BUNDLE_ROOT_CASES],
+                         ids=[c[0] for c in _BUNDLE_ROOT_CASES])
+def test_the_loader_base_is_read_from_executable_code(source, expected):
+    assert _bundle_root_assignments(source) == expected
 
 
 # ----------------------------------------------------------------------------
