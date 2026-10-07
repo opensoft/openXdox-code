@@ -47,6 +47,7 @@ from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carri
 
 WEB = OPENDOX_WEB
 EXPLORER_JS = WEB / "views" / "explorer.js"
+DISPLAY_JS = WEB / "views" / "display.js"
 VIEWER_JS = WEB / "views" / "viewer.js"
 VENDOR_JS = WEB / "vendor" / "markdown-it.min.js"
 NODE = shutil.which("node")
@@ -56,28 +57,57 @@ def _snapshot():
     return generate_snapshot(BASE_REPO, "fixture-repo", source_revision=PINNED_REVISION, git=FakeGit())
 
 
+def _with_display_js(tmp_path):
+    """explorer.js's one sibling, beside its copy (R9-W1 (A″),
+    opensoft/openxFactory#656 comment 6021830531, as
+    `test_staging_workbench.py`'s helpers copy theirs): since section 3.4 slice
+    S7 the explorer imports `./display.js`, so that file is copied under its
+    own name, and `package.json` makes node read it as a module."""
+    shutil.copy(DISPLAY_JS, tmp_path / "display.js")
+    (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
+
+
+def _served_display() -> dict:
+    """`/capabilities["display"]` under the registered host, as the pinned
+    `serve.build_server()` states it, replayed as `test_gate_loop_views.py`'s
+    `_served_display` replays it. Composed, `tests/conftest.py` registers the
+    governed host for this file (DECLARED_HOST_SUITES): openxFactory's
+    composite, whose facet declares the artifact folder's words."""
+    from opendox import display_profile, view_extension
+    from opendox.profile_proxy import profile_openxfactory
+
+    return display_profile.display_manifest(
+        display_profile.host_display(profile_openxfactory),
+        host_profile=view_extension.host_profile_name(profile_openxfactory))
+
+
 # ----------------------------------------------------------------------------
 # explorer listing derivation — the ACTUAL explorer.js, run in node
 # ----------------------------------------------------------------------------
 
 _EXPLORER_HARNESS = """
 import { resolveExplorerTarget, classifyChangeFile } from './explorer.mjs';
+import { readDisplay } from './display.js';
 import { readFileSync } from 'node:fs';
-const snap = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const snap = input.snapshot;
+// THE SERVED DISPLAY, read as the page reads `/capabilities` and handed to the
+// explorer as the shell hands it `ctx.display` (section 3.4 slice S7)
+const D = readDisplay({ display: input.display });
 
 const out = {
-  staged: resolveExplorerTarget('staged', 'ideation-governance', snap),
-  proposal: resolveExplorerTarget('proposal', 'add-ideation-governance', snap),
-  realized: resolveExplorerTarget('realized', 'add-document-cataloging', snap),
-  unknownKind: resolveExplorerTarget('bogus', 'x', snap),
-  unknownId: resolveExplorerTarget('staged', 'does-not-exist', snap),
+  staged: resolveExplorerTarget('staged', 'ideation-governance', snap, D),
+  proposal: resolveExplorerTarget('proposal', 'add-ideation-governance', snap, D),
+  realized: resolveExplorerTarget('realized', 'add-document-cataloging', snap, D),
+  unknownKind: resolveExplorerTarget('bogus', 'x', snap, D),
+  unknownId: resolveExplorerTarget('staged', 'does-not-exist', snap, D),
   classify: {
-    proposal: classifyChangeFile('openspec/changes/foo/proposal.md'),
-    design: classifyChangeFile('openspec/changes/foo/design.md'),
-    tasks: classifyChangeFile('openspec/changes/foo/tasks.md'),
-    specDeltas: classifyChangeFile('openspec/changes/foo/specs/bar/spec.md'),
-    supportingDocs: classifyChangeFile('openspec/changes/foo/supporting-docs/x.md'),
-    other: classifyChangeFile('openspec/changes/foo/notes.txt'),
+    proposal: classifyChangeFile('openspec/changes/foo/proposal.md', D),
+    design: classifyChangeFile('openspec/changes/foo/design.md', D),
+    tasks: classifyChangeFile('openspec/changes/foo/tasks.md', D),
+    specDeltas: classifyChangeFile('openspec/changes/foo/specs/bar/spec.md', D),
+    supportingDocs: classifyChangeFile('openspec/changes/foo/supporting-docs/x.md', D),
+    other: classifyChangeFile('openspec/changes/foo/notes.txt', D),
   },
 };
 console.log(JSON.stringify(out));
@@ -85,14 +115,19 @@ console.log(JSON.stringify(out));
 
 
 def _run_node_explorer(snapshot, tmp_path):
+    """Run the ACTUAL explorer.js over `snapshot` with its sibling beside it,
+    handed the display the page is served (VR, under R9-R1 (a)), so every group
+    label it derives is the registered host's word for that artifact."""
     if not NODE:
         pytest.skip("node not available for the JS derivation probe")
     shutil.copy(EXPLORER_JS, tmp_path / "explorer.mjs")
+    _with_display_js(tmp_path)
     (tmp_path / "harness.mjs").write_text(_EXPLORER_HARNESS, encoding="utf-8")
-    snap_path = tmp_path / "snapshot.json"
-    snap_path.write_text(json.dumps(snapshot), encoding="utf-8")
+    input_path = tmp_path / "explorer-input.json"
+    input_path.write_text(json.dumps({"snapshot": snapshot, "display": _served_display()}),
+                          encoding="utf-8")
     proc = subprocess.run(
-        [NODE, str(tmp_path / "harness.mjs"), str(snap_path)],
+        [NODE, str(tmp_path / "harness.mjs"), str(input_path)],
         capture_output=True, text=True, cwd=tmp_path,
     )
     assert proc.returncode == 0, f"node harness failed:\n{proc.stderr}"
@@ -105,8 +140,19 @@ def test_explorer_js_exists_and_is_importable_standalone():
     # decoupled (mountExplorer takes an onOpenFile callback instead), so
     # explorer.js is independently landable/testable. (Doc comments may still
     # mention "viewer.js" by name, hence checking import statements only.)
-    imports = re.findall(r'^\s*import\s.*$', EXPLORER_JS.read_text(encoding="utf-8"), re.MULTILINE)
-    assert not imports, imports
+    #
+    # RESPELLED TO S7's DESIGN (section 3.4 slice S7, openDox-code `1e46971`;
+    # R9-R1 (a), opensoft/openxFactory#656 comment 6021830531). This pin read
+    # "no import at all" until S7 made every class-C module read its words
+    # through `./display.js`. The claim it exists for is unchanged: nothing
+    # here imports the viewer. Standalone now means with at most its one
+    # sibling, the display reader, which is all the harnesses above copy
+    # beside it. Each import statement's module is read whole, so an import
+    # spread over several lines is read too.
+    sources = re.findall(r"""^\s*import\b(?:[^'";]*?\bfrom\s*)?["']([^"']+)["']""",
+                         EXPLORER_JS.read_text(encoding="utf-8"), re.MULTILINE)
+    assert not [source for source in sources if "viewer" in source], sources
+    assert set(sources) <= {"./display.js"}, sources
 
 
 def test_staged_tile_lists_the_topic_folder_with_headers(tmp_path):
@@ -143,6 +189,7 @@ def test_aggregate_folder_entry_keeps_its_member_source_key(tmp_path):
     }
     # Drive the real resolver with the aggregate's namespaced tile id.
     shutil.copy(EXPLORER_JS, tmp_path / "aggregate-explorer.mjs")
+    _with_display_js(tmp_path)
     script = """
 import { resolveExplorerTarget } from './aggregate-explorer.mjs';
 const snapshot = JSON.parse(process.argv[2]);
@@ -179,6 +226,7 @@ def test_aggregate_folder_entry_disambiguates_same_repository_refs(tmp_path):
         ],
     }
     shutil.copy(EXPLORER_JS, tmp_path / "aggregate-explorer.mjs")
+    _with_display_js(tmp_path)
     script = """
 import { resolveExplorerTarget } from './aggregate-explorer.mjs';
 const snapshot = JSON.parse(process.argv[2]);
@@ -203,7 +251,11 @@ def test_aggregate_wheel_navigation_threads_the_owning_member_key():
     wheel = (WEB / "views" / "wheel.js").read_text(encoding="utf-8")
     assert "openDoc: (path, doc, owner) =>" in app
     assert "sourceKeyFor(owner || doc)" in app
-    assert ("path, opts.wheelKey === \"documents\" ? item.ref : null, item.ref"
+    # The source reel is named by its ROLE constant since section 3.4 slice S7
+    # (openDox-code `1e46971`): `SOURCE` is `STAGE_ROLES[0]` off `display.js`,
+    # where the reel's key was openxFactory's `"documents"` before it.
+    assert re.search(r"const\s*\[\s*SOURCE\s*,[^\]]*\]\s*=\s*STAGE_ROLES\s*;", wheel)
+    assert ("path, opts.wheelKey === SOURCE ? item.ref : null, item.ref"
             in wheel)
     assert "nav.openDoc(entry.path, null, item.ref);" in wheel
     explorer = EXPLORER_JS.read_text(encoding="utf-8")
@@ -213,12 +265,22 @@ def test_aggregate_wheel_navigation_threads_the_owning_member_key():
     assert "resolved?.ref || sourceKey?.ref || null" in explorer
 
 
+# THE GROUP LABELS ARE THE SERVED WORDS (R9-R1 (a), opensoft/openxFactory#656
+# comment 6021830531; section 3.4 slice S7). explorer.js groups a change
+# folder's files by the facet's artifact axis: each ordered packet document is
+# its own group, named by its own file name, then the declared delta and
+# supporting subfolders under the facet's labels, then `other`. The registered
+# host's facet declares that axis (openxFactory's `_display_facet()`: packet
+# `proposal.md`, `design.md`, `tasks.md`; `Spec deltas`; `Supporting docs`),
+# so these two pins read the words the page is served, as measured, where they
+# read openxFactory's pre-S7 spelling before.
+
 def test_proposal_tile_groups_proposal_and_tasks(tmp_path):
     r = _run_node_explorer(_snapshot(), tmp_path)
     proposal = r["proposal"]
     assert proposal["kind"] == "proposal"
     labels = [g["label"] for g in proposal["groups"]]
-    assert labels == ["proposal", "tasks"]  # fixture has no design/spec-deltas/supporting-docs
+    assert labels == ["proposal.md", "tasks.md"]  # fixture has no design/spec-deltas/supporting-docs
     paths = {f["path"] for g in proposal["groups"] for f in g["files"]}
     assert paths == {
         "openspec/changes/add-ideation-governance/proposal.md",
@@ -244,8 +306,8 @@ def test_unresolvable_tile_and_kind_degrade_to_null(tmp_path):
 def test_change_file_classification(tmp_path):
     r = _run_node_explorer(_snapshot(), tmp_path)
     assert r["classify"] == {
-        "proposal": "proposal", "design": "design", "tasks": "tasks",
-        "specDeltas": "spec deltas", "supportingDocs": "supporting docs", "other": "other",
+        "proposal": "proposal.md", "design": "design.md", "tasks": "tasks.md",
+        "specDeltas": "Spec deltas", "supportingDocs": "Supporting docs", "other": "other",
     }
 
 

@@ -782,10 +782,18 @@ def test_surrogates_are_refused_by_the_rule():
 
 
 def test_every_textual_home_states_the_admission_rule():
-    """One rule, four homes — and the round's own lesson is that a home stating
-    the OLD rule is how the four drift apart (PR #314, Codex P2 found exactly
-    that: the normative manifest text still described the exclusion form after
-    the code had been inverted)."""
+    """One rule, its textual homes — and the round's own lesson is that a home
+    stating the OLD rule is how they drift apart (PR #314, Codex P2 found
+    exactly that: the normative manifest text still described the exclusion
+    form after the code had been inverted).
+
+    THREE HOMES SINCE THE CARVE (plan 038 T101; RULED W5, openxFactory#656
+    `6021830531`). The fourth was openxFactory's `contracts/manifest.yaml`,
+    whose `xfactory-workbench-chat-turn` row carried the rule. That row left
+    openxFactory's manifest at contract-v4.0 for the openDox root's, which
+    records the row without the rule, so no manifest in the composed tree
+    states it, and the manifest home is dropped. The rule stays stated in the
+    other three, and the openDox root's manifest gains nothing here."""
     homes = {
         # openDox's own module through the PIN, not the pre-carve
         # `scripts/ideation_dashboard/` path (plan 034 task T040); this file
@@ -794,7 +802,6 @@ def test_every_textual_home_states_the_admission_rule():
         "validator": REPO_ROOT / "scripts"
         / "validate-ideation-dashboard-contracts.py",
         "browser": CHAT_MODEL_JS,
-        "manifest": REPO_ROOT / "contracts" / "manifest.yaml",
     }
     stale = "at least one character outside"
     for label, path in homes.items():
@@ -803,7 +810,7 @@ def test_every_textual_home_states_the_admission_rule():
             f"{label} does not state the admission rule")
         # AND THE OLD FORM IS NOT STATED AS CURRENT. Presence alone is not
         # enough: a home carrying BOTH statements reads as ambiguous to the
-        # next author, and ambiguity is how four homes drift. The exclusion
+        # next author, and ambiguity is how the homes drift. The exclusion
         # form may appear only as HISTORY, which every home spells with a
         # past-tense marker rather than as a definition of the rule.
         assert stale not in text, (

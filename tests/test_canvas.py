@@ -47,6 +47,7 @@ from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carri
 WEB = OPENDOX_WEB
 CANVAS_MODEL_JS = WEB / "views" / "canvas-model.js"
 CANVAS_JS = WEB / "views" / "canvas.js"
+DISPLAY_JS = WEB / "views" / "display.js"
 NODE = shutil.which("node")
 VALIDATOR = find_openxfactory_validator()
 
@@ -64,8 +65,13 @@ import {
   buildCanvasModel, listCanvasClusters, supersedePlan, composerPlan,
   esc, supersedeReason, DRAFTS_DIR,
 } from './canvas-model.mjs';
+import { readDisplay } from './display.js';
 import { readFileSync } from 'node:fs';
-const snap = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const snap = input.snapshot;
+// THE SERVED DISPLAY, read as the page reads `/capabilities` and handed to
+// every derivation, as the canvas hands it `ctx.display` (section 3.4 slice S7)
+const D = readDisplay({ display: input.display });
 
 function compact(m) {
   if (!m) return null;
@@ -85,31 +91,57 @@ function compact(m) {
 }
 
 console.log(JSON.stringify({
-  clusters: listCanvasClusters(snap),
-  gov: compact(buildCanvasModel(snap, 'cl-ideation-governance')),
-  avatar: compact(buildCanvasModel(snap, 'cl-avatar')),
-  dtn: compact(buildCanvasModel(snap, 'cl-dtn')),
-  missing: buildCanvasModel(snap, 'cl-nope'),
-  supersede: supersedePlan(snap, 'cl-avatar', 'os-avatar-shape', 'pos-avatar-lab'),
+  clusters: listCanvasClusters(snap, D),
+  gov: compact(buildCanvasModel(snap, 'cl-ideation-governance', D)),
+  avatar: compact(buildCanvasModel(snap, 'cl-avatar', D)),
+  dtn: compact(buildCanvasModel(snap, 'cl-dtn', D)),
+  missing: buildCanvasModel(snap, 'cl-nope', D),
+  supersede: supersedePlan(snap, 'cl-avatar', 'os-avatar-shape', 'pos-avatar-lab', D),
   composer: composerPlan(snap, 'cl-ideation-governance',
     { id: 'regulated-traceability-profile', title: 't', claim: 'c',
-      evidenceDocuments: ['ideation/staging/ideation-governance/README.md'] }),
+      evidenceDocuments: ['ideation/staging/ideation-governance/README.md'] }, D),
   escaped: esc("<script>alert('x')</script>&\\""),
-  reason: supersedeReason('pos-avatar-lab'),
+  reason: supersedeReason('pos-avatar-lab', D),
   draftsDir: DRAFTS_DIR,
 }));
 """
 
 
+def _served_display() -> dict:
+    """`/capabilities["display"]` under the registered host, as the pinned
+    `serve.build_server()` states it, replayed as `test_gate_loop_views.py`'s
+    `_served_display` replays it. Composed, `tests/conftest.py` registers the
+    governed host for this file (DECLARED_HOST_SUITES): openxFactory's
+    composite, the host whose facet `canvas_drafts` reads on the server side."""
+    from opendox import display_profile, view_extension
+    from opendox.profile_proxy import profile_openxfactory
+
+    return display_profile.display_manifest(
+        display_profile.host_display(profile_openxfactory),
+        host_profile=view_extension.host_profile_name(profile_openxfactory))
+
+
 def _run_node(snapshot, tmp_path):
+    """Run the ACTUAL canvas-model.js over `snapshot`, as the canvas runs it.
+
+    THE MODEL'S SIBLING COMES WITH IT (R9-W1 (A″), opensoft/openxFactory#656
+    comment 6021830531, as `test_staging_workbench.py`'s helpers copy theirs):
+    since section 3.4 slice S7 the model imports `./display.js`, so that file is
+    copied beside it under its own name, and `package.json` makes node read it
+    as a module. AND THE SERVED DISPLAY (VR, under R9-R1 (a)): the harness is
+    handed the display the page is served, so every word the model spells is
+    the registered host's, as `canvas_drafts` spells its side."""
     if not NODE:
         pytest.skip("node not available for the JS derivation probe")
     shutil.copy(CANVAS_MODEL_JS, tmp_path / "canvas-model.mjs")
+    shutil.copy(DISPLAY_JS, tmp_path / "display.js")
+    (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
     (tmp_path / "harness.mjs").write_text(_HARNESS, encoding="utf-8")
-    snap_path = tmp_path / "snapshot.json"
-    snap_path.write_text(json.dumps(snapshot), encoding="utf-8")
+    input_path = tmp_path / "canvas-input.json"
+    input_path.write_text(json.dumps({"snapshot": snapshot, "display": _served_display()}),
+                          encoding="utf-8")
     proc = subprocess.run(
-        [NODE, str(tmp_path / "harness.mjs"), str(snap_path)],
+        [NODE, str(tmp_path / "harness.mjs"), str(input_path)],
         capture_output=True, text=True, cwd=tmp_path,
     )
     assert proc.returncode == 0, f"node harness failed:\n{proc.stderr}"
@@ -169,13 +201,19 @@ def test_gap_unclaimed_member(tmp_path):
     # dtn-register.md is a member of cl-ideation-governance but no possible of
     # that cluster pins it as evidence.
     assert [g["document"] for g in unclaimed] == ["ideation/brainstorm/dtn-register.md"]
-    assert len(gov_gaps) == 1  # no unsupported-possible gap here (both are supported)
+    assert len(gov_gaps) == 1  # no unsupported-candidate gap here (both are supported)
 
+
+# THE GAP KIND IS SPELLED BY ROLE (section 3.4 slice S7; R9-R1 (a), opensoft/
+# openxFactory#656 comment 6021830531). canvas-model.js names a possible with no
+# document support `unsupported-candidate`, after the stage role it sits at,
+# under every host: that is the kind the canvas renders from, and these two
+# pins are respelled to it from openxFactory's pre-S7 `unsupported-possible`.
 
 def test_gap_unsupported_possible(tmp_path):
     r = _run_node(_snapshot(), tmp_path)
     avatar_gaps = r["avatar"]["gaps"]
-    unsupported = [g for g in avatar_gaps if g["kind"] == "unsupported-possible"]
+    unsupported = [g for g in avatar_gaps if g["kind"] == "unsupported-candidate"]
     # pos-avatar-inline claims cl-avatar but pins no evidence.
     assert [g["possibleId"] for g in unsupported] == ["pos-avatar-inline"]
 
@@ -185,7 +223,7 @@ def test_gap_both_kinds_on_one_cluster(tmp_path):
     kinds = sorted(g["kind"] for g in r["dtn"]["gaps"])
     # cl-dtn: its one member (dtn-register.md) is unclaimed AND its one possible
     # (pos-dtn-autopromote, rejected) has no document support.
-    assert kinds == ["unclaimed-member", "unsupported-possible"]
+    assert kinds == ["unclaimed-member", "unsupported-candidate"]
 
 
 # ---- option-set grouping ----
@@ -211,6 +249,13 @@ def test_js_and_python_draft_constants_agree(tmp_path):
     r = _run_node(_snapshot(), tmp_path)
     assert r["reason"] == cd.supersede_reason("pos-avatar-lab")
     assert r["draftsDir"] == cd.DRAFTS_DIR
+    # AND THE STATE A NEW DRAFT IS SEEDED IN, which both halves read off one
+    # facet since slice S7: the composer plan the canvas previews and the
+    # `register_state` `canvas_drafts` writes. The served display's `values`
+    # carry the governed register's word, which openDox's neutral one is not,
+    # so this holds only while the harness runs under the display the page is
+    # served.
+    assert r["composer"]["state"] == cd.register_state("captured")
 
 
 # ----------------------------------------------------------------------------
