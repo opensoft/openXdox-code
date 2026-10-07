@@ -392,9 +392,13 @@ def test_every_schema_the_consumer_validates_is_on_disk():
     run is composed that is this module's `SCRIPT` too. In a lone checkout it
     is not, because there `SCRIPT` is looked for at the carve's `parents[2]`,
     above the checkout (V2-10). Run from an install, it is the packaged
-    validator. In a lone install its tree carries no `contracts/`, so the three
-    come from the distribution's packaged copies, each held to `copies.yaml`'s
-    digest. This module's fixtures are not used: in a lone checkout they read
+    validator, `openxdox/contracts/validate-ideation-dashboard-contracts.py`,
+    whose `ROOT` is the installed `openxdox` package: its `contracts/` is
+    there, and the three are the packaged copies in it, each held to
+    `copies.yaml`'s digest. A source tree carries no `contracts/` of its own,
+    so there the three come from the installed distribution's packaged copies,
+    held to the same digests, which is what the last check below asserts. This
+    module's fixtures are not used: in a lone checkout they read
     openxFactory's tree, which is why the file is declared under
     `openxfactory-contracts`, and F7.1 runs this case by node id."""
     from openxdox import contracts, snapshot
