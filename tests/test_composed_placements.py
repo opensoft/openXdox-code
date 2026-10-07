@@ -380,6 +380,19 @@ def test_a_runbook_replaced_by_a_link_to_identical_bytes_is_refused(composed,
     assert not os.path.lexists(composed.destination)
 
 
+def test_a_runbook_reached_through_a_linked_directory_is_refused(composed,
+                                                                 tmp_path):
+    # Copilot r4201912214: a link in ANY component below the spec leg. Here
+    # `docs/` points at an outside copy whose bytes are identical today.
+    external = tmp_path / "external-docs"
+    shutil.copytree(composed.spec / "docs", external)
+    shutil.rmtree(composed.spec / "docs")
+    (composed.spec / "docs").symlink_to(external, target_is_directory=True)
+    said = composed.refused()
+    assert "is a symbolic link" in said
+    assert not os.path.lexists(composed.destination)
+
+
 def test_an_opendox_root_answered_by_an_enclosing_repository_is_refused(
         composed):
     # Copilot r4201032886: without its own repository, git would answer
