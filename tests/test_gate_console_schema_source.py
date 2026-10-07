@@ -249,13 +249,16 @@ def test_a_host_schema_the_console_cannot_apply_refuses_as_gate_refused(tmp_path
         assert out[name].startswith(
             "GateRefused: the demotion execution receipt schema could not be "
             "parsed"), out[name]
-    # A cyclic mapping never finishes the meta-schema check. A cyclic list is
-    # refused by the check itself under the pinned jsonschema; either way, a
-    # GateRefused.
-    assert out["cyclic_mapping"].startswith(
-        "GateRefused: the demotion execution receipt schema could not be "
-        "checked: RecursionError"), out["cyclic_mapping"]
-    assert out["cyclic_list"].startswith("GateRefused: "), out["cyclic_list"]
+    # A cyclic mapping and a cyclic list must each come out as a GateRefused,
+    # and that is ALL these two assert. Which refusal each earns, and what it
+    # wraps, is the installed jsonschema's own behaviour, and `pyproject.toml`
+    # leaves it open (`jsonschema>=4.18`, no upper bound): the exception a
+    # cyclic mapping raises from the meta-schema check, and whether the check
+    # refuses a cyclic list itself, are not this console's contract. So neither
+    # case names the step it was refused at or the exception it wraps. An
+    # exception that ESCAPED reads `ESCAPED ...` and fails the prefix.
+    for name in ("cyclic_mapping", "cyclic_list"):
+        assert out[name].startswith("GateRefused: "), out[name]
 
 
 def test_the_console_reads_no_schema_from_beside_the_checkout() -> None:
