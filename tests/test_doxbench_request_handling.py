@@ -875,8 +875,17 @@ def test_compute_capabilities_still_returns_its_exact_pre_existing_dict():
         "actor": None,
         "refresh": no_refresh,
     }
+    #
+    # SINCE T084 (openDox-code `e49b17c`; RULED openxFactory#656 `5920216845`,
+    # item 1) `gate` is true only where a CONTRIBUTED binding answers
+    # `POST /actions/gate/<verb>`, so the local human's dict is asked with the
+    # routes this leg's own gate column contributes, as an assembly that
+    # collected them asks it (plan 038 T101, R2-INV-R9's CP). The dict it
+    # returns is unchanged.
+    from openxdox.serve_gate import GateRoutesExtension
     assert serve_mod.compute_capabilities(
-        nlm_present=True, checkout_real=True, loopback=True, actor="brett") == {
+        nlm_present=True, checkout_real=True, loopback=True, actor="brett",
+        route_bindings=GateRoutesExtension().routes()) == {
         "actions": {"notebook": True, "gate": True, "refresh": False,
                     "session": True, "edit": True, "intent": False},
         "actor": "brett",
