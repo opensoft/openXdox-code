@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import REPO_ROOT  # noqa: F401  (sys.path side effect)
+from conftest import carved_module_path  # (sys.path side effect)
 from session_fixtures import GATE_RECORDS_PREFIX  # noqa: E402
 
 from opendox import doxbench_threads as dt  # noqa: E402
@@ -28,8 +28,12 @@ from opendox.boundary import (  # noqa: E402
     OUTSIDE_ALLOWLIST, BoundaryViolation, HumanGate,
 )
 
-THREADS_PY = (REPO_ROOT / "scripts" / "ideation_dashboard"
-              / "doxbench_threads.py")
+# The thread module's SOURCE, at its carved home: openDox's own module through
+# the PIN (plan 034 task T040's resolver, `carved_module_path`), not the
+# pre-carve `scripts/ideation_dashboard/` path this leg does not have (plan 038
+# T101, R2-INV-R9's PP). The negative space below is asserted against the
+# module this leg actually runs.
+THREADS_PY = carved_module_path("doxbench_threads.py")
 
 DOCUMENT = "ideation/staging/demo-topic/README.md"
 SCOPE = dt.ThreadScope(repository="openxFactory", tile_kind="staged",
@@ -632,8 +636,9 @@ def test_the_doxbench_save_gate_declares_the_thread_prefix(tmp_path):
 def test_no_other_gate_on_this_surface_gained_the_thread_prefix(tmp_path):
     """"Do not widen any other gate": the `edit-document` gate — the other
     worktree-rooted session gate — still declares the records tree alone."""
-    source = (REPO_ROOT / "scripts" / "ideation_dashboard"
-              / "gate_routes.py").read_text(encoding="utf-8")
+    # `gate_routes.py` came to this leg (`src/openxdox/`), read at its carved
+    # home (plan 038 T101).
+    source = carved_module_path("gate_routes.py").read_text(encoding="utf-8")
     assert source.count("doxbench_threads.THREAD_PREFIX") == 1
 
 
