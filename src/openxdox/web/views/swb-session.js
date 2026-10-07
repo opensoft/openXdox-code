@@ -311,16 +311,29 @@ export function sessionEndingReport(branch) {
 // mount reads the module-level install, which is the shape every affordance in
 // this file has always used; `firstEditTransport` passes its own, because its
 // returned transport outlives the call that built it (Copilot review, round 3).
+//
+// THE CALL SPELLINGS ARE PINNED. `tests/test_session_confinement.py` holds both
+// write transports, this one and `swb-create.js`, to the model's own two names at
+// their two call sites, so `submitSession` shadows those names with the pair it
+// is to use instead of calling the pair through local aliases. The pinned text is
+// deliberately not quoted in this comment: a needle quoted in its own source
+// satisfies itself. `MODULE_TRANSPORT` is the module-level pair, each reaching
+// the CURRENT install at call time exactly as the two consts above do, so with no
+// `bound` the behaviour is the one the earlier ternaries gave.
+const MODULE_TRANSPORT = {
+  consoleHeaders: (...args) => consoleHeaders(...args),
+  withConsoleRepair: (...args) => withConsoleRepair(...args),
+};
+
 async function submitSession(affordance, body, fetcher, caps, repair, bound) {
   const doFetch = fetcher || fetch;
-  const headersOf = bound ? bound.consoleHeaders : consoleHeaders;
-  const repairWith = bound ? bound.withConsoleRepair : withConsoleRepair;
+  const { consoleHeaders, withConsoleRepair } = bound || MODULE_TRANSPORT;
   const send = async () => {
     const response = await doFetch(sessionRoute(affordance), {
       method: "POST",
       // the human-console header among them (FR-019's third clause): a write that
       // cannot present this serve's token is refused before its body is parsed
-      headers: headersOf(caps),
+      headers: consoleHeaders(caps),
       body: JSON.stringify(body),
     });
     try {
@@ -329,7 +342,7 @@ async function submitSession(affordance, body, fetcher, caps, repair, bound) {
       return { ok: false, message: "malformed response (HTTP " + response.status + ")" };
     }
   };
-  return repairWith(send, repair);
+  return withConsoleRepair(send, repair);
 }
 
 // ---- the doxBench Save transport (010-doxbench-editor-chat T080) -----------

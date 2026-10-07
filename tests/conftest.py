@@ -454,7 +454,9 @@ _LAUNCH_SUITE = "test_snapshot_validation_launch.py"
 
 @_pytest.fixture(autouse=True)
 def _the_launch_suite_runs_a_local_install(request, monkeypatch):
-    if request.node.path.name != _LAUNCH_SUITE:
+    # W2 (plan 038 T095) extends this premise, composed, to the suites
+    # `runs_a_local_install` names (LOCAL_INSTALL_SUITES, at the end of file).
+    if not runs_a_local_install(request.node.path.name):
         yield
         return
     from opendox import cli as _cli
@@ -638,11 +640,19 @@ def _a_hosts_plane_for_the_token_reading_suites(request):
 # facets are read once with `sys.path` saved, `sys.path` is put back, and an
 # `openxdox` module imported from anywhere else refuses the case, by name.
 #
+# AND THE STAGING WORKBENCH'S SUITE (plan 038 T026; R-1 (a), its spans widened
+# by Brett Heap at openxFactory#656 comment 6016648451). `test_staging_workbench.py`
+# parses its gate-off CLI descriptors (`gate create-document …`) with the real
+# parser, and its node harnesses run in the display `/capabilities` serves,
+# which openDox reads off the registered host. With no host registered, the
+# descriptors read `invalid choice: 'gate'` and every harness helper refuses
+# `ProfileNotRegistered`, so it runs under the governed host too.
+#
 # THE LIST IS THE SCAN'S, as HOST_PLANE_SUITES is. `tests/test_host_plane.py`
 # holds it equal to the governed suites, computed as 12.5 computes them
 # (`governed_suites()` below), that name a `gate` verb of openXdox's command
-# line. A module on both lists runs under the governed host, which is a host's
-# plane too (`plane_host_for`).
+# line, as an argument vector or as a command line. A module on both lists runs
+# under the governed host, which is a host's plane too (`plane_host_for`).
 # ---------------------------------------------------------------------------
 
 GOVERNED_HOST_SUITES = frozenset({
@@ -654,6 +664,7 @@ GOVERNED_HOST_SUITES = frozenset({
     "test_session_notebook.py",
     "test_session_transaction.py",
     "test_session_verbs.py",
+    "test_staging_workbench.py",
 })
 
 #: 12.5's governed set is every `tests/test_*.py` that names one of these
@@ -791,3 +802,320 @@ if _OPENXFACTORY_HOST is not None:
 
     _gate_console.register_contract_schema_source(
         Path(_OPENXFACTORY_HOST.__file__).resolve().parents[1] / "contracts" / "schemas")
+
+
+# ---------------------------------------------------------------------------
+# THE COMPOSED HARNESS FOR THE DECLARED INTEGRATION TESTS (plan 038 T095; T094's
+# map, R2-INV-R9, and the holder's rulings on it, openxFactory#656 comment
+# 6021830531: OQ-R9-1, OQ-R9-2 and OQ-R9-4 at their defaults, and W2).
+#
+# ARC-Q2 (a) (comment 6016982816) made the composed workflow the permanent home
+# of the declared exclusion: each file `tests/declared_exclusion.yaml` lists
+# runs there alone, with openxFactory's `scripts/` on the path. T094 mapped
+# every composed red of those files outside 12.5's set. Four of its means are
+# this harness's, and the test files' own respellings code against them:
+#   * HR: the governed host, for the files DECLARED_HOST_SUITES names;
+#   * SR: two of openxFactory's host seams, for the files HOST_SEAM_SUITES
+#     names;
+#   * CS: the contract family's composed source, a farm outside the checkout,
+#     named by CONTRACTS_DIR;
+#   * LI: the launch suite's local install, for LOCAL_INSTALL_SUITES too.
+# And OQ-R9-4's `openxfactory_root()`, for the files that read openxFactory's
+# own tooling or documents in the composed tree.
+#
+# ALL OF IT IS COMPOSED-ONLY. Each piece acts only where `opendox_host` is
+# importable, which no lone checkout supplies. There `openxfactory_root()` and
+# CONTRACTS_DIR are None, and nothing is registered, built or set. So a lone
+# run, and the evidence `tests/test_declared_exclusion.py` holds each listed
+# file to, are what they were. `tests/test_host_plane.py` holds each list to
+# its rules and each piece to its behaviour, in a lone checkout.
+# ---------------------------------------------------------------------------
+
+import atexit as _atexit  # noqa: E402
+import os as _os  # noqa: E402
+import shutil as _shutil  # noqa: E402
+import tempfile as _tempfile  # noqa: E402
+
+
+def openxfactory_root() -> Path | None:
+    """The composed openxFactory tree's root where the run is composed, and
+    None where it is not (OQ-R9-4): the directory above openxFactory's host
+    module, as T021's registration above reaches its `contracts/schemas/`."""
+    host_module = openxfactory_host()
+    if host_module is None:
+        return None
+    return Path(host_module.__file__).resolve().parents[1]
+
+
+# HR. THE GOVERNED HOST FOR THE DECLARED INTEGRATION TESTS THAT NEED A HOST'S
+# COLUMNS (OQ-R9-1). Each of these files builds openDox's parser, server or
+# canvas through what the REGISTERED host contributes: openXdox's `gate` verbs
+# and gate and projection routes, openxFactory's lane column
+# (`POST /actions/refresh`), the plane `document-abstract` asks for, or the
+# profile and display a host serves. With no host carrying them, T094 measured
+# them composed reading `invalid choice: 'gate'`, `unknown_action`,
+# `model_capability_unavailable` or `ProfileNotRegistered`. They are not 12.5's
+# governed suites, so `GOVERNED_HOST_SUITES` cannot carry them: this list sits
+# beside it.
+#
+# WHERE THE RUN IS COMPOSED, for the length of each of their tests, this
+# registers THE GOVERNED HOST, `governed_host()` above, and puts the registry
+# back afterwards. It is set up after the stand-in host's fixture, which it
+# requests, so a file on both lists runs under the governed host, which is a
+# host's plane too, and the stand-in is restored after it. Where the run is not
+# composed it registers nothing, so a lone run keeps the stand-in or nothing,
+# as before.
+#
+# THE LIST IS T094's MEASUREMENT, not a scan. No reading of a file's text
+# separates these from declared files that name the same routes in a static
+# check, or build a plane that needs no host's column (`test_renderer.py`,
+# `test_doxbench_transport.py`), or bring their own (`test_hermeticity_gate_verbs.py`).
+# So `tests/test_host_plane.py` holds it to the rules a list of this kind can be
+# held to: every member is a declared entry, none is a governed suite, and
+# `test_column_contributions_governed.py` is never on it. That file registers
+# openXdox's columns itself, and T094 measured two of its cases red under the
+# governed host, where two bindings claim `POST /actions/gate/` (OQ-R9-1).
+# `test_explorer_viewer.py` and `test_doxbench_scope.py` are on it for the
+# display a host serves (VR, under R9-R1 (a)); `test_gate_console.py` for its
+# two cases that parse `gate`.
+DECLARED_HOST_SUITES = frozenset({
+    "test_canvas.py",
+    "test_create_document_cli.py",
+    "test_create_project.py",
+    "test_doxbench_abstract_route.py",
+    "test_doxbench_request_handling.py",
+    "test_doxbench_scope.py",
+    "test_edit_project.py",
+    "test_explorer_viewer.py",
+    "test_gate_console.py",
+    "test_gate_failure_diagnostics.py",
+    "test_generated_at_anchor.py",
+    "test_notebook_action.py",
+    "test_register_edit_lane.py",
+    "test_repo_selector.py",
+    "test_session_document_ownership.py",
+    "test_trust_gaps.py",
+    "test_wheel_verbs_cli.py",
+})
+
+
+def declared_host_for(suite: str):
+    """The host a declared-host suite's cases run under: `governed_host`
+    where the run is composed and `suite` is on DECLARED_HOST_SUITES, and
+    None otherwise, which registers nothing."""
+    if suite in DECLARED_HOST_SUITES and openxfactory_host() is not None:
+        return governed_host
+    return None
+
+
+@_pytest.fixture(autouse=True)
+def _the_governed_host_for_the_declared_host_suites(
+        request, _a_hosts_plane_for_the_token_reading_suites):
+    host = declared_host_for(request.node.path.name)
+    if host is None:
+        yield
+        return
+    with a_hosts_plane(host):
+        yield
+
+
+# SR. TWO OF openxFactory'S HOST SEAMS, FOR THE FILES THAT MEET THEM. openDox
+# answers its scoped health check and its model-binding trust from seams a
+# host fills at process start. openxFactory's host fills both, and with neither
+# filled T094 measured `test_authoring_agent.py`'s scaffold case reading the
+# health check `not-available`, and `test_doxchat_model_intake.py`'s approval
+# case reading its approved binding "not trusted on this machine", which the
+# governed policy decides by the declaration instead.
+#
+# WHERE THE RUN IS COMPOSED, for the length of each test of a file
+# HOST_SEAM_SUITES names, this registers what openxFactory's host registers at
+# each named seam, and puts the seam back afterwards, as T073 registers the
+# rail. What is registered is read off `opendox_host.seams()`, the table the
+# host's process start registers from, so a later host pin is followed. A
+# registration held before the test is dropped for it, and a host's is
+# registered again after it. openDox's own default is not, since its consumers
+# register it again, as `a_hosts_plane` treats the default profile.
+HEALTH_CHECK_SEAM = ("opendox.workbench", "register_health_check")
+BINDING_TRUST_SEAM = ("opendox.doxbench_trust", "register")
+
+HOST_SEAM_SUITES: dict[str, tuple[tuple[str, str], ...]] = {
+    "test_authoring_agent.py": (HEALTH_CHECK_SEAM,),
+    "test_doxchat_model_intake.py": (BINDING_TRUST_SEAM,),
+}
+
+#: For each seam: the global that holds its registration, the global that marks
+#: it openDox's default (None where the seam has no default), and the call that
+#: empties it.
+HOST_SEAM_HOLDERS: dict[tuple[str, str], tuple[str, str | None, str]] = {
+    HEALTH_CHECK_SEAM: ("_health_check", None, "unregister_health_check"),
+    BINDING_TRUST_SEAM: ("_registered", "_is_default", "unregister"),
+}
+
+
+def openxfactory_seams(wanted) -> tuple:
+    """The rows of openxFactory's host seam table for the seams `wanted` names,
+    each `(module, registration call, what it registers)`, where the run is
+    composed, and none where it is not."""
+    host_module = openxfactory_host()
+    if host_module is None or not wanted:
+        return ()
+    saved = list(sys.path)
+    try:
+        table = tuple(host_module.seams())
+    finally:
+        sys.path[:] = saved
+    _refuse_an_openxdox_from_elsewhere()
+    rows = []
+    for seam in wanted:
+        found = [row for row in table if (row[0].__name__, row[1]) == seam]
+        if len(found) != 1:
+            raise RuntimeError(
+                f"openxFactory's host seam table names {len(found)} rows for "
+                f"{'.'.join(seam)}, so what its host registers there is not one "
+                "thing this harness can register for it")
+        rows.append(found[0])
+    return tuple(rows)
+
+
+@contextlib.contextmanager
+def a_hosts_seam(module, call: str, what):
+    """Register `what` at the seam `module.call` for the length of the block,
+    then put the seam back as it was, less openDox's default."""
+    held, is_default, unregister = HOST_SEAM_HOLDERS[(module.__name__, call)]
+    previous = getattr(module, held, None)
+    a_hosts = previous is not None and not (
+        is_default is not None and getattr(module, is_default, False))
+    getattr(module, unregister)()
+    try:
+        yield getattr(module, call)(what)
+    finally:
+        getattr(module, unregister)()
+        if a_hosts:
+            getattr(module, call)(previous)
+
+
+@_pytest.fixture(autouse=True)
+def _the_hosts_seams_for_the_seam_suites(request):
+    rows = openxfactory_seams(HOST_SEAM_SUITES.get(request.node.path.name, ()))
+    if not rows:
+        yield
+        return
+    with contextlib.ExitStack() as stack:
+        for module, call, what in rows:
+            stack.enter_context(a_hosts_seam(module, call, what))
+        yield
+
+
+# CS. THE CONTRACT FAMILY'S COMPOSED SOURCE (OQ-R9-2). The family's validator
+# is this leg's (`scripts/validate-ideation-dashboard-contracts.py` and its
+# packaged copy), and its schemas and examples sit with three owners in the
+# composed tree: openxFactory, openDox-spec and openXdox-spec. The validator
+# takes "the family's other seven" schemas from the ONE directory
+# `CONTRACTS_DIR` names, and its examples from beside it. With nothing named,
+# T094 measured the family's tests unresolvable composed.
+#
+# WHERE THE RUN IS COMPOSED, the farm is built once, at this conftest's import,
+# and CONTRACTS_DIR is set to it in this process's environment, before any test
+# imports the validator (it reads the variable at import) or starts it (a
+# subprocess inherits it). The module's CONTRACTS_DIR names the same directory.
+# The farm is laid out openxFactory-style, as openxFactory's own composed
+# validator farm is (`doxbench_contracts._composed_validator`):
+#   * `<farm>/contracts/schemas/`: a link to each schema the carve manifest
+#     resolves under `contracts/schemas/`, wherever the shed left it
+#     (`carved_reach.sources_under`), then to each of openxFactory's own
+#     schemas that is not linked yet;
+#   * `<farm>/examples/ideation-dashboard/`: a link to each YAML example the
+#     three owners keep under `examples/ideation-dashboard/`, at the same
+#     relative path, less openDox's own `opendox-snapshot-*` examples, whose
+#     kind the family's validator does not serve. Two owners naming one path
+#     is refused, never resolved.
+# It is OUTSIDE the checkout, in a temporary directory removed at exit: the
+# validator refuses a `contracts/` that links out of its tree (`:157-163`). A
+# temporary root inside the checkout (a TMPDIR, or `under`, beneath it) is
+# refused before anything is created.
+# The reach is read with `sys.path` saved and put back, and it must be the
+# composed tree's own.
+CONTRACT_EXAMPLE_LEFT_OUT = "opendox-snapshot-"
+
+
+def build_contracts_farm(reach, farm: Path) -> Path:
+    """Lay the family's composed source out under `farm`, from openxFactory's
+    reach `reach` (`carved_reach`), and answer `<farm>/contracts`, the
+    directory CONTRACTS_DIR names."""
+    schemas = farm / "contracts" / "schemas"
+    schemas.mkdir(parents=True)
+    for key, resolved in sorted(reach.sources_under("contracts/schemas").items()):
+        name = key.rsplit("/", 1)[-1]
+        if key == f"contracts/schemas/{name}":
+            (schemas / name).symlink_to(resolved)
+    for path in sorted((reach.REPO_ROOT / "contracts" / "schemas").glob("*.yaml")):
+        if not (schemas / path.name).exists():
+            (schemas / path.name).symlink_to(path)
+    examples = farm / "examples" / "ideation-dashboard"
+    examples.mkdir(parents=True)
+    linked: dict[Path, Path] = {}
+    for owner in (reach.REPO_ROOT, reach.MOUNTS["opendox_spec"],
+                  reach.MOUNTS["openxdox_spec"]):
+        base = owner / "examples" / "ideation-dashboard"
+        for path in sorted(base.rglob("*.yaml")):
+            if path.name.startswith(CONTRACT_EXAMPLE_LEFT_OUT):
+                continue
+            relative = path.relative_to(base)
+            if relative in linked:
+                raise RuntimeError(
+                    f"two owners keep the example {relative}: {linked[relative]} "
+                    f"and {path}. The farm links one file per path, so it "
+                    "refuses rather than choose")
+            linked[relative] = path
+            (examples / relative).parent.mkdir(parents=True, exist_ok=True)
+            (examples / relative).symlink_to(path)
+    return farm / "contracts"
+
+
+def compose_the_contracts_farm(environ, *, under: str | None = None) -> Path | None:
+    """Where the run is composed: build the farm in a new temporary directory
+    (in `under`, or the system's), set `environ["CONTRACTS_DIR"]` to it, and
+    answer it. Where it is not: answer None, and touch nothing."""
+    root = openxfactory_root()
+    if root is None:
+        return None
+    parent = Path(under if under is not None else _tempfile.gettempdir()).resolve()
+    if parent.is_relative_to(REPO_ROOT):
+        raise RuntimeError(
+            f"the contracts farm would be built under {parent}, inside this "
+            f"checkout ({REPO_ROOT}), and it must sit outside it. Point TMPDIR "
+            "outside the checkout")
+    saved = list(sys.path)
+    try:
+        reach = importlib.import_module("carved_reach")
+    finally:
+        sys.path[:] = saved
+    if Path(reach.REPO_ROOT).resolve() != root:
+        raise RuntimeError(
+            f"carved_reach was imported from {reach.__file__}, not from the "
+            f"composed tree at {root}, so the farm would read another tree")
+    farm = Path(_tempfile.mkdtemp(prefix="openxdox-contracts-farm-", dir=under))
+    _atexit.register(_shutil.rmtree, farm, ignore_errors=True)
+    contracts = build_contracts_farm(reach, farm)
+    environ["CONTRACTS_DIR"] = str(contracts)
+    return contracts
+
+
+CONTRACTS_DIR = compose_the_contracts_farm(_os.environ)
+
+
+# LI. THE LAUNCH SUITE'S LOCAL INSTALL, EXTENDED (W2). `test_renderer.py` and
+# `test_repo_root_guard.py` drive `generate-and-open` too, and T094 measured
+# four of their cases composed reading "generate-and-open refused:
+# OPENDOX_OIDC_ISSUER is required ... this install is HOSTED". W2 extends T086's
+# Q4 (a) premise to them: `_the_launch_suite_runs_a_local_install` above runs
+# for each file `runs_a_local_install` answers. For these two, only where the
+# run is composed; for the launch suite, everywhere, as before.
+LOCAL_INSTALL_SUITES = frozenset({"test_renderer.py", "test_repo_root_guard.py"})
+
+
+def runs_a_local_install(suite: str) -> bool:
+    """Whether `suite`'s cases run on the local install the launch suite's
+    fixture stands in."""
+    return suite == _LAUNCH_SUITE or (
+        suite in LOCAL_INSTALL_SUITES and openxfactory_host() is not None)
