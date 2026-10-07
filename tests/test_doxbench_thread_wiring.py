@@ -35,7 +35,8 @@ from pathlib import Path
 import pytest
 
 from conftest import (  # noqa: F401  (sys.path side effect)
-    BASE_REPO, REPO_ROOT, serve_surface_source,
+    BASE_REPO, carved_module_homes, carved_module_path,
+    openxfactory_root, serve_surface_source,
 )
 
 from opendox import doxbench_knowledge as kn  # noqa: E402
@@ -954,10 +955,35 @@ def test_no_thread_write_path_reaches_a_push(tmp_path):
     # there rather than restating four names is what keeps the two sweeps from
     # drifting apart while both keep passing.
     for module in NO_IMPLICIT_PUSH_MODULES:
-        source = (REPO_ROOT / "scripts" / "ideation_dashboard"
-                  / module).read_text(encoding="utf-8")
+        source = _swept_module_path(module).read_text(encoding="utf-8")
         for forbidden in FORBIDDEN_PUSH_TOKENS:
             assert forbidden not in source, (module, forbidden)
+
+
+def _swept_module_path(module: str) -> Path:
+    """Where the pre-carve `scripts/ideation_dashboard/<module>` the push sweep
+    reads lives in a composed run (plan 038 T101, R2-INV-R9's PP).
+
+    The carve split the swept modules: most went to openDox or came to this
+    leg (`carved_module_homes`), and three stayed openxFactory's own
+    (`nightly_lane.py`, `doxbench_status_exemption.py`,
+    `serve_openxfactory_lanes.py`), which the composed tree carries at
+    openxFactory's `scripts/ideation_dashboard/`. So a module is read from the
+    ONE of those three homes that has it. A module found in two homes, or in
+    none, refuses the sweep by name, so a module that moves again reads as a
+    failure, never as a sweep that got smaller."""
+    openxfactory = openxfactory_root()
+    assert openxfactory is not None, (
+        "the push sweep reads three of its modules from openxFactory's tree, "
+        "so it runs composed (R1Q23 (a)), with openxFactory's scripts/ on the "
+        "path")
+    homes = (*carved_module_homes(module),
+             openxfactory / "scripts" / "ideation_dashboard" / module)
+    found = [path for path in homes if path.is_file()]
+    assert len(found) == 1, (
+        f"{module}: expected in exactly one of {[str(h) for h in homes]}; "
+        f"found in {len(found)}")
+    return found[0]
 
 
 # ===========================================================================
@@ -1352,8 +1378,16 @@ def test_the_liveness_question_has_ONE_spelling_and_it_normalises_refs(
     # and serve.py's method is that function, not a copy of it
     # THE SERVE SURFACE, not one file of it (§ 2.4 PR 2 of 4 moved this
     # code to a sibling module; the scan widened rather than narrowed).
+    # SINCE T084 (openDox-code `e49b17c`; RULED openxFactory#656 `5920216845`)
+    # the serve asks it THROUGH THE SCOPE SEAM: the route asks its own method,
+    # and that method asks the registered scope authority, whose openXdox
+    # registration IS `doxbench_scope` (`column_contributions.SCOPE`). Still
+    # ONE spelling, asked and not re-derived (plan 038 T101, R2-INV-R9's CP).
     serve_source = serve_surface_source()
-    assert "doxbench_scope.is_live_session_ref(" in serve_source
+    assert "self._is_live_session_ref(" in serve_source
+    assert "column_seams.scope.current().is_live_session_ref(" in serve_source
+    from openxdox import column_contributions
+    assert column_contributions.SCOPE is doxbench_scope
     assert "live_session_branches(" not in serve_source, (
         "serve.py must ASK the shared question, not re-derive it (a prose "
         "mention of the authority is fine; a call is a second copy)")
@@ -1383,6 +1417,7 @@ def test_another_tiles_session_is_not_this_tiles_worktree(scratch_repo):
 
 def test_the_thread_prefix_is_declared_on_exactly_one_gate():
     """The widening is as narrow as the task allows: ONE prefix, ONE gate."""
-    source = (REPO_ROOT / "scripts" / "ideation_dashboard"
-              / "gate_routes.py").read_text(encoding="utf-8")
+    # `gate_routes.py` came to this leg (`src/openxdox/`), read at its carved
+    # home (plan 038 T101).
+    source = carved_module_path("gate_routes.py").read_text(encoding="utf-8")
     assert source.count("doxbench_threads.THREAD_PREFIX") == 1

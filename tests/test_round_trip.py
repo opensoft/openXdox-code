@@ -26,7 +26,7 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from conftest import REPO_ROOT
+from conftest import carved_module_path, openxfactory_root
 
 from doc_health import families
 from openxdox import gate_console as gc
@@ -461,7 +461,9 @@ def test_round_trip_and_doc_health_agree_about_every_fence(name):
 # fenced-flag vector each module computes, which is the thing all four actually
 # share.
 
-_MOVER = REPO_ROOT / "scripts" / "proposal-support.py"
+# openxFactory's own forward gate, which the carve left in openxFactory: read
+# from the composed tree (plan 038 T103).
+_MOVER = openxfactory_root() / "scripts" / "proposal-support.py"
 
 
 def _mover_module():
@@ -727,9 +729,11 @@ def test_the_shared_predicate_is_spelled_the_same_in_all_three():
     """The algorithm, not just its outcome on these fixtures: all three lstrip (or
     trimStart) and then test the literal three backticks. A fixture set can only
     ever sample the input space; this pins the rule itself."""
-    mine = (REPO_ROOT / "scripts/ideation_dashboard/round_trip.py").read_text(
-        encoding="utf-8")
-    fam = (REPO_ROOT / "scripts/doc_health/families.py").read_text(encoding="utf-8")
+    # Each read where its module now lives (plan 038 T103): `round_trip.py` at
+    # its carved home, this leg's `src/openxdox/`, and `families.py` where this
+    # process imports it from, openxFactory's composed tree.
+    mine = carved_module_path("round_trip.py").read_text(encoding="utf-8")
+    fam = Path(families.__file__).read_text(encoding="utf-8")
     js = OUTLINE_MODEL_JS.read_text(encoding="utf-8")
     assert 'return line.lstrip().startswith("```")' in mine
     assert 'if line.lstrip().startswith("```")' in fam
