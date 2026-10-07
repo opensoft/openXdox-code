@@ -17,7 +17,7 @@ import yaml as yaml_mod
 
 import pytest
 
-from opendox import cli
+from opendox import cli, generator_seam
 from openxdox import gate_console as gc
 from openxdox import kickoff as ko
 from opendox.boundary import HumanGate
@@ -60,9 +60,13 @@ def _checkout(tmp_path, register=None, name="checkout"):
 
 def _wire_snapshot(monkeypatch, snapshot=None):
     """`derive-possibles` validates its cluster against the SNAPSHOT; stub the
-    generation the way the lens CLI tests do, so the case stays hermetic."""
+    generation the way the lens CLI tests do, so the case stays hermetic.
+
+    The CLI generates through the generator seam (plan 034 T055), which looks
+    the registered generator up on each call, so the seam's `generate` is what
+    a stub replaces."""
     monkeypatch.setattr(
-        cli, "generate_snapshot",
+        generator_seam, "generate",
         lambda *a, **k: CLUSTERS if snapshot is None else snapshot)
 
 

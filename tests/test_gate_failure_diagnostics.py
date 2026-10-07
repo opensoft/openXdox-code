@@ -42,7 +42,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit
+from conftest import BASE_REPO, PINNED_REVISION, FakeGit
 from session_fixtures import build_scratch_repo
 
 from openxdox import gate_routes as gr
@@ -205,11 +205,12 @@ def test_two_different_long_set_names_do_not_collapse_onto_one_manifest():
     assert wb.notebook_alias(a) != wb.notebook_alias(b)
 
 
+# `workbench` is openDox's since the carve, installed beside this checkout, so
+# a fresh interpreter imports it by name and needs no path to find it.
 _SLUG_IN_A_FRESH_INTERPRETER = """\
 import sys
-sys.path.insert(0, sys.argv[1])
-from ideation_dashboard.workbench import slug
-print(slug(sys.argv[2]))
+from opendox.workbench import slug
+print(slug(sys.argv[1]))
 """
 
 
@@ -218,8 +219,7 @@ def _slug_in_another_process(name: str, *, hash_seed: str) -> str:
     `PYTHONHASHSEED`. The seed is the point: it is the one input a same-process
     repeat holds fixed and a real second run does not."""
     return subprocess.run(
-        [sys.executable, "-c", _SLUG_IN_A_FRESH_INTERPRETER,
-         str(REPO_ROOT / "scripts"), name],
+        [sys.executable, "-c", _SLUG_IN_A_FRESH_INTERPRETER, name],
         capture_output=True, text=True, check=True,
         env={**os.environ, "PYTHONHASHSEED": hash_seed}).stdout.strip()
 

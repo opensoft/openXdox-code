@@ -113,7 +113,10 @@ def _serving(repo, snapshot_path):
 def _raw_get(host, port, raw_path):
     """A RAW request-line path, so the server's own resolver is what answers."""
     conn = http.client.HTTPConnection(host, port, timeout=5)
-    conn.putrequest("GET", raw_path, skip_host=False, skip_accept_encoding=True)
+    # ONE `Host` line: `skip_host=True` keeps `putrequest` from adding its own,
+    # so the `putheader` below is the only one. openDox's loopback Host guard
+    # (plan 034 T103, openDox-code `390e2c2`) refuses a second as `403 invalid_host`.
+    conn.putrequest("GET", raw_path, skip_host=True, skip_accept_encoding=True)
     conn.putheader("Host", f"{host}:{port}")
     conn.endheaders()
     resp = conn.getresponse()
