@@ -10,3 +10,7 @@ venv/
 *.swp
 .idea/
 .vscode/
+
+# What scripts/composed_placements.py places for a composed run (plan 038
+# T022): linked from the composed tree, never committed.
+/docs/ideation-dashboard-session-runbook.md
