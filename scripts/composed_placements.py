@@ -28,7 +28,8 @@ remedy otherwise:
   * each source is a file openDox-spec TRACKS, UNMODIFIED, in a spec checkout
     whose HEAD is the commit the openDox root's `spec` gitlink names. So the
     run reads the pinned document, and not whatever a working tree holds;
-  * each destination is ignored by this checkout's `.gitignore`;
+  * each destination is ignored by this checkout's own `.gitignore`, not
+    only by a local exclude (`.git/info/exclude`, `core.excludesFile`);
   * a destination already present is this script's own link to that same
     source. Anything else there is refused, never overwritten.
 It places all or nothing: every check passes before the first link is made.
@@ -85,10 +86,25 @@ class PlacementRefused(Exception):
     """A placement this script will not make, with the reason and the remedy."""
 
 
+#: Git variables that select a repository, work tree or index. Git honours
+#: them over the directory each check runs in, and it sets `GIT_DIR` and
+#: `GIT_WORK_TREE` for every hook it runs, so a hook running this script would
+#: point the pin, clean and ignore checks at another repository. They are
+#: dropped for every call, as `openxdox.domain_corpus_adapter`'s
+#: `AMBIENT_GIT_VARIABLES` drops them (Copilot r4200975244).
+AMBIENT_GIT_VARIABLES = (
+    "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CEILING_DIRECTORIES", "GIT_PREFIX",
+)
+
+
 def _git(*args: str, cwd: Path) -> subprocess.CompletedProcess:
+    environment = {key: value for key, value in os.environ.items()
+                   if key not in AMBIENT_GIT_VARIABLES}
     try:
-        return subprocess.run(["git", *args], cwd=cwd, capture_output=True,
-                              text=True, check=False)
+        return subprocess.run(["git", *args], cwd=cwd, env=environment,
+                              capture_output=True, text=True, check=False)
     except FileNotFoundError as exc:
         raise PlacementRefused(
             "git is not on PATH, and the placements are checked with it") from exc
@@ -137,12 +153,25 @@ def _check(placement: Placement, spec: Path) -> tuple[Path, Path]:
             "read the pinned document; restore it with `git checkout -- "
             f"{placement.source}` in {spec}.")
     destination = CHECKOUT / placement.destination
-    ignored = _git("check-ignore", "-q", "--", str(placement.destination),
+    # Ignored by the repository-root `.gitignore` itself, never by a local
+    # exclude (`.git/info/exclude`, `core.excludesFile`), which no other
+    # checkout carries. `-v` prints the deciding pattern as
+    # `<source>:<line>:<pattern><TAB><path>`, its source relative to the
+    # repository root, and exits 0 for a negated (`!`) pattern too.
+    verdict = _git("check-ignore", "-v", "--", str(placement.destination),
                    cwd=CHECKOUT)
-    if ignored.returncode != 0:
+    ignored_by, _, rest = verdict.stdout.partition(":")
+    pattern = rest.partition(":")[2].partition("\t")[0]
+    if verdict.returncode != 0 or pattern.startswith("!"):
         raise PlacementRefused(
             f"{placement.destination} is not ignored by this checkout's "
             ".gitignore, so a placed file could be committed. Name it there.")
+    if ignored_by != ".gitignore":
+        raise PlacementRefused(
+            f"{placement.destination} is ignored only by {ignored_by}, a local "
+            "exclude that no other checkout carries, and not by this "
+            "checkout's .gitignore, so a placed file could be committed "
+            "elsewhere. Name it in .gitignore.")
     if os.path.lexists(destination):
         if not (destination.is_symlink()
                 and Path(os.readlink(destination)) == source):

@@ -222,11 +222,58 @@ def test_an_uninitialized_opendox_root_is_refused(composed):
     assert not os.path.lexists(composed.destination)
 
 
-def test_a_destination_the_gitignore_does_not_name_is_refused(composed):
+def _drop_the_gitignore_line(composed: Composed) -> None:
     gitignore = composed.checkout / ".gitignore"
     text = gitignore.read_text(encoding="utf-8")
     assert f"/{RUNBOOK}\n" in text, "this checkout's .gitignore names the runbook"
     gitignore.write_text(text.replace(f"/{RUNBOOK}\n", ""), encoding="utf-8")
+
+
+def _exclude_locally(composed: Composed, where: str, tmp_path: Path) -> None:
+    """Name the runbook in a local exclude, which no other checkout carries."""
+    if where == "info/exclude":
+        exclude = composed.checkout / ".git" / "info" / "exclude"
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        with exclude.open("a", encoding="utf-8") as handle:
+            handle.write(f"/{RUNBOOK}\n")
+    else:
+        excludes = tmp_path / "excludes"
+        excludes.write_text(f"/{RUNBOOK}\n", encoding="utf-8")
+        _git("config", "core.excludesFile", str(excludes), cwd=composed.checkout)
+
+
+def test_a_destination_the_gitignore_does_not_name_is_refused(composed):
+    _drop_the_gitignore_line(composed)
+    said = composed.refused()
+    assert "is not ignored by this checkout's .gitignore" in said
+    assert not os.path.lexists(composed.destination)
+
+
+@pytest.mark.parametrize("where", ["info/exclude", "core.excludesFile"])
+def test_a_destination_only_a_local_exclude_names_is_refused(composed, tmp_path,
+                                                             where):
+    # Copilot r4196244480; the holder's ruling on opensoft/openxFactory#656,
+    # comment 6026275158, item 2: the root .gitignore must be the source.
+    _drop_the_gitignore_line(composed)
+    _exclude_locally(composed, where, tmp_path)
+    said = composed.refused()
+    assert "a local exclude that no other checkout carries" in said
+    assert not os.path.lexists(composed.destination)
+
+
+def test_a_local_exclude_beside_the_gitignore_line_still_places(composed,
+                                                                 tmp_path):
+    # The root .gitignore outranks a local exclude, so it stays the source.
+    _exclude_locally(composed, "info/exclude", tmp_path)
+    result = composed.run()
+    assert result.returncode == 0, result.stderr
+    assert composed.destination.is_symlink()
+
+
+def test_a_gitignore_that_negates_the_destination_is_refused(composed):
+    # `git check-ignore -v` exits 0 for a negated pattern too.
+    with (composed.checkout / ".gitignore").open("a", encoding="utf-8") as handle:
+        handle.write(f"!/{RUNBOOK}\n")
     said = composed.refused()
     assert "is not ignored by this checkout's .gitignore" in said
     assert not os.path.lexists(composed.destination)
@@ -238,6 +285,32 @@ def test_without_git_on_path_it_refuses(composed, tmp_path):
     said = composed.refused(PATH=str(nothing))
     assert "git is not on PATH" in said
     assert not os.path.lexists(composed.destination)
+
+
+@pytest.mark.parametrize("edited", [False, True], ids=["clean", "edited"])
+def test_ambient_git_repository_variables_do_not_redirect_the_checks(
+        composed, tmp_path, edited):
+    # Copilot r4200975244: git sets GIT_DIR and GIT_WORK_TREE for every hook,
+    # and honours them over the directory each check runs in. Pointed at a
+    # decoy repository, they must change nothing.
+    decoy = tmp_path / "decoy"
+    decoy.mkdir()
+    _git("init", "-q", cwd=decoy)
+    (decoy / "README.md").write_text("decoy\n", encoding="utf-8")
+    _git("add", "README.md", cwd=decoy)
+    _git("commit", "-q", "-m", "decoy", cwd=decoy)
+    ambient = {"GIT_DIR": str(decoy / ".git"), "GIT_WORK_TREE": str(decoy),
+               "GIT_INDEX_FILE": str(decoy / ".git" / "index")}
+    if edited:
+        composed.source.write_text("edited in the working tree\n",
+                                   encoding="utf-8")
+        said = composed.refused(**ambient)
+        assert "differs from openDox-spec's pinned commit" in said
+        assert not os.path.lexists(composed.destination)
+    else:
+        result = composed.run(**ambient)
+        assert result.returncode == 0, result.stderr
+        assert composed.destination.read_text(encoding="utf-8") == "runbook A\n"
 
 
 # --- what it never overwrites or takes away ---------------------------------
