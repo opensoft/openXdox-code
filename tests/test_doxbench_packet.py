@@ -33,7 +33,7 @@ from pathlib import Path
 import pytest
 
 from conftest import REPO_ROOT  # noqa: F401  (sys.path side effect)
-from conftest import assert_not_at_this_leg, carved_module_path
+from conftest import assert_not_at_this_leg, carved_module_path, openxfactory_root
 
 from opendox import doxbench_knowledge as kn  # noqa: E402
 from opendox import doxbench_packet as pk  # noqa: E402
@@ -593,7 +593,10 @@ def test_the_status_read_agrees_with_the_repositorys_own_corpus_reader():
 
     assert pk.STATUS_SCAN_LINES == 15
     checked = 0
-    for path in sorted((REPO_ROOT / "docs").rglob("*.md"))[:80]:
+    # THE REPOSITORY'S OWN CORPUS is openxFactory's, the one its corpus reader
+    # reads, so it is read from the composed tree (plan 038 T103): this
+    # checkout's own `docs/` holds too few documents for the check to be one.
+    for path in sorted((openxfactory_root() / "docs").rglob("*.md"))[:80]:
         text = path.read_text(encoding="utf-8", errors="replace")
         assert pk.lifecycle_status(text) == parse_status(text), path
         checked += 1
