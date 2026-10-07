@@ -8,19 +8,25 @@ Three layers, each proven where it lives:
     itself (the roster, the freshness header contract, the stale notice, the
     passive newer-data hint, and the sparse-station note) — skipped when node is
     absent, exactly like the sibling model harnesses;
-  * serve.py is driven over real HTTP for the keyed snapshot route, the snapshot
-    index, per-entry `/source` confinement, the freshness headers, and BOTH
-    refresh bindings (including every refusal: off-loopback regenerate, an
+  * openDox's serve is driven over real HTTP for the keyed snapshot route, the
+    snapshot index, per-entry `/source` confinement, the freshness headers, and
+    BOTH refresh bindings (including every refusal: off-loopback regenerate, an
     unknown pair, and an unreachable source leaving the prior view in place);
-  * the D12 relative-import fix is proven the only way it can be — by starting
-    `serve.py` as a PLAIN SCRIPT in a subprocess (which is exactly how the served
-    container image starts it) and POSTing to an action route, where the old
-    relative imports produced a 500 with a traceback in the log.
+  * the serve is started in a SUBPROCESS, as a plain script and as a module,
+    with the host registered from THIS checkout, and POSTed to; and openDox's
+    own serve, with no host, is POSTed to off loopback without loading PyYAML.
+
+These run composed (`tests/declared_exclusion.yaml`; ARC-Q2 (a), openxFactory#656
+comment 6016982816), under the host `tests/conftest.py` registers for the
+declared-host suites (plan 038 T095). Plan 038 T100 respelled them to the carve
+(T094's map R2-INV-R9, and the holder's rulings on it, openxFactory#656 comment
+6021830531).
 """
 
 from __future__ import annotations
 
 import http.client
+import inspect
 import json
 import os
 import re
@@ -34,28 +40,23 @@ from pathlib import Path
 
 import pytest
 
-from conftest import (BASE_REPO, PINNED_REVISION, REPO_ROOT, FakeGit,
-                      serve_surface_paths, serve_surface_source)
+from conftest import (BASE_REPO, BUILT_FACETS, GOVERNED_COLUMNS, PINNED_REVISION,
+                      REPO_ROOT, FakeGit, _refuse_an_openxdox_from_elsewhere)
 
 from opendox import serve as serve_mod
 from openxdox import snapshot_registry as reg
 from openxdox.generator import generate_snapshot
+# The snapshot index is the projection column's route, and the column is
+# openXdox's since the carve (BUILD slice 2b): openDox's serve no longer names it.
+from openxdox.serve_projection import SNAPSHOT_INDEX_ROUTE
 
 from opendox_bundle import OPENDOX_WEB  # noqa: E402  (skips where the pin carries no bundle)
 
 WEB = OPENDOX_WEB
 MODEL_JS = WEB / "views" / "repo-selector-model.js"
-SERVE_PY = REPO_ROOT / "scripts" / "ideation_dashboard" / "serve.py"
+# The display reader the model imports (openDox § 3.4 slice S7).
+DISPLAY_JS = WEB / "views" / "display.js"
 NODE = shutil.which("node")
-
-# The D12 relative-import guard (see test_serve_module_uses_no_relative_imports
-# below): a single shared pattern, used both by the production scan and by
-# test_the_relative_import_guard_catches_every_dot_and_segment_depth, so a
-# future narrowing of the regex turns the pinning test red rather than leaving
-# it green against its own separately-maintained copy. Matches one or more
-# leading dots (sibling- or parent-relative) followed by an optional
-# dotted module path (`pkg`, `pkg.sub`, ...) before `import`.
-RELATIVE_IMPORT_RE = re.compile(r"\s*from\s+\.+[\w.]*\s+import\b")
 
 
 def _snapshot(repository="fixture-repo", revision=PINNED_REVISION):
@@ -75,8 +76,12 @@ def _write_snapshot(path: Path, repository="fixture-repo", revision=PINNED_REVIS
 
 _NODE_HARNESS = """
 import * as m from './repo-selector-model.mjs';
+import { readDisplay } from './display.js';
 import { readFileSync } from 'node:fs';
 const input = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+// the display the shell installs from /capabilities; none handed in reads as
+// the neutral install, exactly as a shell whose probe found no facet
+const display = readDisplay({ display: input.display || null });
 const roster = m.buildRoster(input.index);
 const active = m.resolveActive(input.index, input.requested || null);
 const stored = m.resolveActive(input.index, 'MedxFactory@main');
@@ -96,8 +101,9 @@ const out = {
   stale: m.staleNotice(active),
   newer: m.newerAvailable(active, input.snapshot),
   hint: m.hintLabel(active),
-  emptyStations: m.emptyStations(input.snapshot).map((s) => s.key),
-  sparse: m.sparseNotice(active, input.snapshot),
+  emptyStations: m.emptyStations(input.snapshot, display).map((s) => s.key),
+  sparse: m.sparseNotice(active, input.snapshot, display),
+  displayRead: { facet: display.hostFacet, profile: display.hostProfile },
   emptyRoster: m.buildRoster(null).length,
   noIndexActive: m.resolveActive(null, null),
   keyRoundTrip: m.keyId('openxFactory', null) + '|' + JSON.stringify(m.parseKeyId('a@feat/x')),
@@ -123,10 +129,25 @@ console.log(JSON.stringify(out));
 """
 
 
+def _place_the_model(tmp_path):
+    """Copy the model beside a harness, with the one module it imports.
+
+    Since openDox's § 3.4 slice S7 the model imports `./display.js`, the reader
+    of the display facet the shell installs, so a harness that copied the model
+    alone failed in node on `ERR_MODULE_NOT_FOUND` before any derivation ran.
+    `display.js` is copied beside it under its own name, as the staging
+    workbench's harnesses copy their model's siblings (plan 038 T026), and
+    `package.json` makes node read `.js` as a module. This is R9-W1 (A″)
+    (openxFactory#656 comment 6021830531): openDox's module is left as it is."""
+    shutil.copy(MODEL_JS, tmp_path / "repo-selector-model.mjs")
+    shutil.copy(DISPLAY_JS, tmp_path / "display.js")
+    (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
+
+
 def _run_model(payload, tmp_path):
     if not NODE:
         pytest.skip("node not available for the JS derivation probe")
-    shutil.copy(MODEL_JS, tmp_path / "repo-selector-model.mjs")
+    _place_the_model(tmp_path)
     (tmp_path / "harness.mjs").write_text(_NODE_HARNESS, encoding="utf-8")
     data = tmp_path / "input.json"
     data.write_text(json.dumps(payload), encoding="utf-8")
@@ -275,16 +296,33 @@ def test_model_passive_hint_fires_only_when_the_source_advertises_newer_data(tmp
 
 
 def test_model_names_the_empty_stations_of_a_sparse_repository(tmp_path):
+    """The note names each empty station in the words the plane SERVES.
+
+    Since openDox's § 3.4 slice S7 the model reads a station's label from the
+    display facet, and the shell installs the one `/capabilities` serves. So
+    the harness is handed that display, read from a server under the host this
+    run registers, and the words asserted are the served ones (R9-R1 (a),
+    openxFactory#656 comment 6021830531). The stations are still keyed by the
+    snapshot's own fields."""
+    served = _served_display(tmp_path / "served")
     sparse = {"repository": "agenttower",
               "generation": {"source_revision": "c" * 40},
               "documents": [], "clusters": [], "possibles": [], "staged_topics": [],
               "changes": [{"id": "add-thing", "status": "active"}]}
     r = _run_model({"index": _index(), "requested": "agenttower@main",
-                    "snapshot": sparse}, tmp_path)
+                    "snapshot": sparse, "display": served}, tmp_path)
+    # the harness read the display it was handed, not the neutral fallback
+    assert r["displayRead"] == {"facet": served["host_facet"],
+                                "profile": served["host_profile"]}
     assert r["emptyStations"] == ["documents", "clusters", "possibles", "staged_topics"]
-    assert "no ideation documents" in r["sparse"]
+    # each empty station, by its served label, in the funnel's order
+    labels = [served["stages"][role]["label"]
+              for role in ("source", "grouping", "candidate", "selection")]
+    assert r["sparse"].startswith("no " + ", no ".join(labels) + " in agenttower"), r["sparse"]
+    assert "no source items" in r["sparse"]         # the served word, as measured
     assert "honest" in r["sparse"]                  # sparse is rendered, never refused
-    full = _run_model({"index": _index(), "snapshot": _snapshot()}, tmp_path)
+    full = _run_model({"index": _index(), "snapshot": _snapshot(),
+                       "display": served}, tmp_path)
     assert full["sparse"] is None
 
 
@@ -318,6 +356,16 @@ def _get(host, port, path):
     return status, headers, body
 
 
+def _served_display(tmp_path):
+    """The `display` `/capabilities` serves, from a server built under the host
+    this run registered: the payload the shell reads and installs."""
+    snap = _write_snapshot(tmp_path / "snapshot.json")
+    with _serving(snapshot=snap, checkout_root=BASE_REPO) as (host, port, _):
+        status, _headers, body = _get(host, port, serve_mod.CAPABILITIES_ROUTE)
+    assert status == 200, body
+    return json.loads(body)["display"]
+
+
 def _post(host, port, path, obj=None):
     conn = http.client.HTTPConnection(host, port, timeout=15)
     body = json.dumps(obj or {}).encode("utf-8")
@@ -349,7 +397,7 @@ def test_single_repository_serve_is_unchanged_and_offers_one_entry(tmp_path):
     snap = _write_snapshot(tmp_path / "snapshot.json")
     with _serving(snapshot=snap, checkout_root=BASE_REPO) as (host, port, _):
         status, headers, body = _get(host, port, serve_mod.SNAPSHOT_ROUTE)
-        istatus, _iheaders, ibody = _get(host, port, serve_mod.SNAPSHOT_INDEX_ROUTE)
+        istatus, _iheaders, ibody = _get(host, port, SNAPSHOT_INDEX_ROUTE)
     assert status == 200 and json.loads(body)["repository"] == "fixture-repo"
     assert headers["x-snapshot-repository"] == "fixture-repo"
     assert headers["x-snapshot-ref"] == "main"
@@ -408,7 +456,7 @@ def test_unreachable_source_serves_the_baked_fallback_with_a_stale_header(tmp_pa
     with _serving(snapshot=baked, checkout_root=BASE_REPO, repository="alpha",
                   data_source=reg.DirectoryDataSource(tmp_path / "nowhere")) as (host, port, _):
         status, headers, body = _get(host, port, serve_mod.SNAPSHOT_ROUTE)
-        _i, _ih, ibody = _get(host, port, serve_mod.SNAPSHOT_INDEX_ROUTE)
+        _i, _ih, ibody = _get(host, port, SNAPSHOT_INDEX_ROUTE)
     assert status == 200 and json.loads(body)["repository"] == "alpha"
     assert headers["x-snapshot-origin"] == "baked"
     assert headers["x-snapshot-stale"] == "true"
@@ -536,37 +584,129 @@ def test_no_publication_build_or_rollout_route_exists(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# D12: serve.py runs as a PLAIN SCRIPT, and its POST routes work there
+# The serve in a SUBPROCESS: as a plain script and as a module, each with the
+# host registered from THIS checkout; and openDox's own serve, with no host
 # ---------------------------------------------------------------------------
 
+#: THE HOST, REGISTERED IN THE CHILD FROM THIS CHECKOUT (R9-W4, openxFactory#656
+#: comment 6021830531). A subprocess loads no conftest, so nothing registers a
+#: host in it, and openxFactory's own serve entry
+#: (`scripts/ideation-dashboard-serve.py`) imports openXdox from openxFactory's
+#: pinned leg, so a test started through it would measure that commit and not
+#: this one. So the child makes the registration `governed_host()` in
+#: `tests/conftest.py` makes, from this checkout:
+#:   * this checkout's `src/` goes first on the path, and openXdox's governed
+#:     columns (`GOVERNED_COLUMNS`) are imported from it, before anything of
+#:     openxFactory's;
+#:   * the `openxdox` the guard below takes as home must be this checkout's;
+#:   * openXdox's governed projection is registered at openDox's seams
+#:     (`openxdox.projection_contributions.register()`), from this checkout and
+#:     before anything reads a default there, as the root `conftest.py`'s
+#:     registration makes it at the start of this test process. openxFactory's
+#:     host makes the same call (`opendox_host.register_openxfactory()`, plan 034
+#:     T064); without it the serve projects through openDox's neutral defaults;
+#:   * openxFactory's composite (`opendox_host.profile()`, on the composed run's
+#:     path) is built and its facets (`BUILT_FACETS`) read with `sys.path` saved,
+#:     and `sys.path` is put back, since its lane column puts openxFactory's
+#:     pinned openXdox leg at the head of the path;
+#:   * T020's guard, the very function (`_refuse_an_openxdox_from_elsewhere`),
+#:     refuses any `openxdox` module imported from anywhere else;
+#:   * and only then is the composite registered with openDox's registry, before
+#:     `opendox.serve` runs, whose entry point then registers no default of its
+#:     own over it.
+_THIS_CHECKOUTS_HOST = """\
+import importlib
+import sys
+from pathlib import Path
+
+sys.path.insert(0, {src!r})
+for _module in {columns!r}:
+    importlib.import_module(_module)
+from openxdox import domain_profile as _domain_profile
+if Path(_domain_profile.__file__).resolve().parent != Path({src!r}).resolve() / "openxdox":
+    raise SystemExit("openxdox was imported from " + _domain_profile.__file__
+                     + ", not from this checkout's " + {src!r})
+from openxdox import projection_contributions
+projection_contributions.register()
+import opendox_host
+
+_saved = list(sys.path)
+try:
+    _composite = opendox_host.profile()
+    for _facet in {facets!r}:
+        getattr(_composite, _facet)
+finally:
+    sys.path[:] = _saved
+
+
+{guard}
+
+_refuse_an_openxdox_from_elsewhere()
+from opendox import domain_profile as _registry
+_registry.register(_composite)
+"""
+
+#: How the child runs the serve once the host is registered.
+#:   * As a PLAIN SCRIPT, as openxFactory's `scripts/ideation-dashboard-serve.py`
+#:     runs it, the file the container image starts: `opendox.serve`'s `main()`
+#:     over the process's own arguments.
+#:   * As a MODULE, as openDox documents its serve (`python -m opendox.serve`,
+#:     its `SERVE_PROG`): `runpy` does what `-m` does.
+AS_A_PLAIN_SCRIPT = "from opendox.serve import main\nsys.exit(main(sys.argv[1:]))\n"
+AS_A_MODULE = ("import runpy\n"
+               "runpy.run_module('opendox.serve', run_name='__main__', alter_sys=True)\n")
+
+
+def _this_checkouts_serve(tmp_path, how):
+    """A plain script, written for one test, that registers the host from this
+    checkout and then runs the serve `how` says. Hands back its argv."""
+    program = _THIS_CHECKOUTS_HOST.format(
+        src=str(REPO_ROOT / "src"),
+        columns=[module for _facet, module, _name in GOVERNED_COLUMNS],
+        facets=list(BUILT_FACETS),
+        guard=inspect.getsource(_refuse_an_openxdox_from_elsewhere))
+    script = tmp_path / "serve_from_this_checkout.py"
+    script.write_text(program + how, encoding="utf-8")
+    return [str(script)]
+
+
 @contextmanager
-def _plain_script_server(tmp_path, extra_args=(), env=None):
-    """Start serve.py the way the container image does — `python serve.py …`,
-    NOT `python -m ideation_dashboard.serve` — and hand back its URL. The
-    checkout is a COPY: this server's routes can write (the regenerate binding
-    does), and a test never writes into the committed fixture tree."""
+def _a_serve_process(tmp_path, argv, extra_args=(), env=None):
+    """Start the serve in a subprocess, `python -u <argv> …`, and hand back its
+    URL. The checkout is a COPY: this server's routes can write (the regenerate
+    binding does), and a test never writes into the committed fixture tree."""
     snap = _write_snapshot(tmp_path / "snapshot.json")
     checkout = tmp_path / "checkout"
     shutil.copytree(BASE_REPO, checkout)
     proc = subprocess.Popen(
-        [sys.executable, "-u", str(SERVE_PY), "--snapshot", str(snap),
+        [sys.executable, "-u", *argv, "--snapshot", str(snap),
          "--checkout-root", str(checkout), "--host", "127.0.0.1", "--port", "0",
          "--actor", "tester", *extra_args],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
         cwd=str(tmp_path), env=env)
     port = None
+    said = []
     deadline = time.time() + 30
     try:
         while time.time() < deadline:
             line = proc.stdout.readline()
             if not line:
                 break
+            said.append(line)
             match = re.search(r"http://127\.0\.0\.1:(\d+)/", line)
             if match:
                 port = int(match.group(1))
                 break
-        assert port, "serve.py did not report a URL when run as a plain script"
-        yield "127.0.0.1", port, proc
+        assert port, "the serve did not report a URL:\n" + "".join(said)
+        try:
+            yield "127.0.0.1", port, proc
+        except BaseException as failure:
+            # what the serve printed while the test talked to it, tracebacks
+            # included, goes with the failure
+            proc.terminate()
+            rest, _ = proc.communicate(timeout=10)
+            failure.add_note("the serve said:\n" + "".join(said) + (rest or ""))
+            raise
     finally:
         proc.terminate()
         try:
@@ -578,15 +718,20 @@ def _plain_script_server(tmp_path, extra_args=(), env=None):
 def test_plain_script_invocation_serves_get_and_post_routes(tmp_path):
     """The D12 regression: under plain-script invocation the old relative
     `from . import …` imports made EVERY POST route 500 (the handler died before
-    writing a response — a client saw the connection close). Here the new refresh
-    route runs its binding and the unknown-action refusal — the path that goes
-    through the error catalog, i.e. the crash site — answers structurally.
+    writing a response — a client saw the connection close). Started as a plain
+    script, as the container image starts its serve, the refresh route runs its
+    binding and the unknown-action refusal — the path that goes through the
+    error catalog, i.e. the crash site — answers structurally.
+
+    The script registers the host from this checkout first (R9-W4), since the
+    snapshot index and the refresh are routes a host contributes.
 
     (The notebook route is deliberately NOT posted: it would project a real
-    scratch notebook. Its import path is pinned statically instead, below.)"""
-    with _plain_script_server(tmp_path) as (host, port, _proc):
+    scratch notebook.)"""
+    argv = _this_checkouts_serve(tmp_path, AS_A_PLAIN_SCRIPT)
+    with _a_serve_process(tmp_path, argv) as (host, port, _proc):
         snap_status, _h, snap_body = _get(host, port, serve_mod.SNAPSHOT_ROUTE)
-        index_status, _ih, index_body = _get(host, port, serve_mod.SNAPSHOT_INDEX_ROUTE)
+        index_status, _ih, index_body = _get(host, port, SNAPSHOT_INDEX_ROUTE)
         refresh_status, refresh_body = _post(host, port, serve_mod.ACTIONS_REFRESH_ROUTE, {})
         unknown_status, unknown_body = _post(host, port, "/actions/nope", {})
     assert snap_status == 200 and json.loads(snap_body)["repository"] == "fixture-repo"
@@ -599,128 +744,80 @@ def test_plain_script_invocation_serves_get_and_post_routes(tmp_path):
 
 
 def test_hosted_posts_do_not_load_notebook_only_dependencies(tmp_path):
-    """The lean hosted image has no PyYAML: refetch and route refusals must not
-    import the NotebookLM/workbench stack merely because the request is POST."""
-    published = tmp_path / "published"
-    _published(published, repos=("fixture-repo",))
+    """openDox's lean plane answers a POST without PyYAML. Off loopback and with
+    no host, the refresh is refused as `unknown_action`, since it is a route a
+    host contributes and none is registered; so is an unknown action; the
+    notebook route refuses off loopback; no POST tries to import `yaml`, and
+    `yaml` is never loaded.
+
+    RE-SCOPED by R9-R2 (a) (openxFactory#656 comment 6021830531). The claim was
+    that openxFactory's hosted image, serving its refetch binding, loads no
+    PyYAML. Since the carve that binding is a host's, and the host that serves
+    it registers openXdox's domain profile, which loads PyYAML by design
+    (`openxdox.domain_profile`), so that claim is obsolete. What is held here is
+    openDox's own serve with no host: `python -m opendox.serve`, its documented
+    command, with a PyYAML blocker as the only entry on its path.
+
+    THE BLOCKER REFUSES EVERY IMPORT AND COUNTS IT, so `yaml` never loads, and a
+    POST whose caller swallowed the refusal is still caught. The serve's START
+    tries one (measured: `build_server()` probes the notebook adapter, which
+    imports `opendox.workbench`, which imports PyYAML), the probe reads the
+    refusal as no notebook support, and the serve starts. That is the serve
+    starting without PyYAML, which this claim allows. What it forbids is a POST
+    reaching for it, so the count is read once the serve is up and again after
+    the POSTs."""
     blocked = tmp_path / "blocked-imports"
     blocked.mkdir()
+    attempts = tmp_path / "pyyaml-import-attempts"
     (blocked / "yaml.py").write_text(
+        f"with open({str(attempts)!r}, 'a', encoding='utf-8') as _seen:\n"
+        "    _seen.write('an import of yaml\\n')\n"
         "raise RuntimeError('PyYAML must not load in the hosted POST plane')\n",
         encoding="utf-8")
+
+    def tried():
+        return (attempts.read_text(encoding="utf-8").count("\n")
+                if attempts.exists() else 0)
+
     env = os.environ.copy()
-    env["PYTHONPATH"] = os.pathsep.join(
-        part for part in (str(blocked), env.get("PYTHONPATH")) if part)
-    with _plain_script_server(
-            tmp_path,
-            extra_args=("--data-source-dir", str(published),
-                        "--repository", "fixture-repo",
-                        "--host", "0.0.0.0"),
-            env=env) as (host, port, _proc):
+    env["PYTHONPATH"] = str(blocked)
+    with _a_serve_process(tmp_path, ["-m", "opendox.serve"],
+                          extra_args=("--host", "0.0.0.0"),
+                          env=env) as (host, port, _proc):
+        at_start = tried()
         refresh_status, refresh_body = _post(
             host, port, serve_mod.ACTIONS_REFRESH_ROUTE, {})
         unknown_status, unknown_body = _post(host, port, "/actions/nope", {})
         notebook_status, notebook_body = _post(
             host, port, serve_mod.ACTIONS_NOTEBOOK_ROUTE,
             {"tile_kind": "cluster", "tile_id": "anything"})
-    assert refresh_status == 200, refresh_body
-    assert refresh_body["binding"] == "refetch"
+        after_the_posts = tried()
+    assert refresh_status == 404, refresh_body
+    assert refresh_body["error"] == "unknown_action"
     assert unknown_status == 404
     assert unknown_body["error"] == "unknown_action"
     assert notebook_status == 403
     assert notebook_body["error"] == "loopback_only"
+    assert after_the_posts == at_start, (
+        f"a POST tried to import PyYAML ({after_the_posts - at_start} time(s))")
 
 
-def test_serve_module_uses_no_relative_imports(tmp_path):
-    """The D12 fix, pinned: serve.py is the module the container runs as a plain
-    SCRIPT, where a relative import has no parent package. A new `from . import …`
-    here would 500 a POST route in production while every module-invoked test
-    stayed green — so the absence is asserted, not assumed."""
-    # EVERY FILE THE SERVE IS MADE OF (§ 2.4 PR 2 of 4 split it into four):
-    # the D12 hazard is a property of the SCRIPT, and a relative import in a
-    # module the script imports 500s exactly the same route. Widened, never
-    # narrowed — one of these files is still `serve.py` itself.
-    # RELATIVE_IMPORT_RE matches one or more leading dots (sibling- or
-    # PARENT-relative: `from .. import y`, `from ..pkg import y`) followed by
-    # an optional DOTTED module path (`from .pkg.sub import y`, `from
-    # ..pkg.sub import y`) — a bare `\.\w*` catches only a single-segment
-    # sibling import and misses both widenings, and all of them fail
-    # identically once serve.py runs as a plain script (Copilot review, PR
-    # #748).
-    offenders = [
-        f"{path.name} {n}: {line.strip()}"
-        for path in serve_surface_paths()
-        for n, line in enumerate(
-            path.read_text(encoding="utf-8").splitlines(), 1)
-        if RELATIVE_IMPORT_RE.match(line)
-    ]
-    assert not offenders, "relative import in the serve (D12):\n" + "\n".join(
-        offenders)
-    # Second widening in this same edit (undisclosed in the PR-2 repoint
-    # table's row 11, which describes only the offenders scan above): these
-    # three POSITIVE anchors moved from `SERVE_PY.read_text()` to the whole
-    # surface too. Only `notebook_action` actually moved (now
-    # serve_project.py only); `workbench` and `gate_routes` still resolve in
-    # serve.py at their pre-split lines, so pinning them to the surface is
-    # strictly a widening, never a narrowing — nothing here goes hollow.
-    text = serve_surface_source()
-    assert "from ideation_dashboard import notebook_action" in text
-    assert "from ideation_dashboard import workbench" in text
-    assert "from ideation_dashboard import gate_routes" in text
-
-
-@pytest.mark.parametrize("line", [
-    "from . import x",
-    "from .pkg import x",
-    "from .. import x",
-    "from ..pkg import x",
-    "  from ... import x",
-    "from .pkg.sub import x",
-    "from ..pkg.sub import x",
-])
-def test_the_relative_import_guard_catches_every_dot_and_segment_depth(line):
-    """A prior version of this guard's regex (`\\.\\w*`, one dot and at most
-    one module segment) matched `from . import x` and `from .pkg import x`
-    but silently missed both a PARENT-relative import (`from .. import x`,
-    `from ..pkg import x`) and a MULTI-SEGMENT one (`from .pkg.sub import
-    x`, `from ..pkg.sub import x`) — all of which fail identically once
-    serve.py runs as a plain script. Exercises the SAME `RELATIVE_IMPORT_RE`
-    the production scan above uses (not a separately-maintained copy), so a
-    future narrowing of that one pattern is caught here by a red test, not by
-    a production 500."""
-    assert RELATIVE_IMPORT_RE.match(line), (
-        f"the relative-import guard does not match {line!r}")
+# RETIRED by R9-W3 (openxFactory#656 comment 6021830531): the D12 relative-import
+# pin, `test_serve_module_uses_no_relative_imports`, with the pattern it scanned
+# with (`RELATIVE_IMPORT_RE`) and that pattern's own self-test. It read every
+# file of the serve for a relative import, because one broke a serve started as
+# a plain script. Since the carve those files are openDox's, and openDox's import
+# style belongs to openDox-code. The plain-script start itself is held by
+# behaviour, above.
 
 
 def test_module_invocation_still_works(tmp_path):
-    """The documented live-serve command (`python3 -m ideation_dashboard.serve`)
-    keeps working — the fix adds a path, it does not move one."""
-    snap = _write_snapshot(tmp_path / "snapshot.json")
-    proc = subprocess.Popen(
-        [sys.executable, "-u", "-m", "ideation_dashboard.serve",
-         "--snapshot", str(snap), "--checkout-root", str(BASE_REPO),
-         "--host", "127.0.0.1", "--port", "0"],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-        cwd=str(REPO_ROOT / "scripts"))
-    try:
-        port = None
-        deadline = time.time() + 30
-        while time.time() < deadline:
-            line = proc.stdout.readline()
-            if not line:
-                break
-            match = re.search(r"http://127\.0\.0\.1:(\d+)/", line)
-            if match:
-                port = int(match.group(1))
-                break
-        assert port, "module invocation did not report a URL"
-        status, body = _post("127.0.0.1", port, serve_mod.ACTIONS_REFRESH_ROUTE, {})
-    finally:
-        proc.terminate()
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:  # pragma: no cover
-            proc.kill()
+    """The documented live-serve command, `python -m opendox.serve`, keeps
+    working: run as a module, after the same registration from this checkout
+    (R9-W4), the refresh runs the regenerate binding."""
+    argv = _this_checkouts_serve(tmp_path, AS_A_MODULE)
+    with _a_serve_process(tmp_path, argv) as (host, port, _proc):
+        status, body = _post(host, port, serve_mod.ACTIONS_REFRESH_ROUTE, {})
     assert status == 200, body
     assert body["binding"] == "regenerate"
 
@@ -756,7 +853,7 @@ console.log(JSON.stringify(out));
 def _run_projects(payload, tmp_path):
     if not NODE:
         pytest.skip("node not available for the JS derivation probe")
-    shutil.copy(MODEL_JS, tmp_path / "repo-selector-model.mjs")
+    _place_the_model(tmp_path)
     (tmp_path / "harness.mjs").write_text(_PROJECT_HARNESS, encoding="utf-8")
     data = tmp_path / "input.json"
     data.write_text(json.dumps(payload), encoding="utf-8")
@@ -911,7 +1008,7 @@ console.log(JSON.stringify(out));
 def _run_header(payload, tmp_path):
     if not NODE:
         pytest.skip("node not available for the JS derivation probe")
-    shutil.copy(MODEL_JS, tmp_path / "repo-selector-model.mjs")
+    _place_the_model(tmp_path)
     (tmp_path / "harness.mjs").write_text(_HEADER_HARNESS, encoding="utf-8")
     data = tmp_path / "input.json"
     data.write_text(json.dumps(payload), encoding="utf-8")
