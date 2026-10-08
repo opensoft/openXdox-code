@@ -1027,8 +1027,11 @@ def _the_hosts_seams_for_the_seam_suites(request):
 #   * `<farm>/examples/ideation-dashboard/`: a link to each YAML example the
 #     three owners keep under `examples/ideation-dashboard/`, at the same
 #     relative path, less openDox's own `opendox-snapshot-*` examples, whose
-#     kind the family's validator does not serve. Two owners naming one path
-#     is refused, never resolved.
+#     kind the family's validator does not serve. Only openDox-spec's are left
+#     out: an example of that prefix from openxFactory or openXdox-spec is
+#     linked like any other (T073; Copilot r4201411760 on openXdox-code#46,
+#     the holder's r4201421102). Two owners naming one path is refused, never
+#     resolved.
 # It is OUTSIDE the checkout, in a temporary directory removed at exit: the
 # validator refuses a `contracts/` that links out of its tree (`:157-163`). A
 # temporary root inside the checkout (a TMPDIR, or `under`, beneath it) is
@@ -1036,6 +1039,9 @@ def _the_hosts_seams_for_the_seam_suites(request):
 # The reach is read with `sys.path` saved and put back, and it must be the
 # composed tree's own.
 CONTRACT_EXAMPLE_LEFT_OUT = "opendox-snapshot-"
+#: The one owner whose examples of that prefix are left out: openDox-spec,
+#: as `carved_reach.MOUNTS` names it.
+CONTRACT_EXAMPLE_LEFT_OUT_OWNER = "opendox_spec"
 
 
 def build_contracts_farm(reach, farm: Path) -> Path:
@@ -1054,11 +1060,13 @@ def build_contracts_farm(reach, farm: Path) -> Path:
     examples = farm / "examples" / "ideation-dashboard"
     examples.mkdir(parents=True)
     linked: dict[Path, Path] = {}
+    left_out_from = reach.MOUNTS[CONTRACT_EXAMPLE_LEFT_OUT_OWNER]
     for owner in (reach.REPO_ROOT, reach.MOUNTS["opendox_spec"],
                   reach.MOUNTS["openxdox_spec"]):
         base = owner / "examples" / "ideation-dashboard"
         for path in sorted(base.rglob("*.yaml")):
-            if path.name.startswith(CONTRACT_EXAMPLE_LEFT_OUT):
+            if (owner == left_out_from
+                    and path.name.startswith(CONTRACT_EXAMPLE_LEFT_OUT)):
                 continue
             relative = path.relative_to(base)
             if relative in linked:
@@ -1119,3 +1127,102 @@ def runs_a_local_install(suite: str) -> bool:
     fixture stands in."""
     return suite == _LAUNCH_SUITE or (
         suite in LOCAL_INSTALL_SUITES and openxfactory_host() is not None)
+
+
+# ---------------------------------------------------------------------------
+# THE HOST'S STATUS-EXEMPTION RAIL FOR THE DECLARED RAIL SUITES (plan 038
+# T073; ARC-Q2 (a), openxFactory#656 comment 6003918488; R1Q24 (a), comment
+# 5850003126).
+#
+# R1Q24 (a) declared the files that need openxFactory's status-exemption rail,
+# which only openxFactory's host registers at openDox's status-exemption seam
+# (`opendox.doxbench_packet.register_status_exemption`). In a lone checkout
+# nothing registers it, so their cases refuse with
+# `StatusExemptionNotRegistered`, which is the declaration's evidence for their
+# reason. ARC-Q2 (a) makes them declared integration tests, which the composed
+# workflow runs. So, as U-1 registers the governed host above, for the length
+# of each test of a file `tests/declared_exclusion.yaml` names under the reason
+# `status-exemption-rail`, this registers THE HOST'S RAIL where the run is
+# composed, and puts the seam back afterwards. Where the run is not composed it
+# registers nothing, and the lone checkout's evidence is unchanged.
+#
+# THE RAIL IS THE ONE openxFactory'S HOST REGISTERS: the
+# `register_status_exemption` row of `opendox_host.seams()`, the table the
+# host's process start registers from. It is read off that table rather than
+# named here, so a later host pin is followed.
+#
+# THE LIST IS THE DECLARATION'S, as the root `conftest.py` has already held it
+# to its rules: a file gets the rail, or stops getting it, only with its entry.
+#
+# THE SEAM IS PUT BACK. A rail held before the test is dropped for it. After
+# it, a host's rail is registered again, and openDox's own default, an entry
+# point's, is not, since the next entry point registers it again, as
+# `a_hosts_plane` treats the default profile.
+# ---------------------------------------------------------------------------
+
+STATUS_EXEMPTION_RAIL_REASON = "status-exemption-rail"
+
+
+@functools.cache
+def status_exemption_rail_suites() -> frozenset[str]:
+    """The test modules the declaration names under the rail's reason."""
+    import yaml
+
+    declaration = yaml.safe_load(
+        (HERE / "declared_exclusion.yaml").read_text(encoding="utf-8"))
+    return frozenset(Path(entry["path"]).name
+                     for entry in declaration["entries"]
+                     if STATUS_EXEMPTION_RAIL_REASON in entry["reasons"])
+
+
+@functools.cache
+def openxfactory_status_exemption_rail():
+    """openxFactory's status-exemption rail where the run is composed, and
+    None where it is not: what its host registers at openDox's seam, read off
+    the host's own seam table."""
+    host_module = openxfactory_host()
+    if host_module is None:
+        return None
+    saved = list(sys.path)
+    try:
+        rails = [what for _, call, what in host_module.seams()
+                 if call == "register_status_exemption"]
+    finally:
+        sys.path[:] = saved
+    _refuse_an_openxdox_from_elsewhere()
+    if len(rails) != 1:
+        raise RuntimeError(
+            f"openxFactory's host seam table names {len(rails)} "
+            "status-exemption rails, so the rail it registers is not one "
+            "this harness can register for it")
+    return rails[0]
+
+
+@contextlib.contextmanager
+def a_hosts_rail(rail):
+    """Register `rail` at openDox's status-exemption seam for the length of
+    the block, then put the seam back as it was, less openDox's default."""
+    from opendox import doxbench_packet as _packet
+
+    previous = getattr(_packet, "_status_exemption_rail", None)
+    a_hosts = previous is not None and not getattr(
+        _packet, "_status_exemption_is_default", False)
+    _packet.unregister_status_exemption()
+    try:
+        yield _packet.register_status_exemption(rail)
+    finally:
+        _packet.unregister_status_exemption()
+        if a_hosts:
+            _packet.register_status_exemption(previous)
+
+
+@_pytest.fixture(autouse=True)
+def _the_hosts_rail_for_the_declared_rail_suites(request):
+    rail = (openxfactory_status_exemption_rail()
+            if request.node.path.name in status_exemption_rail_suites()
+            else None)
+    if rail is None:
+        yield
+        return
+    with a_hosts_rail(rail):
+        yield

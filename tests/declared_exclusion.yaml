@@ -12,6 +12,23 @@
 # emptied list is `count: 0` with no reasons and no entries. The root
 # conftest loads it, excludes nothing, and prints that nothing is left out.
 #
+# EVERY ENTRY IS ALSO A DECLARED INTEGRATION TEST (plan 038 task T073, in
+# openxFactory `specs/038-opendox-document-tool-self-maintenance/`; ARC-Q2
+# (a), openxFactory#656 comment 6003918488; #1144's F9.1 as batch Q amends
+# it). What a lone checkout cannot run runs in this repository's own CI,
+# composed with openxFactory: `.github/workflows/composed.yml` runs every
+# file below at the ONE openxFactory commit `tests/composed_host_pin.yaml`
+# names, in R1Q23 (a)'s form. 12.5's governed suites among them run in its
+# governed step, and every other entry runs in its declared step, each file
+# alone. So no file here is dropped from both suites. The count is `count`,
+# and each entry keeps its reason. This file names that commit by naming the
+# pin file, and writes no commit id of its own, so the pin advances (after
+# T030, T064 and T075) with no edit here. Read with the paragraph above: in a
+# lone checkout each entry stays an open extraction until its reason is
+# cleared, and composed it is a declared integration test, by which
+# declaration requirement 9 closes for openXdox-code (batch Q). Each reason's
+# `open_until` names that composed home, so every lone run prints it.
+#
 # WHO READS IT.
 #   * The repository-root `conftest.py`. It derives `collect_ignore` from
 #     `entries`, so a run that loads it collects the whole suite less these
@@ -27,6 +44,12 @@
 #     list cannot hide a failure of any other kind. A file that stops failing
 #     for its reason turns that test red, and it leaves the list in the pull
 #     request that clears the reason.
+#   * `.github/workflows/composed.yml`. Its declared step runs every entry
+#     that is not one of 12.5's governed suites, composed and each alone, and
+#     refuses an entry that neither of its two steps runs.
+#   * `tests/conftest.py`. Where the run is composed, it registers the rail
+#     openxFactory's host registers for each entry naming
+#     `status-exemption-rail`, and only for those.
 #
 # THE RULES.
 #   * `schema_version` is the integer 1, and `count` is an integer equal to the
@@ -65,15 +88,15 @@ reasons:
   - id: doc_health
     reason: "reaches openxFactory's doc_health, which openxFactory packages nowhere and no lone checkout supplies"
     ruled: "R1Q6 (d), openxFactory#656 comment 5817152735"
-    open_until: "the doc_health direction arc (plan 034 T008)"
+    open_until: "the doc_health direction arc (plan 034 T008); run composed, as a declared integration test, by .github/workflows/composed.yml at the openxFactory commit tests/composed_host_pin.yaml names (ARC-Q2 (a), openxFactory#656 comment 6003918488)"
   - id: status-exemption-rail
     reason: "needs openxFactory's status-exemption rail, which only openxFactory registers at openDox's status-exemption seam"
     ruled: "R1Q24 (a), openxFactory#656 comment 5850003126"
-    open_until: "the doc_health direction arc (plan 034 T008)"
+    open_until: "never in a lone checkout: a declared integration test, run composed by .github/workflows/composed.yml at the openxFactory commit tests/composed_host_pin.yaml names (ARC-Q2 (a), openxFactory#656 comment 6003918488)"
   - id: openxfactory-contracts
     reason: "reads openxFactory's contracts (the contract family's validator, schemas and examples, or its contracts/manifest.yaml) where openxFactory's tree keeps them, which is outside this checkout"
     ruled: "R1Q24 (a), openxFactory#656 comment 5850003126"
-    open_until: "the doc_health direction arc (plan 034 T008)"
+    open_until: "never in a lone checkout: a declared integration test, run composed by .github/workflows/composed.yml at the openxFactory commit tests/composed_host_pin.yaml names (ARC-Q2 (a), openxFactory#656 comment 6003918488)"
 
 entries:
   - {path: tests/test_authoring_agent.py, reasons: [doc_health]}

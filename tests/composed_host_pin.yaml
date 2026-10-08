@@ -1,0 +1,33 @@
+# THE COMPOSED RUN'S HOST: the one openxFactory commit the composed workflow
+# checks out (plan 038 task T029, U-9, in openxFactory
+# `specs/038-opendox-document-tool-self-maintenance/`; decision N-7a, ruled
+# with the plan on openxFactory#656 comment 6013547504).
+#
+# WHAT READS IT. `.github/workflows/composed.yml`, and nothing else. It checks
+# openxFactory out at `commit`, initializes that checkout's `openDox`,
+# `openXdox` and `openXwallet` submodules recursively, and runs 12.5's
+# governed suites with that checkout's `scripts/` on `PYTHONPATH` (R1Q23 (a)'s
+# form; F12.1 runs composed, CF-5). The workflow refuses the file, naming the
+# rule, unless all of these hold:
+#   * `schema_version` is the integer 1, and `kind` is `composed-host-pin`;
+#   * `commit` is a full 40-character lowercase commit id;
+#   * no other key is present, and no key is given twice.
+# The repository is openxFactory, always: the workflow names it, and this file
+# names only the commit.
+#
+# WHEN IT MOVES. Never on its own: each advance is an openXdox-code pull
+# request of its own, so the composed run always tests the host that
+# openxFactory's `main` carries (plan 038 plan.md, "The composed workflow's
+# openxFactory pin"). It advances after T030, T064 and T075 land in
+# openxFactory, and T073 re-runs after each advance.
+#
+# ITS FIRST VALUE. openxFactory `main`'s head when T029 authored this file,
+# read with `git ls-remote` at 2026-10-06T11:56:20Z: `92010d3e`, "Land
+# add-factory-mcp-conformance on main as Speckit feature 037, with repairs
+# and validator fixes (#1243)".
+#
+# A CREATED file: no row in openxFactory's `docs/opendox-carve-manifest.yaml`
+# (RULED OQ-C).
+schema_version: 1
+kind: composed-host-pin
+commit: 92010d3e67f2c556687e1c3583ed3ca1867f4b8b
