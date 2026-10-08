@@ -58,9 +58,25 @@ console.log(JSON.stringify(buildGroupingModel(snaps)));
 
 
 def _run_node_grouping(snapshots, tmp_path):
+    """Run `buildGroupingModel` over `snapshots` in node.
+
+    THE MODULE'S ONE SIBLING (plan 038 T097, under R9-W1 (A″),
+    openxFactory#656 comment 6021830531). Since § 3.4 slice S7, `grouping.js`
+    imports `./display.js`. So the harness copies `display.js` beside the
+    module under its own name (`display.js` imports nothing), and writes a
+    `package.json` so that node reads `.js` as a module. That is what T026's
+    harness in `test_staging_workbench.py` does for its siblings.
+
+    The tallies are keyed BY ROLE since S7: `grouping.js` keys each one
+    `"tally:" + role`, one per stage role, in spine order. So the keys below
+    are `tally:source` (documents), `tally:grouping` (clusters),
+    `tally:candidate` (possibles), `tally:submission` (active changes) and
+    `tally:completion` (archived changes)."""
     if not NODE:
         pytest.skip("node not available for the JS derivation probe")
     shutil.copy(GROUPING_JS, tmp_path / "grouping.mjs")
+    shutil.copy(WEB / "views" / "display.js", tmp_path / "display.js")
+    (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
     (tmp_path / "harness.mjs").write_text(_HARNESS, encoding="utf-8")
     snaps_path = tmp_path / "snapshots.json"
     snaps_path.write_text(json.dumps(snapshots), encoding="utf-8")
@@ -85,8 +101,8 @@ def test_single_repo_with_resolved_project_renders_under_its_project(tmp_path):
     assert [g["label"] for g in model["groups"]] == ["fixture-family"]
     assert model["ungroupedProjects"] == []
     # a single repo's project tallies mirror its own snapshot counts exactly
-    assert model["projects"][0]["tallies"]["documents"] == len(snap["documents"])
-    assert model["projects"][0]["tallies"]["clusters"] == len(snap["clusters"])
+    assert model["projects"][0]["tallies"]["tally:source"] == len(snap["documents"])
+    assert model["projects"][0]["tallies"]["tally:grouping"] == len(snap["clusters"])
 
 
 def test_unregistered_repository_renders_as_its_own_implicit_project(tmp_path):
@@ -102,7 +118,7 @@ def test_unregistered_repository_renders_as_its_own_implicit_project(tmp_path):
     assert model["groups"] == []
     assert [p["label"] for p in model["ungroupedProjects"]] == ["not-registered"]
     # never a failure: the same tally shape as a registered repo
-    assert proj["tallies"]["documents"] == len(snap["documents"])
+    assert proj["tallies"]["tally:source"] == len(snap["documents"])
 
 
 # ----------------------------------------------------------------------------
@@ -117,9 +133,9 @@ def test_multi_repo_project_aggregates_member_repositories_under_one_heading(tmp
     siblings = model["projects"][0]
     assert {r["repository"] for r in siblings["repositories"]} == {"fixture-repo-b", "fixture-repo-c"}
     # aggregate tallies SUM the member repositories' own counts, never re-derived
-    assert siblings["tallies"]["documents"] == 2 * len(snap_b["documents"])
-    assert siblings["tallies"]["clusters"] == 2 * len(snap_b["clusters"])
-    assert siblings["tallies"]["possibles"] == 2 * len(snap_b["possibles"])
+    assert siblings["tallies"]["tally:source"] == 2 * len(snap_b["documents"])
+    assert siblings["tallies"]["tally:grouping"] == 2 * len(snap_b["clusters"])
+    assert siblings["tallies"]["tally:candidate"] == 2 * len(snap_b["possibles"])
 
 
 def test_per_repository_detail_reachable_beneath_the_project(tmp_path):
@@ -132,8 +148,8 @@ def test_per_repository_detail_reachable_beneath_the_project(tmp_path):
     siblings = model["projects"][0]
     assert len(siblings["repositories"]) == 2
     by_repo = {r["repository"]: r for r in siblings["repositories"]}
-    assert by_repo["fixture-repo-b"]["tallies"]["documents"] == len(snap_b["documents"])
-    assert by_repo["fixture-repo-c"]["tallies"]["documents"] == len(snap_c["documents"])
+    assert by_repo["fixture-repo-b"]["tallies"]["tally:source"] == len(snap_b["documents"])
+    assert by_repo["fixture-repo-c"]["tallies"]["tally:source"] == len(snap_c["documents"])
 
 
 # ----------------------------------------------------------------------------
@@ -150,9 +166,9 @@ def test_group_tallies_aggregate_all_member_projects(tmp_path):
     assert {p["label"] for p in family["projects"]} == {"fixture-core", "fixture-siblings"}
     archived = len([c for c in snap_a["changes"] if c["status"] == "archived"])
     active = len([c for c in snap_a["changes"] if c["status"] == "active"])
-    assert family["tallies"]["documents"] == 3 * len(snap_a["documents"])
-    assert family["tallies"]["changes_archived"] == 3 * archived
-    assert family["tallies"]["changes_active"] == 3 * active
+    assert family["tallies"]["tally:source"] == 3 * len(snap_a["documents"])
+    assert family["tallies"]["tally:completion"] == 3 * archived
+    assert family["tallies"]["tally:submission"] == 3 * active
 
 
 def test_group_view_also_surfaces_ungrouped_projects_alongside_groups(tmp_path):

@@ -108,7 +108,7 @@ entries:
   - {path: tests/test_create_project.py, reasons: [doc_health]}
   - {path: tests/test_doxbench_abstract_envelope.py, reasons: [status-exemption-rail]}
   - {path: tests/test_doxbench_abstract_route.py, reasons: [doc_health]}
-  - {path: tests/test_doxbench_blank_reason.py, reasons: [doc_health, openxfactory-contracts], note: "two reasons, each checked: a case that reaches doc_health, and one that reads openxFactory's contracts/manifest.yaml"}
+  - {path: tests/test_doxbench_blank_reason.py, reasons: [doc_health]}
   - {path: tests/test_doxbench_knowledge_service.py, reasons: [doc_health]}
   - {path: tests/test_doxbench_mutation_boundary.py, reasons: [doc_health]}
   - {path: tests/test_doxbench_packet.py, reasons: [doc_health, status-exemption-rail], note: "two reasons, each checked: cases that need the rail, and cases that reach doc_health"}

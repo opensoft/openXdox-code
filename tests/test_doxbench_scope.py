@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import copy
 import json
 import shutil
@@ -12,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 import yaml
 
-from conftest import FIXTURES, REPO_ROOT
+from conftest import FIXTURES, REPO_ROOT, a_hosts_plane
 
 from opendox import branch_session
 from openxdox import gate_console
@@ -32,6 +33,7 @@ CASES_PATH = FIXTURES / "doxbench_scope_cases.json"
 WEB_VIEWS = OPENDOX_WEB / "views"
 MODEL_JS = WEB_VIEWS / "staging-workbench-model.js"
 WHEEL_MODEL_JS = WEB_VIEWS / "wheel-model.js"
+DISPLAY_JS = WEB_VIEWS / "display.js"
 NODE = shutil.which("node")
 
 
@@ -62,21 +64,56 @@ def _server_projections(source_root: Path) -> dict[str, dict | None]:
     return projections
 
 
-def _browser_projections(tmp_path: Path) -> dict[str, dict | None]:
+def _served_display() -> dict:
+    """`/capabilities["display"]` under the registered host, as the pinned
+    `serve.build_server()` states it: the display a browser reads.
+
+    The statement is REPLAYED, as `test_gate_loop_views.py`'s `_served_display`
+    and `test_staging_workbench.py`'s copy helpers replay it, because
+    `opendox.serve` is not imported here for a facet. It needs a registered
+    host, as `/capabilities` does: composed, `tests/conftest.py` registers the
+    governed host for this file (DECLARED_HOST_SUITES), which is openxFactory's
+    composite."""
+    from opendox import display_profile, view_extension
+    from opendox.profile_proxy import profile_openxfactory
+
+    return display_profile.display_manifest(
+        display_profile.host_display(profile_openxfactory),
+        host_profile=view_extension.host_profile_name(profile_openxfactory))
+
+
+def _browser_projections(tmp_path: Path, display: dict | None) -> dict[str, dict | None]:
+    """The browser's projection of every case, by the ACTUAL staging model,
+    with `display` installed as the shell installs the served facet at mount
+    (`setDisplay(readDisplay(...))`, § 3.4 slice S7). `None` installs nothing,
+    which is the page with no facet: openDox's own neutral words.
+
+    THE MODEL'S SIBLINGS COME WITH IT (R9-W1 (A″), opensoft/openxFactory#656
+    comment 6021830531, as `test_staging_workbench.py`'s helpers copy theirs):
+    `wheel-model.js` imports `./display.js` since S7, and the display reader is
+    `display.js`'s, so it is copied beside the two models under its own name,
+    and `package.json` makes node read it as a module."""
     if NODE is None:
         pytest.skip("node not available for browser scope parity")
     shutil.copy(MODEL_JS, tmp_path / "staging-workbench-model.mjs")
     shutil.copy(WHEEL_MODEL_JS, tmp_path / "wheel-model.mjs")
+    shutil.copy(DISPLAY_JS, tmp_path / "display.js")
+    (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
+    cases = _fixture()
+    cases["display"] = display
     cases_path = tmp_path / "scope-cases.json"
-    cases_path.write_text(CASES_PATH.read_text(encoding="utf-8"), encoding="utf-8")
+    cases_path.write_text(json.dumps(cases), encoding="utf-8")
     harness = tmp_path / "scope-harness.mjs"
     harness.write_text(
         """
 import { readFileSync } from 'node:fs';
-import { doxbenchScopeProjection } from './staging-workbench-model.mjs';
+import { doxbenchScopeProjection, setDisplay } from './staging-workbench-model.mjs';
 import { primaryFragmentPath } from './wheel-model.mjs';
+import { readDisplay } from './display.js';
 
 const fixture = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+// THE FACET, installed before anything derives, as the shell installs it
+setDisplay(readDisplay({ display: fixture.display }));
 const output = {};
 for (const row of fixture.cases) {
   output[row.name] = doxbenchScopeProjection(
@@ -108,7 +145,92 @@ console.log(JSON.stringify(output));
 
 
 def test_server_and_actual_browser_projection_are_byte_shape_equivalent(tmp_path):
-    assert _server_projections(tmp_path) == _browser_projections(tmp_path)
+    """The server's projection IS the page's, labels and notes included, under
+    the display the page is served (R9-R1 (a), § 3.4 slice S7 completed on the
+    server side)."""
+    assert _server_projections(tmp_path) == _browser_projections(
+        tmp_path, _served_display())
+
+
+class _HostDeclaringStageWords:
+    """A host's profile that contributes no column and declares its own words
+    for the three stations a section label names, openxFactory's pre-S7 words.
+    Partial, as a facet may be: every other role keeps openDox's word."""
+
+    ROUTE_EXTENSIONS: tuple = ()
+    SUBCOMMAND_EXTENSIONS: tuple = ()
+    DISPLAY = {
+        "stages": {
+            "source": {"one": "document", "many": "documents"},
+            "grouping": {"one": "cluster", "many": "clusters"},
+            "selection": {"one": "topic", "many": "topics"},
+        },
+    }
+
+
+@contextlib.contextmanager
+def _no_host_registered():
+    """Run a block with NO host registered with openDox's registry, then put
+    back what was, as `a_hosts_plane` does (the entry point's default is not
+    put back: the next entry point registers it again)."""
+    from opendox import default_profile, domain_profile
+
+    previous = domain_profile.current() if domain_profile.is_registered() else None
+    domain_profile.unregister()
+    try:
+        yield
+    finally:
+        domain_profile.unregister()
+        if previous is not None and previous is not default_profile:
+            domain_profile.register(previous)
+
+
+def _labels(projections: dict, case: str) -> list[tuple[str, str]]:
+    return [(section["key"], section["label"])
+            for section in projections[case]["sections"]]
+
+
+def test_the_server_labels_follow_the_facet_a_host_declares(tmp_path):
+    """The labels are the FACET's words, not a coincidence of openDox's.
+
+    The served display carries openDox's neutral stage words today, because
+    openXdox overlays only `completion` and the values (RULED `5784683830`,
+    `5801057769`), so parity under it cannot tell a server that reads the facet
+    from one that always speaks neutral words. A host that declares its own
+    words for the three stations a label names can: the server speaks them, and
+    the page, handed that host's served display, speaks the same bytes."""
+    with a_hosts_plane(_HostDeclaringStageWords):
+        server = _server_projections(tmp_path)
+        browser = _browser_projections(tmp_path, _served_display())
+    assert server == browser
+    assert _labels(server, "cluster") == [("members", "cluster documents")]
+    assert _labels(server, "possible") == [
+        ("cited", "cited supporting evidence"),
+        ("inherited", "inherited from claiming clusters"),
+    ]
+    assert _labels(server, "staged") == [
+        ("folder", "topic folder documents"),
+        ("declaring", "documents declaring this topic"),
+        ("neighbourhood", "cluster neighbourhood"),
+    ]
+    assert server["staged"]["sections"][2]["note"] == (
+        "member documents of this topic's linked clusters — inferred via "
+        "clusters, not its own material")
+
+
+def test_with_no_host_registered_the_labels_are_openDoxs_neutral_words(tmp_path):
+    """No host, no served page: the server answers with the words the page's
+    model speaks when the shell installs no facet, openDox's own, and never
+    refuses the scope for want of a vocabulary."""
+    with _no_host_registered():
+        server = _server_projections(tmp_path)
+    assert server == _browser_projections(tmp_path, None)
+    assert _labels(server, "cluster") == [("members", "group source items")]
+    assert _labels(server, "staged") == [
+        ("folder", "selection folder source items"),
+        ("declaring", "source items declaring this selection"),
+        ("neighbourhood", "group neighbourhood"),
+    ]
 
 
 def test_cluster_is_all_context_and_session_created_material_is_context_and_editable(

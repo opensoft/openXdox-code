@@ -40,7 +40,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import REPO_ROOT
+from conftest import carved_module_path
 from session_fixtures import build_scratch_repo
 from staging_shapes import staging_fragment
 
@@ -462,8 +462,9 @@ def test_the_first_save_calls_only_the_public_transaction_entry_point():
     they run under is not reentrant and the unwind is asymmetric on whether the
     Save opened or joined the session, so reaching them directly would bypass
     both decisions. The exposure names neither."""
-    source = (REPO_ROOT / "scripts" / "ideation_dashboard"
-              / "gate_routes.py").read_text(encoding="utf-8")
+    # `gate_routes.py` is openXdox's since the carve; the conftest resolves it
+    # at its one home, and refuses a module found in both or in neither.
+    source = carved_module_path("gate_routes.py").read_text(encoding="utf-8")
     assert "commit_first_edit" in source
     for private in ("_commit_first_edit_locked", "_unwind_first_edit"):
         assert private not in source, private

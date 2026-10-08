@@ -32,46 +32,111 @@ from opendox.doxbench_scope_types import (  # noqa: F401  (re-export)
 
 _SERVED_DOTFILE_SUFFIXES = frozenset({".yaml", ".yml", ".md", ".json"})
 
-_SECTION_META = {
-    "members": {
-        "label": "cluster documents",
-        "note": "the cluster's own snapshot document edges",
-    },
-    "cited": {
-        "label": "cited supporting evidence",
-        "note": "recorded evidence pins — a governed citation",
-    },
-    "inherited": {
-        "label": "inherited from claiming clusters",
-        "note": (
-            "membership INFERRED from the claiming clusters — not cited evidence"
-        ),
-        "inherited": True,
-    },
-    "folder": {
-        "label": "topic folder documents",
-        "note": (
-            "the corpus documents that live in this staging folder — "
-            "the topic's own material"
-        ),
-        "owned": True,
-    },
-    "declaring": {
-        "label": "documents declaring this topic",
-        "note": (
-            "documents whose declared destinations name this staging topic — "
-            "inbound context"
-        ),
-    },
-    "neighbourhood": {
-        "label": "cluster neighbourhood",
-        "note": (
-            "member documents of the topic's linked clusters — inferred via "
-            "clusters, not the topic's own material"
-        ),
-        "inherited": True,
-    },
-}
+# EVERY SECTION LABEL AND NOTE IS A FUNCTION OF THE FACET THE BROWSER READS
+# (§ 3.4 slice S7, completed on the server side: RULED R9-R1 (a),
+# opensoft/openxFactory#656 comment 6021830531). The section KEY is a role and
+# never moves (`members` is "the documents this grouping itself claims" in any
+# domain); the WORDS are the registered host's spelling of the stations a
+# sentence names, read BY ROLE off its display facet. Until this slice the
+# labels here were one domain's words ("cluster documents", "topic folder
+# documents"), while openDox's staging model has built the same six sentences
+# from the facet since S7, so the two halves of one projection disagreed under
+# every host. These are that model's sentences (`views/staging-workbench-model.js`
+# `SECTION_META`), word for word, and `test_doxbench_scope.py` holds the two
+# byte-identical under the served facet, under a host that declares its own
+# stage words, and with no host at all.
+#
+# The stage roles a sentence names, as `opendox.display_profile.STAGE_ROLES`
+# spells them: the raw material, its grouping, and the selection.
+_SOURCE, _GROUPING, _SELECTION = "source", "grouping", "selection"
+
+
+def _section_meta(display: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """Every section's label, note and flags, in `display`'s stage words.
+
+    `display` is a display manifest (`opendox.display_profile.display_manifest`),
+    whose `stages` table is already merged over openDox's neutral words, so
+    every role reads a word. Only the stage words come from it: the keys, the
+    `inherited`/`owned` flags and the connecting prose are this authority's.
+    """
+    stages = display["stages"]
+
+    def one(role: str) -> str:
+        return stages[role]["one"]
+
+    def many(role: str) -> str:
+        return stages[role]["many"]
+
+    return {
+        "members": {
+            "label": f"{one(_GROUPING)} {many(_SOURCE)}",
+            "note": f"the {one(_GROUPING)}'s own snapshot document edges",
+        },
+        "cited": {
+            "label": "cited supporting evidence",
+            "note": "recorded evidence pins — a governed citation",
+        },
+        "inherited": {
+            "label": f"inherited from claiming {many(_GROUPING)}",
+            "note": (
+                f"membership INFERRED from the claiming {many(_GROUPING)} — "
+                "not cited evidence"
+            ),
+            "inherited": True,
+        },
+        "folder": {
+            "label": f"{one(_SELECTION)} folder {many(_SOURCE)}",
+            "note": (
+                f"the corpus {many(_SOURCE)} that live in this "
+                f"{one(_SELECTION)}'s folder — its own material"
+            ),
+            "owned": True,
+        },
+        "declaring": {
+            "label": f"{many(_SOURCE)} declaring this {one(_SELECTION)}",
+            "note": (
+                f"{many(_SOURCE)} whose declared destinations name this "
+                f"{one(_SELECTION)} — inbound context"
+            ),
+        },
+        "neighbourhood": {
+            "label": f"{one(_GROUPING)} neighbourhood",
+            "note": (
+                f"member {many(_SOURCE)} of this {one(_SELECTION)}'s linked "
+                f"{many(_GROUPING)} — inferred via {many(_GROUPING)}, "
+                "not its own material"
+            ),
+            "inherited": True,
+        },
+    }
+
+
+def _served_display() -> Mapping[str, Any]:
+    """The display facet the browser reads, resolved at CALL time.
+
+    It is the `display` block `/capabilities` serves (openDox's
+    `serve.build_server()`): the registered host's `DISPLAY` facet over openDox's
+    neutral words, through `display_profile.display_manifest`. It is read when a
+    scope is resolved, never at import time and never cached, as
+    `opendox.canvas_drafts` reads it for its one shared sentence, so importing
+    this module cannot fail for want of a host, and a host registered later is
+    the one that is read.
+
+    NO HOST REGISTERED, openDox's NEUTRAL WORDS. Without a host there is no
+    served page, and the browser's model given no facet (`setDisplay` never
+    called) speaks openDox's own neutral words. This answers the same rather
+    than refusing: the words label the sections of an authorization answer and
+    never decide it, so a scope resolved where no host is registered (a library
+    caller, a test) keeps its paths, under words that say plainly they are no
+    domain's.
+    """
+    from opendox import display_profile  # lazy: keeps this module's import graph flat
+    from opendox import domain_profile as host_registry
+
+    declared = (
+        display_profile.host_display() if host_registry.is_registered() else None
+    )
+    return display_profile.display_manifest(declared)
 
 
 def _mapping(value: Any) -> Mapping[str, Any]:
@@ -190,12 +255,13 @@ def _build_section(
     key: str,
     references: Iterable[Any],
     *,
+    section_meta: Mapping[str, Mapping[str, Any]],
     by_id: Mapping[str, Mapping[str, Any]],
     seen: set[str],
     source_root: Path,
     require_resolved: bool = False,
 ) -> ScopeSection:
-    meta = _SECTION_META[key]
+    meta = section_meta[key]
     documents: list[ScopeDocument] = []
     for raw in references:
         document_id = _as_id(raw)
@@ -393,6 +459,9 @@ def resolve_scope(
     root = Path(source_root)
     by_id = _document_index(snapshot)
     seen: set[str] = set()
+    # One read of the facet per resolution, so every section of one projection
+    # is spelled in one vocabulary.
+    section_meta = _section_meta(_served_display())
 
     if key.tile_kind == "cluster":
         cluster = next(
@@ -411,6 +480,7 @@ def resolve_scope(
                 _mapping(edge).get("document")
                 for edge in _sequence(cluster.get("document_edges"))
             ),
+            section_meta=section_meta,
             by_id=by_id,
             seen=seen,
             source_root=root,
@@ -443,6 +513,7 @@ def resolve_scope(
                 _mapping(evidence).get("document")
                 for evidence in _sequence(possible.get("supporting_evidence"))
             ),
+            section_meta=section_meta,
             by_id=by_id,
             seen=seen,
             source_root=root,
@@ -469,6 +540,7 @@ def resolve_scope(
         inherited = _build_section(
             "inherited",
             inherited_references,
+            section_meta=section_meta,
             by_id=by_id,
             seen=seen,
             source_root=root,
@@ -497,6 +569,7 @@ def resolve_scope(
     folder = _build_section(
         "folder",
         _sequence(topic.get("files")),
+        section_meta=section_meta,
         by_id=by_id,
         seen=seen,
         source_root=root,
@@ -518,6 +591,7 @@ def resolve_scope(
     declaring = _build_section(
         "declaring",
         declaring_references,
+        section_meta=section_meta,
         by_id=by_id,
         seen=seen,
         source_root=root,
@@ -551,6 +625,7 @@ def resolve_scope(
             _build_section(
                 "neighbourhood",
                 neighbour_references,
+                section_meta=section_meta,
                 by_id=by_id,
                 seen=seen,
                 source_root=root,

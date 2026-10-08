@@ -134,8 +134,9 @@ def test_data_fetches_target_only_snapshot_and_source_passthrough():
     # seam, 010-doxbench-editor-chat T023, threaded through the workbench's own
     # current source base rather than a second route), the v2 tile action seam
     # (notebook.js — GET /capabilities + POST /actions/notebook), and the
-    # repository-selector seam (repo-selector.js — GET /snapshot-index.json +
-    # POST /actions/refresh).
+    # repository-selector seam (repo-selector.js — POST /actions/refresh; its
+    # GET /snapshot-index.json now sits in projection-index.js, by section 3.4
+    # slice S4's split, below).
     # add-doxbench-distilled-abstract §5 / ruling 1(c)(i) (2026-08-25): a
     # SIXTH app.js call site, declared here BY NAME --
     # `POST /actions/workbench/document-abstract`, the docs subpane's
@@ -159,7 +160,7 @@ def test_data_fetches_target_only_snapshot_and_source_passthrough():
     for fname, arg in fetches:
         by_file.setdefault(fname, []).append(arg)
     assert set(by_file) == {"app.js", "viewer.js", "notebook.js", "wheel.js",
-                            "repo-selector.js"}, fetches
+                            "repo-selector.js", "projection-index.js"}, fetches
     # T023 wire clause (2026-07-31): app.js gains the two doxBench transports
     # -- the released model-catalog GET and the chat-turn POST -- exactly the
     # same-origin route arithmetic this docstring declares widening by.
@@ -186,23 +187,32 @@ def test_data_fetches_target_only_snapshot_and_source_passthrough():
     assert len(by_file["notebook.js"]) == 2
     assert any("CAPABILITIES_ROUTE" in a for a in by_file["notebook.js"])
     assert any("ACTIONS_NOTEBOOK_ROUTE" in a for a in by_file["notebook.js"])
-    # repo-selector.js: the index read + the refresh POST, the two
-    # add-project-scoped-selection routes (the register-projection read + the
-    # create-project commission POST), add-opendox-project-header's
-    # edit-project commission POST, and add-register-edit-lane's apply POST —
-    # six same-origin serve.py routes, each the LOUD individually-named
-    # widening this docstring declares.
-    assert len(by_file["repo-selector.js"]) == 6
-    assert any("SNAPSHOT_INDEX_ROUTE" in a for a in by_file["repo-selector.js"])
+    # repo-selector.js, NARROWED BY THE CARVE (plan 038 T099; T094's CP
+    # means). It held six call sites: the index read, the refresh POST, the
+    # register-projection read, and the create-project, edit-project and
+    # apply POSTs. Section 3.4 slice S4 (openDox-code `69d2760`) split it
+    # under RULED Q3 (openxFactory#656 comment `5642758731`): "a route
+    # constant travels with the binding that calls it, never with the model
+    # that happens to declare it." The picker and the refresh affordance stay
+    # class A here, so this file keeps the refresh POST and the
+    # register-projection read. The index read went with the projection
+    # column's own binding, `projection-index.js`, below. The create-project
+    # and edit-project POSTs went with `gate-projects.js`, a class-B binding
+    # that slice S5 leg B (`8efb3cf`) then moved out of openDox and into this
+    # leg's own views, outside the class-A surface this pin is about (see
+    # `WEB` above). The apply POST left the bundle entirely: it is
+    # openxFactory's own fulfilment lane.
+    assert len(by_file["repo-selector.js"]) == 2
     assert any("ACTIONS_REFRESH_ROUTE" in a for a in by_file["repo-selector.js"])
     assert sum("PROJECT_REGISTER_PROJECTION_ROUTE" in a
                for a in by_file["repo-selector.js"]) == 1
-    assert sum("ACTIONS_CREATE_PROJECT_ROUTE" in a
-               for a in by_file["repo-selector.js"]) == 1
-    assert sum("ACTIONS_EDIT_PROJECT_ROUTE" in a
-               for a in by_file["repo-selector.js"]) == 1
-    assert sum("ACTIONS_APPLY_REGISTER_EDITS_ROUTE" in a
-               for a in by_file["repo-selector.js"]) == 1
+    # projection-index.js: the index read, and nothing else. repo-selector.js
+    # reaches this module by a ruled dynamic import (pinned in
+    # `test_dynamic_import_is_absent`), so a leg with no projection column
+    # pays one rejected import and makes no fetch.
+    assert len(by_file["projection-index.js"]) == 1
+    assert sum("SNAPSHOT_INDEX_ROUTE" in a
+               for a in by_file["projection-index.js"]) == 1
 
 
 def test_shared_markdown_seam_is_exported_and_owns_the_nonempty_html_sink():
@@ -613,10 +623,17 @@ def test_the_session_transport_stays_out_of_the_fetch_bearing_set():
     to the bundle and the pinned set and per-file counts are UNCHANGED. This test
     states that as an assertion rather than leaving it as a fact somebody could
     quietly undo: it re-derives the same measurement, asserts the new file is
-    absent from the set, and quotes the pinned assertions above — the set AND all
-    five per-file counts, each needle assembled at runtime so it cannot match its
+    absent from the set, and quotes the pinned assertions above — the set AND every
+    per-file count, each needle assembled at runtime so it cannot match its
     own source (finding 24) — so a future pass that "widens" the pin to admit a
-    transport module fails here even if it edits the pin itself."""
+    transport module fails here even if it edits the pin itself.
+
+    Section 3.4 slice S4 (openDox-code `69d2760`, RULED Q3) moved the set by
+    its own arithmetic, not by a transport: `projection-index.js` joined it
+    with the index read it took from `repo-selector.js`, whose count fell with
+    the route tails S4 sent to their bindings (the sibling pin's comment names
+    each one). Six files and six counts now, each quoted below (plan 038
+    T099; T094's CP means)."""
     session_js = OWN_VIEWS / "swb-session.js"
     assert session_js.is_file(), "the session transport module is missing"
     body = session_js.read_text(encoding="utf-8")
@@ -630,7 +647,7 @@ def test_the_session_transport_stays_out_of_the_fetch_bearing_set():
     assert "swb-session.js" not in by_file
     assert "swb-create.js" not in by_file
     assert set(by_file) == {"app.js", "viewer.js", "notebook.js", "wheel.js",
-                            "repo-selector.js"}
+                            "repo-selector.js", "projection-index.js"}
     # T023 wire clause (2026-07-31): app.js's budget rose 2 -> 4 with the two
     # doxBench transports, add-doxbench-editing-phase-b task 9.5
     # (2026-08-19) rose it 4 -> 5 with the thread READ, and
@@ -641,29 +658,31 @@ def test_the_session_transport_stays_out_of_the_fetch_bearing_set():
     # create-project commission POST; add-opendox-project-header (2026-08-06)
     # rose it 4 -> 5 with the edit-project commission POST — each the LOUD,
     # individually-named widening the sibling pin's docstring declares; every
-    # other count is unchanged.
+    # other count is unchanged. Section 3.4 slice S4 then took repo-selector.js
+    # from 6 to 2 and gave projection-index.js its 1, as this docstring says.
     assert {name: len(args) for name, args in by_file.items()} == {
         "app.js": 6, "viewer.js": 1, "wheel.js": 1, "notebook.js": 2,
-        "repo-selector.js": 6}
+        "repo-selector.js": 2, "projection-index.js": 1}
     # the pin above, quoted: a clobber that relaxes it cannot pass by satisfying
     # the looser form (SC-007's reasoning applied to the renderer boundary)
     own = Path(__file__).read_text(encoding="utf-8")
     assert ('assert set(by_file) == {"app.js", "viewer.js", "notebook.js", '
-            '"wheel.js",\n                            "repo-selector.js"}, '
-            'fetches') in own
+            '"wheel.js",\n                            "repo-selector.js", '
+            '"projection-index.js"}, fetches') in own
     # EVERY per-file count, and every needle BUILT rather than written (PR #49
     # second-review finding 24). The count half of this guard used to quote ONE of
-    # the five counts as a single source literal, and a literal quoting a line of
+    # the counts as a single source literal, and a literal quoting a line of
     # code occurs verbatim inside its own quotes — so `needle in own` was satisfied
     # by the quote itself. Mutation-proven: deleting the real pin left this test
     # PASSING, and relaxing that pin from an equality to an inequality did too. The
-    # other four counts were not quoted at all. A needle ASSEMBLED at runtime
+    # other counts were not quoted at all. A needle ASSEMBLED at runtime
     # cannot match its own source line, so an exact occurrence count is meaningful
     # now: ONE, the pin itself. (Nothing in this block may spell a pinned line
     # literally, in a comment or anywhere else — that is what re-creates the hole.)
     q = '"'
     for name, n in (("app.js", 6), ("viewer.js", 1), ("wheel.js", 1),
-                    ("notebook.js", 2), ("repo-selector.js", 6)):
+                    ("notebook.js", 2), ("repo-selector.js", 2),
+                    ("projection-index.js", 1)):
         count_line = f"assert len(by_file[{q}{name}{q}]) == {n}"
         assert own.count(count_line) == 1, (
             f"the per-file count pin for {name} is not spelled exactly once: a "
@@ -684,10 +703,314 @@ def test_index_references_local_assets_only():
     assert not re.search(r'(src|href)="(?:https?:)?//', html)
 
 
+# The bundle's dynamic imports, each one a ruled loader of a CONTRIBUTED
+# BINDING, keyed by bundle-relative file, with the import()'s argument exactly
+# as written. Where the carve put each one:
+_RULED_DYNAMIC_IMPORTS = {
+    # The view registry's loader: every contributed binding's module, resolved
+    # against the bundle's own root. Section 3.4 slice S3 (openDox-code
+    # `c5edac8`) wrote it, and slice S5 leg B (`8efb3cf`, RULED Q1 to Q12)
+    # mounts the shell's contributed gate loop through it.
+    "views/view_extension.js": ["new URL(binding.module, bundleRoot).href"],
+    # The projection column, reached late and refusably: slice S4
+    # (`69d2760`, RULED Q3).
+    "views/repo-selector.js": ['"./projection-index.js"'],
+    # The intent chips, an optional contributed binding: slice S2 (`c7ab3d8`,
+    # RULED Q5).
+    "views/intent-binding.js": ['"./intent-feed.js"'],
+}
+
+# `import`, then any JavaScript whitespace (U+FEFF too, which Python's `\s`
+# does not cover), then `(`. A member call (`a.import(`) is not a dynamic
+# import and is skipped where it is found; a spread (`...import(`) is one.
+_DYNAMIC_IMPORT_RE = re.compile(r"(?<![\w$])import[\s\ufeff]*\(")
+
+# JavaScript's four line terminators: each ends a `//` comment and a regular-
+# expression literal, and CR and LF end an unterminated quoted string (U+2028
+# and U+2029 are legal inside one).
+_LINE_END_RE = re.compile("[\n\r\u2028\u2029]")
+
+# A `/` that is not a comment opens a regular-expression literal, not a
+# division, at the start of the source, after one of these characters, or
+# after one of these keywords: the usual lexer rule.
+_REGEX_AFTER = frozenset("(,=:[!&|?{};+-*%~^<>")
+_REGEX_KEYWORDS = frozenset({
+    "return", "typeof", "case", "do", "else", "in", "of", "void", "yield",
+    "await", "delete", "new", "throw", "instanceof"})
+
+
+def _lex(src: str) -> tuple[str, list[bool]]:
+    """`src` with each comment replaced by one space, read as a JavaScript
+    lexer reads it, and beside it, for each character of that text, whether
+    it sits inside a string, template or regular-expression literal.
+
+    A comment marker inside a string, a template or a regular-expression
+    literal is that literal's text, not a comment. Those literals are KEPT, so
+    an `import(` spelled inside one still counts: the scan may over-count, but
+    it never hides a call. The whole source is read at once, so a line break
+    or a comment between `import` and `(`, or a generator method's line that
+    opens with `*`, hides nothing; and a `//` comment ends at any of the four
+    line terminators (Copilot's two findings on #47)."""
+    out: list[str] = []
+    lit: list[bool] = []
+    i, n = 0, len(src)
+
+    def regex_may_start() -> bool:
+        k = len(out) - 1
+        while k >= 0 and out[k].isspace():
+            k -= 1
+        if k < 0 or out[k] in _REGEX_AFTER:
+            return True
+        j = k
+        while j >= 0 and (out[j].isalnum() or out[j] in "_$"):
+            j -= 1
+        return "".join(out[j + 1:k + 1]) in _REGEX_KEYWORDS
+
+    while i < n:
+        c = src[i]
+        if c in "'\"`":
+            # a quoted string ends at its quote, or, unterminated, at CR or LF;
+            # a template may span lines; an escape is skipped whole (a line
+            # continuation included: the file is read with universal newlines,
+            # so a CR LF arrives as one LF)
+            j = i + 1
+            while j < n and src[j] != c and (c == "`" or src[j] not in "\r\n"):
+                j += 2 if src[j] == "\\" else 1
+            out.extend(src[i:j + 1])
+            lit.extend([True] * len(src[i:j + 1]))
+            i = j + 1
+        elif src.startswith("//", i):
+            m = _LINE_END_RE.search(src, i)
+            out.append(" ")
+            lit.append(False)
+            i = n if m is None else m.start()
+        elif src.startswith("/*", i):
+            j = src.find("*/", i + 2)
+            out.append(" ")
+            lit.append(False)
+            i = n if j < 0 else j + 2
+        elif c == "/" and regex_may_start():
+            j, in_class = i + 1, False
+            while j < n and src[j] not in "\n\r\u2028\u2029":
+                if src[j] == "\\":
+                    j += 2
+                    continue
+                if src[j] == "[":
+                    in_class = True
+                elif src[j] == "]":
+                    in_class = False
+                elif src[j] == "/" and not in_class:
+                    break
+                j += 1
+            out.extend(src[i:j + 1])
+            lit.extend([True] * len(src[i:j + 1]))
+            i = j + 1
+        else:
+            out.append(c)
+            lit.append(False)
+            i += 1
+    return "".join(out), lit
+
+
+def _dynamic_import_sites(root: Path, *, executable_only: bool = False
+                          ) -> dict[str, list[str]]:
+    """Every dynamic `import(` in the CODE of the bundle under `root`, as
+    {bundle-relative file: [argument, ...]}, each argument read up to its
+    balancing parenthesis, with its whitespace runs collapsed to one space.
+    Every script and page the bundle can serve is read, `.mjs`, `.cjs` and
+    `.htm` beside `_bundle_files()`'s three suffixes.
+
+    By default a spelling inside a literal counts too, so the scan may
+    over-count but never hides a call: that is the reading that REFUSES an
+    unknown import. With `executable_only`, a spelling inside a string,
+    template or regular-expression literal does not count, so only an
+    executable call does: that is the reading that proves a ruled loader is
+    PRESENT (Copilot's fifth finding on #47). A call inside a template's
+    `${...}` reads as literal here, so this reading can only under-count,
+    which fails the presence check rather than passing it."""
+    sites: dict[str, list[str]] = {}
+    for path in sorted(p for p in root.rglob("*") if p.is_file() and p.suffix
+                       in {".js", ".mjs", ".cjs", ".html", ".htm", ".css"}):
+        code, in_literal = _lex(path.read_text(encoding="utf-8"))
+        for m in _DYNAMIC_IMPORT_RE.finditer(code):
+            at = m.start()
+            if code[at - 1:at] == "." and code[at - 3:at] != "...":
+                continue
+            if executable_only and in_literal[at]:
+                continue
+            depth, end = 1, m.end()
+            while end < len(code) and depth:
+                depth += {"(": 1, ")": -1}.get(code[end], 0)
+                end += 1
+            sites.setdefault(path.relative_to(root).as_posix(), []).append(
+                " ".join(code[m.end():end - 1].split()))
+    return sites
+
+
+# The registry loader's base, as the one EXECUTABLE assignment to `bundleRoot`
+# in `views/view_extension.js` (Copilot's sixth finding on #47): every plain or
+# compound assignment, each read to the end of its statement.
+_BUNDLE_ROOT_STATEMENT = 'bundleRoot = new URL("../", import.meta.url)'
+_BUNDLE_ROOT_ASSIGNMENT_RE = re.compile(
+    r"(?<![\w$.])bundleRoot\s*(?:\*\*|<<|>>>?|&&|\|\||\?\?|[-+*/%&|^])?=(?![=>])")
+
+
+def _bundle_root_assignments(src: str) -> list[str]:
+    """Every executable assignment to `bundleRoot` in `src`: comments are not
+    read, and a spelling inside a literal does not count."""
+    code, in_literal = _lex(src)
+    found = []
+    for m in _BUNDLE_ROOT_ASSIGNMENT_RE.finditer(code):
+        if in_literal[m.start()]:
+            continue
+        end = code.find(";", m.start())
+        found.append(" ".join(code[m.start():len(code) if end < 0 else end].split()))
+    return found
+
+
 def test_dynamic_import_is_absent():
-    # ES module static imports only (no dynamic import() that could pull a URL).
-    for path in _bundle_files():
-        assert "import(" not in path.read_text(encoding="utf-8"), f"dynamic import in {path.name}"
+    """INVERTED (plan 038 T099; the holder's W3 at openxFactory#656 comment
+    `6021830531`): the pin now asserts the carve's ruled dynamic import of
+    contributed bindings.
+
+    It used to assert that no bundle file spelled `import(` at all ("ES module
+    static imports only, no dynamic import() that could pull a URL"). The carve
+    made a contributed binding a module the shell imports at run time, so a
+    module a leg does not carry is a rejected promise the shell catches or
+    names, never a static import nothing can resolve. That puts three dynamic
+    imports in openDox's bundle, at the sites `_RULED_DYNAMIC_IMPORTS` names,
+    and the old pin read red on the first comment that described one.
+
+    The name is kept, so the node T094's map and T073's declared run account
+    for keeps its identity, and it still holds: a dynamic import is ABSENT from
+    every file's code but these three, and these three are PRESENT, each
+    exactly as written. Comments are not code, and the scan reads them as a
+    lexer does (`_lex`). None can pull a URL. Two name a
+    bundle-relative sibling literally. The registry's loader resolves
+    `binding.module` against the bundle's own root, and openDox's
+    `viewBinding()` admits only a bundle-relative './...js' module that does
+    not climb out, refusing an absolute URL where the binding is declared
+    (held by openDox-code's own `tests/test_view_registry.py`)."""
+    sites = _dynamic_import_sites(WEB)
+    assert sites == _RULED_DYNAMIC_IMPORTS, (
+        "the bundle's dynamic imports are not the carve's ruled loaders of "
+        f"contributed bindings: {sites}")
+    executable = _dynamic_import_sites(WEB, executable_only=True)
+    assert executable == _RULED_DYNAMIC_IMPORTS, (
+        "a ruled loader is no longer an executable call (a spelling inside a "
+        f"literal is not one): {executable}")
+    loader = (WEB / "views" / "view_extension.js").read_text(encoding="utf-8")
+    assert _bundle_root_assignments(loader) == [_BUNDLE_ROOT_STATEMENT], (
+        "the registry's loader no longer resolves a binding against the "
+        "bundle's own root, in one executable assignment: "
+        f"{_bundle_root_assignments(loader)}")
+
+
+# The scan's own regression cases (Copilot's third finding on #47): each is a
+# probe file's source and the site map the scan must read from it. A call
+# the scan must FIND sits beside text that could hide it, and a spelling that
+# is not a dynamic import must read as none. The written bytes are exactly
+# these, so CR, U+2028, U+2029 and U+FEFF reach the scan.
+_SCAN_CASES = [
+    ("plain", 'const m = await import("./a.js");', ['"./a.js"']),
+    ("line-comment", '// import("./a.js")\nconst x = 1;', []),
+    ("block-comment", '/* import("./a.js") */ const x = 1;', []),
+    ("code-after-block-comment", '/* a note */ const m = import("./a.js");', ['"./a.js"']),
+    ("line-break-before-paren", 'const m = import\n("./a.js");', ['"./a.js"']),
+    ("comment-before-paren", 'const m = import /* why */ ("./a.js");', ['"./a.js"']),
+    ("generator-method-line", 'const o = {\n  *load() {\n    yield import("./a.js");\n  },\n};',
+     ['"./a.js"']),
+    ("cr-ends-line-comment", '// c\rconst m = import("./a.js");', ['"./a.js"']),
+    ("u2028-ends-line-comment", '// c\u2028const m = import("./a.js");', ['"./a.js"']),
+    ("u2029-ends-line-comment", '// c\u2029const m = import("./a.js");', ['"./a.js"']),
+    ("spread", 'const m = [...import("./a.js")];', ['"./a.js"']),
+    ("ufeff-before-paren", 'const m = import\ufeff("./a.js");', ['"./a.js"']),
+    ("member-call-is-not-one", 'const m = loader.import("./a.js");', []),
+    ("optional-member-call-is-not-one", 'const m = loader?.import("./a.js");', []),
+    ("slashes-in-string", 'const u = "http://x/"; const m = import("./a.js");', ['"./a.js"']),
+    ("slashes-in-template", 'const u = `http://x/`; const m = import("./a.js");', ['"./a.js"']),
+    ("quote-and-slashes-in-regex", 'const r = /["\\/\\/]/; const m = import("./a.js");',
+     ['"./a.js"']),
+    ("escaped-slash-then-slash-in-regex", 'const r = /a\\//; const m = import("./a.js");',
+     ['"./a.js"']),
+    ("crlf-continuation-in-string",
+     'const s = "a\\\r\nb"; const u = "http://x/"; const m = import("./a.js");', ['"./a.js"']),
+    ("spelled-in-a-string-over-counts", 'const s = "import(\'./a.js\')";', ["'./a.js'"]),
+    ("argument-whitespace-collapsed", 'import(\n  new URL(m,\n    root).href)', ["new URL(m, root).href"]),
+]
+
+
+@pytest.mark.parametrize(("source", "expected"), [c[1:] for c in _SCAN_CASES],
+                         ids=[c[0] for c in _SCAN_CASES])
+def test_the_dynamic_import_scan_reads_code_as_a_lexer_does(tmp_path, source, expected):
+    """`_dynamic_import_sites` over one probe module: the calls it must find
+    and the spellings it must not count, so a weaker scan cannot pass
+    `test_dynamic_import_is_absent` on today's bundle alone."""
+    (tmp_path / "views").mkdir()
+    (tmp_path / "views" / "probe.js").write_bytes(source.encode("utf-8"))
+    assert _dynamic_import_sites(tmp_path) == (
+        {"views/probe.js": expected} if expected else {})
+
+
+def test_the_dynamic_import_scan_reads_every_script_suffix(tmp_path):
+    """A module the bundle can serve under any script or page suffix is read;
+    a file of another kind is not."""
+    call = 'const m = import("./a.js");'
+    for name in ("a.js", "b.mjs", "c.cjs", "d.html", "e.htm", "f.css", "g.txt", "h.json"):
+        (tmp_path / name).write_text(call, encoding="utf-8")
+    assert sorted(_dynamic_import_sites(tmp_path)) == [
+        "a.js", "b.mjs", "c.cjs", "d.html", "e.htm", "f.css"]
+
+
+# The executable reading: a call counts; a spelling inside a literal or a
+# comment does not (Copilot's fifth finding on #47).
+_EXECUTABLE_CASES = [
+    ("call", 'const m = import("./a.js");', ['"./a.js"']),
+    ("in-a-string", "const s = 'import(\"./a.js\")';", []),
+    ("in-a-template", 'const s = `import("./a.js")`;', []),
+    ("in-a-regex", "const r = /import(x)/;", []),
+    ("in-a-comment", '// import("./a.js")\nconst x = 1;', []),
+    ("call-beside-a-decoy", "const s = 'import(\"./b.js\")'; const m = import(\"./a.js\");",
+     ['"./a.js"']),
+]
+
+
+@pytest.mark.parametrize(("source", "expected"), [c[1:] for c in _EXECUTABLE_CASES],
+                         ids=[c[0] for c in _EXECUTABLE_CASES])
+def test_the_executable_reading_counts_only_calls(tmp_path, source, expected):
+    (tmp_path / "probe.js").write_bytes(source.encode("utf-8"))
+    assert _dynamic_import_sites(tmp_path, executable_only=True) == (
+        {"probe.js": expected} if expected else {})
+
+
+# The loader's base: only an executable assignment counts, and every one does
+# (Copilot's sixth finding on #47).
+_BUNDLE_ROOT_CASES = [
+    ("the-declaration", 'const bundleRoot = new URL("../", import.meta.url);',
+     [_BUNDLE_ROOT_STATEMENT]),
+    ("changed-with-the-old-line-in-a-comment",
+     '// const bundleRoot = new URL("../", import.meta.url);\n'
+     'const bundleRoot = new URL("../../", import.meta.url);',
+     ['bundleRoot = new URL("../../", import.meta.url)']),
+    ("changed-with-the-old-line-in-a-string",
+     "const s = 'const bundleRoot = new URL(\"../\", import.meta.url);';\n"
+     'const bundleRoot = new URL("../../", import.meta.url);',
+     ['bundleRoot = new URL("../../", import.meta.url)']),
+    ("a-later-compound-assignment",
+     'let bundleRoot = new URL("../", import.meta.url);\n'
+     'bundleRoot ??= new URL("../../", import.meta.url);',
+     [_BUNDLE_ROOT_STATEMENT, 'bundleRoot ??= new URL("../../", import.meta.url)']),
+    ("a-property-a-comparison-and-an-arrow-are-not-ones",
+     'o.bundleRoot = 1; if (bundleRoot == x) {} const f = bundleRoot => 1;\n'
+     'const bundleRoot = new URL("../", import.meta.url);',
+     [_BUNDLE_ROOT_STATEMENT]),
+]
+
+
+@pytest.mark.parametrize(("source", "expected"), [c[1:] for c in _BUNDLE_ROOT_CASES],
+                         ids=[c[0] for c in _BUNDLE_ROOT_CASES])
+def test_the_loader_base_is_read_from_executable_code(source, expected):
+    assert _bundle_root_assignments(source) == expected
 
 
 # ----------------------------------------------------------------------------
@@ -706,12 +1029,16 @@ def _grid_tracks(css: str, selector: str) -> list[str]:
 
 def test_six_column_default_and_five_column_collapse_marker():
     css = (WEB / "styles.css").read_text(encoding="utf-8")
-    # the docs column collapses via an opt-in modifier, never by default
-    assert ".funnel-inner.collapsed-docs .only-docs { display: none; }" in css
+    # the first station collapses via an opt-in modifier, never by default.
+    # The modifier is named BY ROLE (plan 038 T099; T094's CP means):
+    # openDox-code `3c3a9e3` (#35, "Wire the views by role") renamed
+    # `collapsed-docs` / `only-docs` to the SOURCE role the station plays
+    # since section 3.4 slice S7, because `docs` is openxFactory's word for it.
+    assert ".funnel-inner.collapsed-source .only-source { display: none; }" in css
     # default funnel grid is six columns; the collapse switches to five
     six = _grid_tracks(css, ".colheads, .funnel-cols {")
     assert len(six) == 6, "default funnel is not six columns"
-    five = _grid_tracks(css, ".funnel-inner.collapsed-docs .colheads, .funnel-inner.collapsed-docs .funnel-cols {")
+    five = _grid_tracks(css, ".funnel-inner.collapsed-source .colheads, .funnel-inner.collapsed-source .funnel-cols {")
     assert len(five) == 5, "collapse is not five columns"
 
 
@@ -747,6 +1074,12 @@ def test_cluster_possible_link_tally_equals_claiming_count():
 # the ACTUAL model.js derivation, run in node against the real fixture snapshot
 # ----------------------------------------------------------------------------
 
+# The six columns are keyed BY ROLE since section 3.4 slice S7 (openDox-code
+# `1e46971`): source, grouping, candidate, selection, submission, completion,
+# where they were openxFactory's docs, clusters, possibles, staged, proposals
+# and realized. Only the KEYS moved, and the counts are the same. No assertion
+# here reads a display WORD, so the harness hands `buildFunnelModel` no display
+# and the model takes openDox's neutral one (plan 038 T099; T094's VR means).
 _NODE_HARNESS = """
 import { buildFunnelModel, visibleEdges } from './model.mjs';
 import { readFileSync } from 'node:fs';
@@ -755,15 +1088,15 @@ const m = buildFunnelModel(snap);
 const cols = Object.fromEntries(m.columns.map(c => [c.key, c.nodes.length]));
 const kinds = {};
 for (const e of m.edges) kinds[e.kind] = (kinds[e.kind] || 0) + 1;
-const docEdgesInto = {};
-for (const e of m.edges) if (e.kind === 'topic' && e.fromColumn === 'docs') docEdgesInto[e.to] = (docEdgesInto[e.to] || 0) + 1;
-const clusters = m.columns.find(c => c.key === 'clusters').nodes;
-const tallyParity = clusters.every(n => (n.cluster.tallies.document_links || 0) === (docEdgesInto[n.domId] || 0));
+const sourceEdgesInto = {};
+for (const e of m.edges) if (e.kind === 'topic' && e.fromColumn === 'source') sourceEdgesInto[e.to] = (sourceEdgesInto[e.to] || 0) + 1;
+const groups = m.columns.find(c => c.key === 'grouping').nodes;
+const tallyParity = groups.every(n => (n.cluster.tallies.document_links || 0) === (sourceEdgesInto[n.domId] || 0));
 const collapsed = visibleEdges(m, { collapsed: true });
-const collapsedTouchesDocs = collapsed.some(e => e.fromColumn === 'docs' || e.toColumn === 'docs');
+const collapsedTouchesSource = collapsed.some(e => e.fromColumn === 'source' || e.toColumn === 'source');
 console.log(JSON.stringify({
   cols, kinds, edges: m.edges.length, tallyParity,
-  collapsedEdges: collapsed.length, collapsedTouchesDocs,
+  collapsedEdges: collapsed.length, collapsedTouchesSource,
   domIdsUnique: new Set(m.edges.flatMap(e => [e.from, e.to])).size >= 0,
 }));
 """
@@ -773,6 +1106,14 @@ def _run_node_model(snapshot, tmp_path):
     if not NODE:
         pytest.skip("node not available for the JS derivation probe")
     shutil.copy(MODEL_JS, tmp_path / "model.mjs")
+    # THE MODEL'S ONE IMPORT, copied beside it (plan 038 T099; T094's DJ means,
+    # the holder's W1 (A'') at openxFactory#656 comment `6021830531`). Since
+    # section 3.4 slice S7 (openDox-code `1e46971`) `model.js` imports
+    # `./display.js`, itself import-free, so the harness copies it as #43's
+    # harness copies the staging model's siblings, and `package.json` makes
+    # node read that `.js` as a module.
+    shutil.copy(MODEL_JS.parent / "display.js", tmp_path / "display.js")
+    (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
     (tmp_path / "harness.mjs").write_text(_NODE_HARNESS, encoding="utf-8")
     snap_path = tmp_path / "snapshot.json"
     snap_path.write_text(json.dumps(snapshot), encoding="utf-8")
@@ -786,12 +1127,12 @@ def _run_node_model(snapshot, tmp_path):
 
 def test_model_derives_the_six_columns(tmp_path):
     r = _run_node_model(_snapshot(), tmp_path)
-    assert r["cols"] == {"docs": 6, "clusters": 6, "possibles": 5, "staged": 2, "proposals": 1, "realized": 1}
+    assert r["cols"] == {"source": 6, "grouping": 6, "candidate": 5, "selection": 2, "submission": 1, "completion": 1}
 
 
 def test_model_edge_derivation(tmp_path):
     r = _run_node_model(_snapshot(), tmp_path)
-    # 10 doc->cluster + 6 cluster->possible = 16 topic; 1 pick; 1 flow
+    # 10 source->grouping + 6 grouping->candidate = 16 topic; 1 pick; 1 flow
     assert r["kinds"] == {"topic": 16, "pick": 1, "flow": 1}
     assert r["edges"] == 18
 
@@ -803,16 +1144,16 @@ def test_model_tally_equals_edge_count_through_the_real_js(tmp_path):
 
 def test_five_column_collapse_drops_doc_edges(tmp_path):
     r = _run_node_model(_snapshot(), tmp_path)
-    # collapsing docs removes exactly the 10 doc->cluster edges; nothing left
-    # touches the docs column
+    # collapsing the source station removes exactly the 10 source->grouping
+    # edges; nothing left touches the source column
     assert r["collapsedEdges"] == 8
-    assert r["collapsedTouchesDocs"] is False
+    assert r["collapsedTouchesSource"] is False
 
 
 def test_model_degrades_on_empty_snapshot(tmp_path):
     empty = {"documents": [], "clusters": [], "possibles": [], "staged_topics": [], "changes": []}
     r = _run_node_model(empty, tmp_path)
-    assert r["cols"] == {"docs": 0, "clusters": 0, "possibles": 0, "staged": 0, "proposals": 0, "realized": 0}
+    assert r["cols"] == {"source": 0, "grouping": 0, "candidate": 0, "selection": 0, "submission": 0, "completion": 0}
     assert r["edges"] == 0
 
 
@@ -838,9 +1179,15 @@ def _serving(tmp_path, *, head):
 
 def _raw_get(host, port, raw_path, method="GET"):
     """Send a RAW request-line path (no client-side normalization) so the
-    server's own traversal defense is what gets tested."""
+    server's own traversal defense is what gets tested.
+
+    ONE `Host` line (plan 038 T099; T094's HH means): `putrequest` skips its
+    own, and the line below is the only one. openDox-code `390e2c2` (T103,
+    #80, "every loopback route checks the Host") admits a request only when it
+    carries exactly one `Host` naming this loopback serve, and answers two with
+    `403 invalid_host` before any route runs."""
     conn = http.client.HTTPConnection(host, port, timeout=5)
-    conn.putrequest(method, raw_path, skip_host=False, skip_accept_encoding=True)
+    conn.putrequest(method, raw_path, skip_host=True, skip_accept_encoding=True)
     conn.putheader("Host", f"{host}:{port}")
     conn.endheaders()
     resp = conn.getresponse()

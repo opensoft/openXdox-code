@@ -181,9 +181,10 @@ const out = {
   caps: readOnlyCaps({ actions: { gate: true, refresh: true, notebook: true },
                        actor: 'brett' }),
   memberRefs: [memberRef(snapshot, 'beta'), memberRef(snapshot, 'nope')],
-  clusterActions: actionsFor('clusters', clusterItem, env).map((a) => a.id),
-  docActions: actionsFor('documents', docItem, env).map((a) => a.id),
-  plainDocActions: actionsFor('documents', docItem, plainEnv).map((a) => a.id),
+  // the wheel keys are S7's stage roles: `grouping` (clusters), `source` (documents)
+  clusterActions: actionsFor('grouping', clusterItem, env).map((a) => a.id),
+  docActions: actionsFor('source', docItem, env).map((a) => a.id),
+  plainDocActions: actionsFor('source', docItem, plainEnv).map((a) => a.id),
   jumps: [jumpRepository(docItem), jumpRepository(clusterItem),
           jumpRepository({ ref: { repositories: ['a', 'b'] } })],
   visible,
@@ -240,11 +241,21 @@ def _trio_snapshot():
 
 
 def _run_node(payload, tmp_path):
+    """Run the node half's harness over `payload`.
+
+    `wheel-model.js` imports `./display.js` since § 3.4 slice S7. So
+    `display.js` is copied beside it under its own name (`display.js` imports
+    nothing), with a `package.json` so that node reads `.js` as a module. That
+    is plan 038 T097, under R9-W1 (A″) (openxFactory#656 comment 6021830531),
+    and it is what T026's harness in `test_staging_workbench.py` does for its
+    siblings. `composed-model.js` and `lens-model.js` import nothing."""
     if not NODE:
         pytest.skip("node not available for the JS derivation probe")
     shutil.copy(WEB / "views" / "composed-model.js", tmp_path / "composed-model.mjs")
     shutil.copy(WEB / "views" / "wheel-model.js", tmp_path / "wheel-model.mjs")
     shutil.copy(WEB / "views" / "lens-model.js", tmp_path / "lens-model.mjs")
+    shutil.copy(WEB / "views" / "display.js", tmp_path / "display.js")
+    (tmp_path / "package.json").write_text('{"type": "module"}', encoding="utf-8")
     (tmp_path / "harness.mjs").write_text(_NODE_HARNESS, encoding="utf-8")
     data = tmp_path / "input.json"
     data.write_text(json.dumps(payload), encoding="utf-8")

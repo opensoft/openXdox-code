@@ -25,10 +25,20 @@ from pathlib import Path
 import pytest
 import yaml
 
-ROOT = Path(__file__).resolve().parents[2]
+from conftest import CONTRACTS_DIR
+
+# WHERE THE CONTRACT FAMILY IS READ (plan 038 T096; CS in T094's map,
+# R2-INV-R9). Where the run is composed, `tests/conftest.py` names the family's
+# composed farm CONTRACTS_DIR, and the validator is this leg's own, which reads
+# that farm. In a lone checkout CONTRACTS_DIR is None, and these are the paths
+# openxFactory's tree kept, above the checkout: this file's declared reason,
+# `openxfactory-contracts`, as `tests/test_declared_exclusion.py` reads it.
+_COMPOSED = CONTRACTS_DIR is not None
+ROOT = Path(__file__).resolve().parents[1 if _COMPOSED else 2]
 SCRIPT = ROOT / "scripts" / "validate-ideation-dashboard-contracts.py"
-SCHEMAS = ROOT / "contracts" / "schemas"
-EXAMPLES = ROOT / "examples" / "ideation-dashboard"
+CONTRACTS = CONTRACTS_DIR if _COMPOSED else ROOT / "contracts"
+SCHEMAS = CONTRACTS / "schemas"
+EXAMPLES = CONTRACTS.parent / "examples" / "ideation-dashboard"
 NEGATIVE = EXAMPLES / "negative"
 
 CATALOG_SCHEMA = SCHEMAS / "xfactory-workbench-model-catalog.schema.yaml"
@@ -375,15 +385,22 @@ def test_every_schema_the_consumer_validates_is_on_disk():
     schema THIS INSTALL validates is on disk, its own three always, and another
     kind's only where the running tree supplies it.
 
-    THE VALIDATOR IS THE INSTALLED DISTRIBUTION'S, never this module's own
-    `SCRIPT`, whose `ROOT` is the carve's `parents[2]`, above the checkout
-    (V2-10): it is the one `openxdox.snapshot.find_validator` answers, and its
-    sources are the ones it reports (`schema_sources`). In a lone install its
-    tree carries no `contracts/`, so the three come from the distribution's
-    packaged copies, each held to `copies.yaml`'s digest. This module's
-    fixtures are not used: they read openxFactory's tree, which is why the file
-    is declared under `openxfactory-contracts`, and F7.1 runs this case by node
-    id."""
+    THE VALIDATOR IS THE INSTALLED DISTRIBUTION'S, the one
+    `openxdox.snapshot.find_validator` answers, and its sources are the ones it
+    reports (`schema_sources`). Run from this source tree, it is this
+    checkout's `scripts/validate-ideation-dashboard-contracts.py`. Where the
+    run is composed that is this module's `SCRIPT` too. In a lone checkout it
+    is not, because there `SCRIPT` is looked for at the carve's `parents[2]`,
+    above the checkout (V2-10). Run from an install, it is the packaged
+    validator, `openxdox/contracts/validate-ideation-dashboard-contracts.py`,
+    whose `ROOT` is the installed `openxdox` package: its `contracts/` is
+    there, and the three are the packaged copies in it, each held to
+    `copies.yaml`'s digest. A source tree carries no `contracts/` of its own,
+    so there the three come from the installed distribution's packaged copies,
+    held to the same digests, which is what the last check below asserts. This
+    module's fixtures are not used: in a lone checkout they read
+    openxFactory's tree, which is why the file is declared under
+    `openxfactory-contracts`, and F7.1 runs this case by node id."""
     from openxdox import contracts, snapshot
 
     validator = snapshot.find_validator()
