@@ -39,6 +39,7 @@ from conftest import (  # noqa: F401  (sys.path side effect)
 )
 
 from opendox import cli
+from openxdox import cli_gate
 from openxdox import completeness as C
 from openxdox import gate_console as gc
 from openxdox import kickoff as ko
@@ -224,10 +225,15 @@ def test_no_parameter_or_keyword_can_bypass_the_gate(tmp_path):
     with pytest.raises(gc.GateRefused) as ei:
         _propose(root, "gate-topic")
     assert "no override" in str(ei.value)
-    # the CLI exposes no bypass flag either
-    cli_source = Path(inspect.getsourcefile(cli)).read_text("utf-8")
-    for flag in ("--force", "--override", "--skip-readiness", "--no-gate"):
-        assert flag not in cli_source, flag
+    # the CLI exposes no bypass flag either. The gate subcommands are openXdox's
+    # (`cli_gate`) and the parser that mounts them is openDox's (`cli`), so the
+    # sources of BOTH are read: a flag added to the module that defines the
+    # `propose` arguments is the one this scan exists to refuse
+    # (openxFactory#656 `6026275158`, item 3).
+    for module in (cli, cli_gate):
+        source = Path(inspect.getsourcefile(module)).read_text("utf-8")
+        for flag in ("--force", "--override", "--skip-readiness", "--no-gate"):
+            assert flag not in source, (module.__name__, flag)
 
 
 def test_the_guard_sits_at_the_one_choke_point_every_surface_passes_through():
@@ -236,7 +242,7 @@ def test_the_guard_sits_at_the_one_choke_point_every_surface_passes_through():
     from openxdox import gate_routes
     assert "propose" in gate_routes.EXECUTING_VERBS
     assert "kickoff_mod.propose" in inspect.getsource(gc.GateConsole.propose)
-    assert "console.propose" in inspect.getsource(cli.cmd_gate_propose)
+    assert "console.propose" in inspect.getsource(cli_gate.cmd_gate_propose)
     assert "_require_ready" in inspect.getsource(ko.propose)
 
 

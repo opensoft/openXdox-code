@@ -161,11 +161,16 @@ def _check(placement: Placement, spec: Path) -> tuple[Path, Path]:
         raise PlacementRefused(
             f"openDox-spec does not track {placement.source} at its pinned "
             "commit, so there is nothing pinned to place")
-    if source.is_symlink():
-        raise PlacementRefused(
-            f"{source} is a symbolic link. The run links only the regular "
-            "file openDox-spec tracks at its pinned commit, whose bytes a link "
-            "does not fix (Copilot r4201424060).")
+    # No link in ANY component below the spec leg, the file's or a parent
+    # directory's: a link's target is not fixed by the pin (Copilot
+    # r4201424060, r4201912214).
+    for depth in range(1, len(placement.source.parts) + 1):
+        part = spec.joinpath(*placement.source.parts[:depth])
+        if part.is_symlink():
+            raise PlacementRefused(
+                f"{part} is a symbolic link. The run links only the regular "
+                "file openDox-spec tracks at its pinned commit, reached "
+                "through no link, whose bytes a link does not fix.")
     # The bytes themselves against the pinned blob. `git diff` can call a file
     # clean without reading it, where the index marks it `assume-unchanged` or
     # `skip-worktree` (Copilot r4201032934). And `--no-filters`: by default
